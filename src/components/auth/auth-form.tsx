@@ -1,0 +1,156 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const formSchema = z.object({
+  email: z.string().email({ message: "Invalid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+});
+
+type AuthFormProps = {
+  mode: "login" | "signup";
+};
+
+export function AuthForm({ mode }: AuthFormProps) {
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setLoading(true);
+    // Here you would call your Firebase auth functions
+    console.log(values);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setLoading(false);
+    toast({
+        title: mode === 'login' ? "Login Successful" : "Account Created",
+        description: "Redirecting to your profile...",
+    });
+    router.push("/profile");
+  }
+
+  const googleSignIn = async () => {
+    setLoading(true);
+    // Firebase Google sign-in logic here
+    console.log("Signing in with Google");
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setLoading(false);
+    toast({
+        title: "Login Successful",
+        description: "Redirecting to your profile...",
+    });
+    router.push("/profile");
+  };
+
+  return (
+    <div className="flex grow items-center justify-center bg-background px-4 py-12">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl">{mode === "login" ? "Welcome back!" : "Create an account"}</CardTitle>
+          <CardDescription>
+            {mode === "login" 
+              ? "Enter your credentials to access your account." 
+              : "Enter your email below to create your account."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="name@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {mode === "login" ? "Log In" : "Sign Up"}
+                </Button>
+              </form>
+            </Form>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            
+            <Button variant="outline" className="w-full" onClick={googleSignIn} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 62.3l-67.9 67.9C293.7 109.2 272.1 104 248 104c-58.4 0-108.3 49.3-115.9 108.2H129.5v66.4h118.5c2.3 12.7 3.5 25.8 3.5 39.4z"></path></svg>}
+              Google
+            </Button>
+          </div>
+          <div className="mt-4 text-center text-sm">
+            {mode === 'login' ? (
+              <>
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="underline text-primary">
+                  Sign up
+                </Link>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <Link href="/login" className="underline text-primary">
+                  Log in
+                </Link>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
