@@ -58,6 +58,8 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
     defaultValues: tournamentData ? {
         ...tournamentData,
         startDate: new Date(tournamentData.startDate),
+        description: tournamentData.description ?? '',
+        prizePool: tournamentData.prizePool ?? '',
     } : {
       name: "",
       description: "",
