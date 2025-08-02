@@ -38,7 +38,7 @@ export function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-card">
       <div className="container flex h-16 items-center">
         <div className="mr-8 flex">
           <Link href="/" className="flex items-center space-x-2">
@@ -47,14 +47,17 @@ export function Header() {
           </Link>
         </div>
         <nav className="hidden md:flex flex-1 items-center space-x-6 text-sm font-medium">
-          <Link href="/tournaments/create" className="text-foreground/60 transition-colors hover:text-foreground/80">
-            Create Tournament
-          </Link>
-          <Link href="/#explore" className="text-foreground/60 transition-colors hover:text-foreground/80">
+          <Link href="/#explore" className="text-foreground/80 transition-colors hover:text-foreground">
             Explore
           </Link>
+          <Link href="/#community" className="text-foreground/80 transition-colors hover:text-foreground">
+            Community
+          </Link>
+          <Link href="/tournaments/create" className="text-foreground/80 transition-colors hover:text-foreground">
+            Create Tournament
+          </Link>
         </nav>
-        <div className="flex items-center justify-end space-x-4">
+        <div className="flex flex-1 items-center justify-end space-x-4">
           {loading ? (
              <div className="h-8 w-24 bg-muted rounded-md animate-pulse" />
           ) : user ? (
