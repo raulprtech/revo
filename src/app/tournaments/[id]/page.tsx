@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,11 +35,12 @@ const formatMapping = {
 };
 
 
-export default function TournamentPage({ params }: { params: { id: string } }) {
+export default function TournamentPage() {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { id } = params;
+  const params = useParams();
+  const id = params.id as string;
 
   useEffect(() => {
     if (!id) return;
