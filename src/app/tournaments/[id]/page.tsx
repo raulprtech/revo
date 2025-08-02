@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket from "@/components/tournaments/bracket";
-import ParticipantList from "@/components/tournaments/participant-list";
+import StandingsTable from "@/components/tournaments/standings-table";
 import ParticipantManager from "@/components/tournaments/participant-manager";
 import Image from "next/image";
 import {
@@ -110,7 +110,7 @@ export default function TournamentPage() {
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-4">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="bracket">Bracket</TabsTrigger>
-          <TabsTrigger value="participants">Participantes</TabsTrigger>
+          <TabsTrigger value="standings">Posiciones</TabsTrigger>
           {isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
         </TabsList>
         <TabsContent value="overview" className="mt-6">
@@ -206,8 +206,8 @@ export default function TournamentPage() {
         <TabsContent value="bracket" className="mt-6">
           <Bracket tournament={tournament} isOwner={isOwner} />
         </TabsContent>
-        <TabsContent value="participants" className="mt-6">
-          <ParticipantList />
+        <TabsContent value="standings" className="mt-6">
+          <StandingsTable />
         </TabsContent>
         {isOwner && (
           <TabsContent value="manage" className="mt-6">
