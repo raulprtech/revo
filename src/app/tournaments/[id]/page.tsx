@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
@@ -118,6 +118,34 @@ export default function TournamentPage() {
         window.removeEventListener('seedsAssigned', loadBracketData);
     }
   }, [id, loadBracketData]);
+
+  const handleShare = async () => {
+    const shareData = {
+      title: tournament?.name,
+      text: `Únete a mi torneo "${tournament?.name}" en TournaVerse!`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({
+          title: "¡Enlace Copiado!",
+          description: "El enlace al torneo ha sido copiado a tu portapapeles.",
+        });
+      }
+    } catch (error) {
+      console.error("Error al compartir:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo compartir o copiar el enlace.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const handleDelete = () => {
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
@@ -300,6 +328,10 @@ export default function TournamentPage() {
               <CardTitle>Detalles del Torneo</CardTitle>
                {isOwner && (
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Compartir
+                  </Button>
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/tournaments/${tournament.id}/edit`}>
                       <Pencil className="mr-2 h-4 w-4" />
