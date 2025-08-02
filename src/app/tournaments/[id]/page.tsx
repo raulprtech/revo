@@ -204,7 +204,7 @@ export default function TournamentPage() {
           </Card>
         </TabsContent>
         <TabsContent value="bracket" className="mt-6">
-          <Bracket tournament={tournament} />
+          <Bracket tournament={tournament} isOwner={isOwner} />
         </TabsContent>
         <TabsContent value="participants" className="mt-6">
           <ParticipantList />
