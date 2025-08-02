@@ -27,7 +27,7 @@ interface Tournament {
 
 const generateRounds = (numParticipants: number) => {
     if (numParticipants < 2) return [];
-    
+
     const playerNames = [
       "CyberNinja", "PixelProwler", "QuantumLeap", "SynthWave",
       "GigaGlitch", "VoidRunner", "DataDragon", "LogicLancer",
@@ -39,33 +39,30 @@ const generateRounds = (numParticipants: number) => {
       "ArrayAvenger", "StringSamurai", "FunctionFighter", "ClassChampion",
     ].slice(0, numParticipants);
 
-    const actualParticipants = playerNames.map(name => ({ name }));
+    let players = playerNames.map(name => ({ name }));
 
-    const rounds = [];
-    let currentPlayers = [...actualParticipants];
-    let roundIndex = 1;
-    let matchId = 1;
-
-    // Handle byes by padding to the next power of 2
     const numRounds = Math.ceil(Math.log2(numParticipants));
     const bracketSize = Math.pow(2, numRounds);
     const byes = bracketSize - numParticipants;
-    
-    let firstRoundPlayers = [];
-    let playersToPlay = actualParticipants.slice(byes * 2);
-    let playersWithByes = actualParticipants.slice(0, byes * 2);
 
-    for(let i = 0; i < playersToPlay.length; i+=2) {
-        firstRoundPlayers.push(playersToPlay[i]);
-        firstRoundPlayers.push(playersToPlay[i+1]);
+    let firstRoundMatches = (bracketSize - byes * 2) / 2;
+    let playersInFirstRound = players.slice(byes);
+    let playersWithByes = players.slice(0, byes);
+
+    let currentPlayers = [];
+    // Distribute players with byes
+    for (let i = 0; i < byes; i++) {
+        currentPlayers.push(playersWithByes[i]);
+        currentPlayers.push({ name: 'BYE'});
     }
-    for(let i = 0; i < playersWithByes.length; i++) {
-        if(i % 2 === 0) firstRoundPlayers.splice(i, 0, playersWithByes[i]);
-        else firstRoundPlayers.push(playersWithByes[i]);
+    // Distribute players playing in the first round
+    for (let i = 0; i < playersInFirstRound.length; i++) {
+        currentPlayers.push(playersInFirstRound[i]);
     }
 
-    currentPlayers = firstRoundPlayers;
-
+    const rounds = [];
+    let matchId = 1;
+    let roundIndex = 1;
 
     while (currentPlayers.length > 1) {
         const roundName = currentPlayers.length === 2 ? "Finales" : currentPlayers.length === 4 ? "Semifinales" : `Ronda ${roundIndex}`;
@@ -74,15 +71,19 @@ const generateRounds = (numParticipants: number) => {
 
         for (let i = 0; i < currentPlayers.length; i += 2) {
             const top = currentPlayers[i];
-            const bottom = currentPlayers[i + 1] || { name: "BYE" };
+            const bottom = currentPlayers[i + 1] || { name: "BYE" }; // Should not happen with proper padding
+            
+            const winner = bottom.name === "BYE" ? top.name : null;
+
             matches.push({
                 id: matchId++,
                 top: { name: top.name, score: null },
                 bottom: { name: bottom.name, score: null },
-                winner: bottom.name === "BYE" ? top.name : null,
+                winner: winner,
             });
-            if (bottom.name === 'BYE') {
-              nextRoundPlayers.push(top);
+
+            if (winner) {
+              nextRoundPlayers.push({ name: winner });
             } else {
               nextRoundPlayers.push({ name: "TBD" });
             }
@@ -90,39 +91,18 @@ const generateRounds = (numParticipants: number) => {
         
         rounds.push({ name: roundName, matches });
         
-        const newNextRoundPlayers = [];
-        for (let i = 0; i < nextRoundPlayers.length; i+=2) {
-          if (nextRoundPlayers[i].name !== 'TBD' && nextRoundPlayers[i+1]?.name !== 'TBD') {
-             newNextRoundPlayers.push(nextRoundPlayers[i]);
-             newNextRoundPlayers.push(nextRoundPlayers[i+1]);
-          } else if (nextRoundPlayers[i].name !== 'TBD' && nextRoundPlayers[i+1]?.name === 'TBD') {
-             const winnerMatch = rounds[rounds.length-1].matches.find(m => m.winner === nextRoundPlayers[i].name);
-             const tbdMatch = rounds[rounds.length-1].matches[nextRoundPlayers.indexOf(nextRoundPlayers[i+1])];
-             if(winnerMatch && tbdMatch) {
-               const winnerIndex = rounds[rounds.length-1].matches.indexOf(winnerMatch);
-               const tbdIndex = rounds[rounds.length-1].matches.indexOf(tbdMatch);
-                if (Math.floor(winnerIndex / 2) === Math.floor(tbdIndex / 2)) {
-                   newNextRoundPlayers.push(nextRoundPlayers[i]);
-                   newNextRoundPlayers.push(nextRoundPlayers[i+1]);
-                } else {
-                   newNextRoundPlayers.push(nextRoundPlayers[i]);
-                   newNextRoundPlayers.push({ name: "TBD" });
-                }
-             } else {
-                newNextRoundPlayers.push(nextRoundPlayers[i]);
-                newNextRoundPlayers.push(nextRoundPlayers[i+1]);
-             }
-          } else {
-              newNextRoundPlayers.push(nextRoundPlayers[i]);
-              newNextRoundPlayers.push(nextRoundPlayers[i+1]);
+        const newCurrentPlayers = [];
+        for(let i=0; i < nextRoundPlayers.length; i+=2) {
+          newCurrentPlayers.push(nextRoundPlayers[i]);
+          if(nextRoundPlayers[i+1]) {
+            newCurrentPlayers.push(nextRoundPlayers[i+1]);
           }
         }
-        
-        currentPlayers = newNextRoundPlayers;
+        currentPlayers = newCurrentPlayers;
         roundIndex++;
     }
-    
-    // Auto-advance winners of BYE matches to the next round immediately
+
+     // Auto-advance winners of BYE matches to the next round immediately
     let roundsUpdated = true;
     while(roundsUpdated) {
         roundsUpdated = false;
@@ -149,7 +129,6 @@ const generateRounds = (numParticipants: number) => {
             }
         }
     }
-
 
     return rounds;
 }
