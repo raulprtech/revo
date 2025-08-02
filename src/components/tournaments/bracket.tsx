@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
-import { Trophy, Move, Printer, Expand } from "lucide-react";
+import { Trophy, Expand } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ReportScoreDialog } from "./report-score-dialog";
 
@@ -38,17 +38,16 @@ const generateRounds = (numParticipants: number) => {
       "ArrayAvenger", "StringSamurai", "FunctionFighter", "ClassChampion",
     ].slice(0, numParticipants);
     
-    const numRounds = Math.ceil(Math.log2(numParticipants));
-    let bracketSize = Math.pow(2, numRounds);
-    
-    // Handle cases where numParticipants is not a power of 2
-    if (numParticipants !== bracketSize) {
-        bracketSize = Math.pow(2, Math.floor(Math.log2(numParticipants)) + 1);
+    let n = 1;
+    while (n < numParticipants) {
+        n *= 2;
     }
-
+    const bracketSize = n;
+    
     const byes = bracketSize - numParticipants;
 
     let players = playerNames.map(name => ({ name }));
+    // Intersperse BYEs for more even distribution if needed, but for now just add to end
     for (let i = 0; i < byes; i++) {
         players.push({ name: "BYE" });
     }
@@ -70,7 +69,9 @@ const generateRounds = (numParticipants: number) => {
             const top = currentPlayers[i];
             const bottom = currentPlayers[i + 1];
             
-            const winner = bottom.name === "BYE" ? top.name : (top.name === "BYE" ? bottom.name : null);
+            const isTopBye = top.name === "BYE";
+            const isBottomBye = bottom.name === "BYE";
+            const winner = isBottomBye ? top.name : (isTopBye ? bottom.name : null);
 
             matches.push({
                 id: matchId++,
@@ -80,10 +81,10 @@ const generateRounds = (numParticipants: number) => {
             });
 
              if (winner) {
-              nextRoundPlayers.push({ name: winner });
-            } else {
-              nextRoundPlayers.push({ name: "TBD" });
-            }
+                nextRoundPlayers.push({ name: winner });
+             } else {
+                nextRoundPlayers.push({ name: "TBD" });
+             }
         }
         
         rounds.push({ name: roundName, matches });
@@ -98,20 +99,29 @@ const generateRounds = (numParticipants: number) => {
         for (let i = 0; i < rounds.length - 1; i++) {
             const round = rounds[i];
             const nextRound = rounds[i+1];
+
             for(let j = 0; j < round.matches.length; j++) {
                 const match = round.matches[j];
-                if (match.winner && (match.top.name === "BYE" || match.bottom.name === "BYE")) {
+
+                if (match.winner) {
                     const nextMatchIndex = Math.floor(j/2);
                     const nextMatch = nextRound.matches[nextMatchIndex];
                     if (nextMatch) {
-                        if(j % 2 === 0) {
+                        const isTopSlot = j % 2 === 0;
+                        if(isTopSlot) {
                             if (nextMatch.top.name === "TBD") {
                                 nextMatch.top.name = match.winner;
+                                if(nextMatch.bottom.name === 'BYE') {
+                                    nextMatch.winner = match.winner;
+                                }
                                 roundsUpdated = true;
                             }
                         } else {
                             if (nextMatch.bottom.name === "TBD") {
                                nextMatch.bottom.name = match.winner;
+                                if(nextMatch.top.name === 'BYE') {
+                                    nextMatch.winner = match.winner;
+                                }
                                roundsUpdated = true;
                             }
                         }
@@ -229,20 +239,22 @@ export default function Bracket({ tournament, isOwner }: { tournament: Tournamen
       });
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleFullscreen = () => {
     if (cardRef.current) {
-        cardRef.current.requestFullscreen();
+        if (!document.fullscreenElement) {
+            cardRef.current.requestFullscreen();
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
     }
   }
 
   if (!tournament) return null;
 
   return (
-    <Card ref={cardRef} className="print:shadow-none print:border-none">
+    <Card ref={cardRef} className="print:shadow-none print:border-none bg-card fullscreen:bg-background fullscreen:p-4 fullscreen:border-none">
       <CardHeader className="flex-row justify-between items-center print:hidden">
         <CardTitle>Bracket del Torneo</CardTitle>
         <div className="flex items-center gap-2">
@@ -255,13 +267,7 @@ export default function Bracket({ tournament, isOwner }: { tournament: Tournamen
                     LIVE
                 </div>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8 cursor-grab" title="Arrastrar para mover">
-                <Move className="h-4 w-4" />
-            </Button>
-             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrint}>
-                <Printer className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleFullscreen}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleFullscreen} title="Pantalla Completa">
                 <Expand className="h-4 w-4" />
             </Button>
         </div>
