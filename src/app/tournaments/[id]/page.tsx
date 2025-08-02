@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Bracket from "@/components/tournaments/bracket";
+import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
 import ParticipantManager from "@/components/tournaments/participant-manager";
 import Image from "next/image";
@@ -57,6 +57,7 @@ export default function TournamentPage() {
   const router = useRouter();
   const id = params.id as string;
   const { toast } = useToast();
+  const [rounds, setRounds] = useState<Round[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -71,6 +72,7 @@ export default function TournamentPage() {
             const user = JSON.parse(storedUser);
             setIsOwner(user.email === currentTournament.ownerEmail);
         }
+        setRounds(generateRounds(currentTournament.maxParticipants));
     }
     setLoading(false);
   }, [id]);
@@ -86,6 +88,88 @@ export default function TournamentPage() {
     });
     router.push("/dashboard");
   }
+
+  const handleScoreReported = (matchId: number, scores: {top: number, bottom: number}) => {
+      setRounds(prevRounds => {
+          const newRounds: Round[] = JSON.parse(JSON.stringify(prevRounds));
+          let matchFound = false;
+
+          for (let i = 0; i < newRounds.length; i++) {
+              const round = newRounds[i];
+              const matchIndex = round.matches.findIndex(m => m.id === matchId);
+              
+              if (matchIndex !== -1) {
+                  const match = round.matches[matchIndex];
+                  match.top.score = scores.top;
+                  match.bottom.score = scores.bottom;
+                  match.winner = scores.top > scores.bottom ? match.top.name : match.bottom.name;
+                  
+                  // Propagate winner to next round
+                  if (i + 1 < newRounds.length) {
+                      const nextRound = newRounds[i+1];
+                      const nextMatchIndex = Math.floor(matchIndex / 2);
+                      const nextMatch = nextRound.matches[nextMatchIndex];
+                      
+                      if (nextMatch) {
+                          if (matchIndex % 2 === 0) { // Top slot of next match
+                              nextMatch.top.name = match.winner;
+                          } else { // Bottom slot of next match
+                              nextMatch.bottom.name = match.winner;
+                          }
+
+                          // If both players for the next match are decided, determine winner if one is a BYE
+                          if(nextMatch.top.name !== 'TBD' && nextMatch.bottom.name !== 'TBD') {
+                              if(nextMatch.bottom.name === 'BYE') nextMatch.winner = nextMatch.top.name;
+                              if(nextMatch.top.name === 'BYE') nextMatch.winner = nextMatch.bottom.name;
+                          }
+                      }
+                  }
+                  matchFound = true;
+                  break;
+              }
+          }
+          // This part is for handling bye propagation when winner is set in nextMatch
+           let roundsUpdated = true;
+            while(roundsUpdated) {
+                roundsUpdated = false;
+                for (let i = 0; i < newRounds.length - 1; i++) {
+                    const round = newRounds[i];
+                    const nextRound = newRounds[i+1];
+
+                    for(let j = 0; j < round.matches.length; j++) {
+                        const match = round.matches[j];
+
+                        if (match.winner) {
+                            const nextMatchIndex = Math.floor(j/2);
+                            const nextMatch = nextRound.matches[nextMatchIndex];
+                            if (nextMatch) {
+                                const isTopSlot = j % 2 === 0;
+                                if(isTopSlot) {
+                                    if (nextMatch.top.name === "TBD") {
+                                        nextMatch.top.name = match.winner;
+                                        if(nextMatch.bottom.name === 'BYE') {
+                                            nextMatch.winner = match.winner;
+                                        }
+                                        roundsUpdated = true;
+                                    }
+                                } else {
+                                    if (nextMatch.bottom.name === "TBD") {
+                                    nextMatch.bottom.name = match.winner;
+                                        if(nextMatch.top.name === 'BYE') {
+                                            nextMatch.winner = match.winner;
+                                        }
+                                    roundsUpdated = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+          
+          return newRounds;
+      });
+  };
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
@@ -204,10 +288,10 @@ export default function TournamentPage() {
           </Card>
         </TabsContent>
         <TabsContent value="bracket" className="mt-6">
-          <Bracket tournament={tournament} isOwner={isOwner} />
+          <Bracket tournament={tournament} isOwner={isOwner} rounds={rounds} onScoreReported={handleScoreReported} />
         </TabsContent>
         <TabsContent value="standings" className="mt-6">
-          <StandingsTable />
+          <StandingsTable rounds={rounds} />
         </TabsContent>
         {isOwner && (
           <TabsContent value="manage" className="mt-6">

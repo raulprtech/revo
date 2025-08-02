@@ -1,17 +1,76 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useMemo } from "react";
+import type { Round } from "./bracket";
 
-const mockStandings = [
-  { id: 1, rank: 1, name: "CyberNinja", wins: 4, losses: 0, avatar: 'https://placehold.co/40x40.png' },
-  { id: 2, rank: 2, name: "SynthWave", wins: 3, losses: 1, avatar: 'https://placehold.co/40x40.png' },
-  { id: 3, rank: 3, name: "GigaGlitch", wins: 2, losses: 2, avatar: 'https://placehold.co/40x40.png' },
-  { id: 4, rank: 4, name: "LogicLancer", wins: 1, losses: 2, avatar: 'https://placehold.co/40x40.png' },
-  { id: 5, rank: 5, name: "QuantumLeap", wins: 0, losses: 2, avatar: 'https://placehold.co/40x40.png' },
-  { id: 6, rank: 5, name: "PixelProwler", wins: 0, losses: 2, avatar: 'https://placehold.co/40x40.png' },
-];
+type StandingsEntry = {
+    id: string;
+    rank: number;
+    name: string;
+    wins: number;
+    losses: number;
+    avatar: string;
+}
 
-export default function StandingsTable() {
+const calculateStandings = (rounds: Round[]): StandingsEntry[] => {
+    if (!rounds || rounds.length === 0) return [];
+    
+    const playerStats: { [name: string]: { wins: number, losses: number } } = {};
+
+    rounds.forEach(round => {
+        round.matches.forEach(match => {
+            const { top, bottom, winner } = match;
+
+            if (top.name !== 'BYE' && top.name !== 'TBD' && !playerStats[top.name]) {
+                playerStats[top.name] = { wins: 0, losses: 0 };
+            }
+            if (bottom.name !== 'BYE' && bottom.name !== 'TBD' && !playerStats[bottom.name]) {
+                playerStats[bottom.name] = { wins: 0, losses: 0 };
+            }
+
+            if (winner) {
+                if (winner === top.name) {
+                    if(playerStats[top.name]) playerStats[top.name].wins++;
+                    if(playerStats[bottom.name]) playerStats[bottom.name].losses++;
+                } else if (winner === bottom.name) {
+                    if(playerStats[bottom.name]) playerStats[bottom.name].wins++;
+                    if(playerStats[top.name]) playerStats[top.name].losses++;
+                }
+            }
+        });
+    });
+
+    const sortedStandings = Object.entries(playerStats)
+        .map(([name, stats]) => ({
+            id: name,
+            name,
+            ...stats
+        }))
+        .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+        
+    let rank = 0;
+    let lastWins = -1;
+    let lastLosses = -1;
+    return sortedStandings.map((player, index) => {
+        if (player.wins !== lastWins || player.losses !== lastLosses) {
+            rank = index + 1;
+        }
+        lastWins = player.wins;
+        lastLosses = player.losses;
+        return {
+            ...player,
+            rank,
+            avatar: `https://placehold.co/40x40.png?text=${player.name.substring(0,2)}`
+        };
+    });
+};
+
+export default function StandingsTable({ rounds }: { rounds: Round[] }) {
+    const standings = useMemo(() => calculateStandings(rounds), [rounds]);
+
     return (
         <Card>
             <CardHeader>
@@ -29,7 +88,7 @@ export default function StandingsTable() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {mockStandings.map((p) => (
+                        {standings.map((p) => (
                             <TableRow key={p.id}>
                                 <TableCell className="font-medium text-center">{p.rank}</TableCell>
                                 <TableCell>

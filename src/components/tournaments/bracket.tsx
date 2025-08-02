@@ -24,7 +24,7 @@ interface Tournament {
     prizePool?: string;
 }
 
-const generateRounds = (numParticipants: number) => {
+export const generateRounds = (numParticipants: number) => {
     if (numParticipants < 2) return [];
 
     const playerNames = [
@@ -136,14 +136,14 @@ const generateRounds = (numParticipants: number) => {
 }
 
 
-type Match = {
+export type Match = {
     id: number;
     top: { name: string; score: number | null };
     bottom: { name: string; score: number | null };
     winner: string | null;
 };
 
-type Round = {
+export type Round = {
     name: string;
     matches: Match[];
 };
@@ -189,55 +189,11 @@ const MatchCard = ({ match, onScoreReported, isOwner }: { match: Match, onScoreR
     )
 }
 
-export default function Bracket({ tournament, isOwner }: { tournament: Tournament, isOwner: boolean }) {
-  const [rounds, setRounds] = useState<Round[]>([]);
+export default function Bracket({ tournament, isOwner, rounds, onScoreReported }: { tournament: Tournament, isOwner: boolean, rounds: Round[], onScoreReported: (matchId: number, scores: {top: number, bottom: number}) => void }) {
   const bracketRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   
   const tournamentWinner = rounds.length > 0 ? rounds[rounds.length - 1].matches[0].winner : null;
-
-  useEffect(() => {
-    if (tournament) {
-      setRounds(generateRounds(tournament.maxParticipants));
-    }
-  }, [tournament]);
-
-  const handleScoreReported = (matchId: number, scores: {top: number, bottom: number}) => {
-      setRounds(prevRounds => {
-          const newRounds = JSON.parse(JSON.stringify(prevRounds));
-          let matchFound = false;
-
-          for (let i = 0; i < newRounds.length; i++) {
-              const round = newRounds[i];
-              const matchIndex = round.matches.findIndex(m => m.id === matchId);
-              
-              if (matchIndex !== -1) {
-                  const match = round.matches[matchIndex];
-                  match.top.score = scores.top;
-                  match.bottom.score = scores.bottom;
-                  match.winner = scores.top > scores.bottom ? match.top.name : match.bottom.name;
-                  
-                  // Propagate winner to next round
-                  if (i + 1 < newRounds.length) {
-                      const nextRound = newRounds[i+1];
-                      const nextMatchIndex = Math.floor(matchIndex / 2);
-                      const nextMatch = nextRound.matches[nextMatchIndex];
-                      
-                      if (nextMatch) {
-                          if (matchIndex % 2 === 0) {
-                              nextMatch.top.name = match.winner;
-                          } else {
-                              nextMatch.bottom.name = match.winner;
-                          }
-                      }
-                  }
-                  matchFound = true;
-                  break;
-              }
-          }
-          return newRounds;
-      });
-  };
 
   const handleFullscreen = () => {
     if (cardRef.current) {
@@ -279,7 +235,7 @@ export default function Bracket({ tournament, isOwner }: { tournament: Tournamen
               <h3 className="text-xl font-bold text-center font-headline">{round.name}</h3>
               <div className="flex flex-col justify-around flex-grow space-y-8">
                 {round.matches.map((match) => (
-                  <MatchCard key={match.id} match={match} onScoreReported={handleScoreReported} isOwner={isOwner} />
+                  <MatchCard key={match.id} match={match} onScoreReported={onScoreReported} isOwner={isOwner} />
                 ))}
               </div>
             </div>
