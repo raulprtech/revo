@@ -5,11 +5,11 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Gamepad2, MapPin } from "lucide-react";
+import { Search, Users, Gamepad2, MapPin, Loader2, CheckCircle2 } from "lucide-react";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 interface Tournament {
     id: string;
@@ -26,10 +26,28 @@ interface Tournament {
     location?: string;
 }
 
+interface User {
+    displayName: string;
+    email: string;
+    photoURL: string;
+}
+
+interface Participant {
+    email: string;
+    name: string;
+    avatar: string;
+    status: 'Aceptado' | 'Pendiente' | 'Rechazado';
+}
+
 export default function TournamentsPage() {
     const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [participatingTournamentIds, setParticipatingTournamentIds] = useState<Set<string>>(new Set());
+    const { toast } = useToast();
+    const router = useRouter();
+
 
     useEffect(() => {
         const storedTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
@@ -41,8 +59,75 @@ export default function TournamentsPage() {
         );
         
         setAllTournaments(openTournaments);
+
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            setCurrentUser(user);
+
+            const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+            const ids = new Set<string>();
+            Object.keys(participantsData).forEach(tournamentId => {
+                if (participantsData[tournamentId].some(p => p.email === user.email)) {
+                    ids.add(tournamentId);
+                }
+            });
+            setParticipatingTournamentIds(ids);
+        }
+
         setLoading(false);
     }, []);
+
+    const handleJoinTournament = (tournamentId: string) => {
+        if (!currentUser) {
+            toast({ title: "Debes iniciar sesión", description: "Inicia sesión para unirte a un torneo.", variant: "destructive" });
+            router.push('/login');
+            return;
+        }
+
+        const tournamentIndex = allTournaments.findIndex(t => t.id === tournamentId);
+        if (tournamentIndex === -1) return;
+
+        const tournament = allTournaments[tournamentIndex];
+
+        if (tournament.participants >= tournament.maxParticipants) {
+            toast({ title: "Torneo Lleno", description: "Este torneo ya ha alcanzado el máximo de participantes.", variant: "destructive" });
+            return;
+        }
+
+        const allTournamentsFromStorage: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+        const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+        
+        const storageTournamentIndex = allTournamentsFromStorage.findIndex(t => t.id === tournamentId);
+        if (storageTournamentIndex === -1) return;
+
+        const tournamentToUpdate = allTournamentsFromStorage[storageTournamentIndex];
+        tournamentToUpdate.participants++;
+        
+        if (!participantsData[tournamentId]) {
+            participantsData[tournamentId] = [];
+        }
+        
+        participantsData[tournamentId].push({
+            email: currentUser.email,
+            name: currentUser.displayName,
+            avatar: currentUser.photoURL,
+            status: 'Pendiente'
+        });
+
+        localStorage.setItem("tournaments", JSON.stringify(allTournamentsFromStorage));
+        localStorage.setItem("participantsData", JSON.stringify(participantsData));
+
+        // Update local state to reflect the change
+        setAllTournaments(prev => {
+            const newTournaments = [...prev];
+            newTournaments[tournamentIndex].participants++;
+            return newTournaments;
+        });
+        setParticipatingTournamentIds(prev => new Set(prev).add(tournamentId));
+        
+        toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
+    }
 
     const filteredTournaments = allTournaments.filter(t => 
         t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -79,46 +164,58 @@ export default function TournamentsPage() {
 
                 {filteredTournaments.length > 0 ? (
                     <div className="mx-auto grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredTournaments.map((tournament) => (
-                            <Card key={tournament.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 bg-card flex flex-col">
-                                <Link href={`/tournaments/${tournament.id}`} className="block">
-                                    <Image
-                                    src={tournament.image}
-                                    width={600}
-                                    height={400}
-                                    alt={tournament.name}
-                                    data-ai-hint={tournament.dataAiHint}
-                                    className="w-full h-48 object-cover"
-                                    />
-                                </Link>
-                                <CardHeader>
-                                    <CardTitle>{tournament.name}</CardTitle>
-                                    <CardDescription className="flex items-center pt-2">
-                                    <Gamepad2 className="mr-2 h-4 w-4" />
-                                    {tournament.game}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                        <Users className="mr-2 h-4 w-4" />
-                                        <span>{tournament.participants} / {tournament.maxParticipants} Participantes</span>
-                                    </div>
-                                    {tournament.location && (
-                                    <div className="flex items-center text-sm text-muted-foreground mt-2">
-                                        <MapPin className="mr-2 h-4 w-4" />
-                                        <span>{tournament.location}</span>
-                                    </div>
-                                    )}
-                                </CardContent>
-                                <CardFooter className="p-4">
-                                    <Button asChild className="w-full">
-                                        <Link href={`/tournaments/${tournament.id}`}>
-                                            Ver Detalles
-                                        </Link>
-                                    </Button>
-                                </CardFooter>
-                            </Card>
-                        ))}
+                        {filteredTournaments.map((tournament) => {
+                            const isParticipant = participatingTournamentIds.has(tournament.id);
+                            return (
+                                <Card key={tournament.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 bg-card flex flex-col">
+                                    <Link href={`/tournaments/${tournament.id}`} className="block">
+                                        <Image
+                                        src={tournament.image}
+                                        width={600}
+                                        height={400}
+                                        alt={tournament.name}
+                                        data-ai-hint={tournament.dataAiHint}
+                                        className="w-full h-48 object-cover"
+                                        />
+                                    </Link>
+                                    <CardHeader>
+                                        <CardTitle>{tournament.name}</CardTitle>
+                                        <CardDescription className="flex items-center pt-2">
+                                        <Gamepad2 className="mr-2 h-4 w-4" />
+                                        {tournament.game}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex-grow">
+                                        <div className="flex items-center text-sm text-muted-foreground">
+                                            <Users className="mr-2 h-4 w-4" />
+                                            <span>{tournament.participants} / {tournament.maxParticipants} Participantes</span>
+                                        </div>
+                                        {tournament.location && (
+                                        <div className="flex items-center text-sm text-muted-foreground mt-2">
+                                            <MapPin className="mr-2 h-4 w-4" />
+                                            <span>{tournament.location}</span>
+                                        </div>
+                                        )}
+                                    </CardContent>
+                                    <CardFooter className="p-4 flex gap-2">
+                                        <Button asChild className="w-full">
+                                            <Link href={`/tournaments/${tournament.id}`}>
+                                                Ver Detalles
+                                            </Link>
+                                        </Button>
+                                         <Button 
+                                            variant="secondary" 
+                                            className="w-full"
+                                            onClick={() => handleJoinTournament(tournament.id)}
+                                            disabled={isParticipant}
+                                        >
+                                            {isParticipant ? <CheckCircle2 className="mr-2 h-4 w-4" /> : null}
+                                            {isParticipant ? 'Inscrito' : 'Inscribirse'}
+                                         </Button>
+                                    </CardFooter>
+                                </Card>
+                            )
+                        })}
                     </div>
                  ) : (
                     <div className="text-center py-16 bg-card rounded-lg">
