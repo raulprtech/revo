@@ -256,6 +256,13 @@ export default function TournamentPage() {
     
     toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
   }
+
+  const handleTournamentStatusChange = (newStatus: string) => {
+    if(tournament){
+        const updatedTournament = { ...tournament, status: newStatus };
+        setTournament(updatedTournament);
+    }
+  }
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
@@ -274,7 +281,7 @@ export default function TournamentPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">{tournament.name}</h1>
-          <Badge className="mt-2 text-sm" variant="secondary">{tournament.status}</Badge>
+          <Badge className="mt-2 text-sm" variant={tournament.status === 'En curso' ? 'default' : 'secondary'}>{tournament.status}</Badge>
         </div>
       </div>
 
@@ -382,7 +389,7 @@ export default function TournamentPage() {
         </TabsContent>
         {isOwner && (
           <TabsContent value="manage" className="mt-6">
-            <ParticipantManager tournamentId={id}/>
+            <ParticipantManager tournamentId={id} onTournamentStart={handleTournamentStatusChange}/>
           </TabsContent>
         )}
       </Tabs>

@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../ui/button";
-import { Check, X, Shuffle } from "lucide-react";
+import { Check, X, Shuffle, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,18 +15,33 @@ interface Participant {
     status: 'Aceptado' | 'Pendiente' | 'Rechazado';
 }
 
-interface ParticipantManagerProps {
-    tournamentId: string;
+interface Tournament {
+    id: string;
+    status: string;
+    // ... other tournament properties
 }
 
-export default function ParticipantManager({ tournamentId }: ParticipantManagerProps) {
+interface ParticipantManagerProps {
+    tournamentId: string;
+    onTournamentStart: (newStatus: string) => void;
+}
+
+export default function ParticipantManager({ tournamentId, onTournamentStart }: ParticipantManagerProps) {
     const [participants, setParticipants] = useState<Participant[]>([]);
+    const [tournamentStatus, setTournamentStatus] = useState('Próximo');
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
         const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
         setParticipants(participantsData[tournamentId] || []);
+
+        const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+        const currentTournament = allTournaments.find(t => t.id === tournamentId);
+        if (currentTournament) {
+            setTournamentStatus(currentTournament.status);
+        }
+
         setLoading(false);
     }, [tournamentId]);
 
@@ -70,9 +85,24 @@ export default function ParticipantManager({ tournamentId }: ParticipantManagerP
             description: "Los participantes han sido mezclados aleatoriamente en el bracket."
         });
         
-        // Trigger a custom event to notify other components like the bracket
         window.dispatchEvent(new CustomEvent('seedsAssigned'));
     };
+
+    const handleStartTournament = () => {
+        const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+        const tournamentIndex = allTournaments.findIndex(t => t.id === tournamentId);
+
+        if (tournamentIndex !== -1) {
+            allTournaments[tournamentIndex].status = 'En curso';
+            localStorage.setItem("tournaments", JSON.stringify(allTournaments));
+            setTournamentStatus('En curso');
+            onTournamentStart('En curso');
+            toast({
+                title: "¡Torneo Iniciado!",
+                description: "La competición ha comenzado. ¡Buena suerte a todos los participantes!",
+            });
+        }
+    }
 
 
     return (
@@ -81,11 +111,11 @@ export default function ParticipantManager({ tournamentId }: ParticipantManagerP
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                     <div>
                         <CardTitle>Gestionar Participantes</CardTitle>
-                        <CardDescription>Acepta o rechaza solicitantes y asigna los seeds del torneo.</CardDescription>
+                        <CardDescription>Acepta o rechaza solicitantes, asigna seeds e inicia el torneo.</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleSeed}><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
-                        <Button>Iniciar Torneo</Button>
+                        <Button variant="outline" onClick={handleSeed} disabled={tournamentStatus === 'En curso'}><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
+                        <Button onClick={handleStartTournament} disabled={tournamentStatus === 'En curso'}><Play className="mr-2 h-4 w-4" /> Iniciar Torneo</Button>
                     </div>
                 </div>
             </CardHeader>
