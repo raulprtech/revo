@@ -38,7 +38,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
-  const id = use(params.id);
+  const id = use(Promise.resolve(params.id));
 
   useEffect(() => {
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
