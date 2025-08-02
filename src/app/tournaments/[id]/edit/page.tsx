@@ -1,3 +1,4 @@
+
 "use client";
 import { CreateTournamentForm } from "@/components/tournaments/create-tournament-form";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +21,7 @@ interface Tournament {
     dataAiHint: string;
     prizePool?: string;
     registrationType: 'public' | 'private';
+    location?: string;
 }
 
 export default function EditTournamentPage() {

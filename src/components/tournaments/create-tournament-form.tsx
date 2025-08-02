@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -41,6 +42,7 @@ const formSchema = z.object({
   maxParticipants: z.coerce.number().min(2, "Se requieren al menos 2 participantes.").max(256),
   registrationType: z.enum(["public", "private"]),
   prizePool: z.string().optional(),
+  location: z.string().min(1, "La ubicación es obligatoria.").optional(),
 });
 
 type CreateTournamentFormProps = {
@@ -60,6 +62,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
         startDate: new Date(tournamentData.startDate),
         description: tournamentData.description ?? '',
         prizePool: tournamentData.prizePool ?? '',
+        location: tournamentData.location ?? '',
     } : {
       name: "",
       description: "",
@@ -68,6 +71,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
       registrationType: "public",
       maxParticipants: 16,
       prizePool: "",
+      location: "",
       startDate: new Date(),
     },
   });
@@ -262,6 +266,19 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
                     <FormLabel>Máximo de Participantes</FormLabel>
                     <FormControl>
                     <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+             <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Ubicación (Opcional)</FormLabel>
+                    <FormControl>
+                    <Input placeholder="ej., Online, Madrid, España" {...field} />
                     </FormControl>
                     <FormMessage />
                 </FormItem>

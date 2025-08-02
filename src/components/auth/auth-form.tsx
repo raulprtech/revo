@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -23,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 const formSchema = z.object({
   email: z.string().email({ message: "Dirección de correo electrónico inválida." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
+  location: z.string().optional(),
 });
 
 type AuthFormProps = {
@@ -39,6 +41,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     defaultValues: {
       email: "",
       password: "",
+      location: "",
     },
   });
 
@@ -52,6 +55,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       displayName: values.email.split('@')[0],
       email: values.email,
       photoURL: `https://placehold.co/128x128.png?text=${values.email[0].toUpperCase()}`,
+      location: values.location,
     };
 
     localStorage.setItem("user", JSON.stringify(user));
@@ -73,6 +77,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       displayName: "Usuario de Google",
       email: "google.user@example.com",
       photoURL: "https://placehold.co/128x128.png?text=G",
+      location: "Mountain View, CA",
     };
 
     localStorage.setItem("user", JSON.stringify(user));
@@ -127,6 +132,21 @@ export function AuthForm({ mode }: AuthFormProps) {
                     </FormItem>
                   )}
                 />
+                {mode === 'signup' && (
+                    <FormField
+                    control={form.control}
+                    name="location"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Ubicación (Opcional)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="ej., Madrid, España" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                )}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {mode === "login" ? "Iniciar Sesión" : "Registrarse"}

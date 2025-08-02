@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -6,7 +7,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
@@ -40,6 +41,7 @@ interface Tournament {
     image: string;
     dataAiHint: string;
     prizePool?: string;
+    location?: string;
 }
 
 interface User {
@@ -373,6 +375,15 @@ export default function TournamentPage() {
                     <p className="text-lg text-foreground">{tournament.ownerEmail.split('@')[0]}</p>
                   </div>
                 </div>
+                {tournament.location && (
+                    <div className="flex items-center space-x-3">
+                        <MapPin className="h-8 w-8 text-primary" />
+                        <div>
+                        <p className="text-sm font-medium">Ubicación</p>
+                        <p className="text-lg text-foreground">{tournament.location}</p>
+                        </div>
+                    </div>
+                )}
               </div>
               <div className="pt-6 border-t">
                   {canJoin && <Button size="lg" onClick={handleJoinTournament}>Unirse al Torneo</Button>}
