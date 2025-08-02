@@ -46,17 +46,7 @@ export function Header() {
             <span className="font-bold text-lg">TournaVerse</span>
           </Link>
         </div>
-        <nav className="hidden md:flex flex-1 items-center space-x-6 text-sm font-medium">
-          <Link href="/#explore" className="text-foreground/80 transition-colors hover:text-foreground">
-            Explore
-          </Link>
-          <Link href="/#community" className="text-foreground/80 transition-colors hover:text-foreground">
-            Community
-          </Link>
-          <Link href="/tournaments/create" className="text-foreground/80 transition-colors hover:text-foreground">
-            Create Tournament
-          </Link>
-        </nav>
+        
         <div className="flex flex-1 items-center justify-end space-x-4">
           {loading ? (
              <div className="h-8 w-24 bg-muted rounded-md animate-pulse" />
