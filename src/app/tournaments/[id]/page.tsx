@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,6 +74,21 @@ export default function TournamentPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isParticipant, setIsParticipant] = useState(false);
 
+  const loadBracketData = useCallback(() => {
+    if (!id) return;
+    const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
+    const seededPlayerNames = seededParticipantsData[id] || [];
+
+    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+    const currentTournament = allTournaments.find(t => t.id === id);
+
+    if (currentTournament) {
+        const participantCount = seededPlayerNames.length > 0 ? seededPlayerNames.length : currentTournament.maxParticipants;
+        setRounds(generateRounds(participantCount, seededPlayerNames));
+    }
+  }, [id]);
+
+
   useEffect(() => {
     if (!id) return;
     
@@ -92,10 +107,15 @@ export default function TournamentPage() {
             const tournamentParticipants = participantsData[id] || [];
             setIsParticipant(tournamentParticipants.some(p => p.email === user.email));
         }
-        setRounds(generateRounds(currentTournament.maxParticipants));
+        loadBracketData();
     }
     setLoading(false);
-  }, [id]);
+    
+    window.addEventListener('seedsAssigned', loadBracketData);
+    return () => {
+        window.removeEventListener('seedsAssigned', loadBracketData);
+    }
+  }, [id, loadBracketData]);
 
   const handleDelete = () => {
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");

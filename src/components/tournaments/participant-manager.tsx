@@ -48,6 +48,32 @@ export default function ParticipantManager({ tournamentId }: ParticipantManagerP
         }
     };
 
+    const handleSeed = () => {
+        const acceptedParticipants = participants.filter(p => p.status === 'Aceptado');
+        if (acceptedParticipants.length < 2) {
+            toast({
+                title: "No hay suficientes participantes",
+                description: "Se necesitan al menos 2 participantes aceptados para asignar seeds.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        const shuffled = [...acceptedParticipants].sort(() => Math.random() - 0.5);
+        
+        const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
+        seededParticipantsData[tournamentId] = shuffled.map(p => p.name);
+        localStorage.setItem("seededParticipantsData", JSON.stringify(seededParticipantsData));
+
+        toast({
+            title: "Seeds Asignados",
+            description: "Los participantes han sido mezclados aleatoriamente en el bracket."
+        });
+        
+        // Trigger a custom event to notify other components like the bracket
+        window.dispatchEvent(new CustomEvent('seedsAssigned'));
+    };
+
 
     return (
         <Card>
@@ -58,7 +84,7 @@ export default function ParticipantManager({ tournamentId }: ParticipantManagerP
                         <CardDescription>Acepta o rechaza solicitantes y asigna los seeds del torneo.</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline"><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
+                        <Button variant="outline" onClick={handleSeed}><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
                         <Button>Iniciar Torneo</Button>
                     </div>
                 </div>

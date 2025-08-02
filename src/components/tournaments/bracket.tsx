@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { Trophy, Expand } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { ReportScoreDialog } from "./report-score-dialog";
 
 interface Tournament {
@@ -24,19 +24,26 @@ interface Tournament {
     prizePool?: string;
 }
 
-export const generateRounds = (numParticipants: number) => {
+export const generateRounds = (numParticipants: number, seededPlayerNames?: string[]) => {
     if (numParticipants < 2) return [];
 
-    const playerNames = [
-      "CyberNinja", "PixelProwler", "QuantumLeap", "SynthWave",
-      "GigaGlitch", "VoidRunner", "DataDragon", "LogicLancer",
-      "BinaryBard", "CircuitSorcerer", "FirewallFury", "GridGuardian",
-      "MatrixMonarch", "NetworkNomad", "OracleKnight", "ProtocolPaladin",
-      "GlitchCat", "TechWarlock", "DataWrangler", "CodeComrade",
-      "ScriptKiddie", "ByteBrawler", "KernelKnight", "BugHunter",
-      "StackSmasher", "PointerProtector", "HeapHero", "CacheCommander",
-      "ArrayAvenger", "StringSamurai", "FunctionFighter", "ClassChampion",
-    ].slice(0, numParticipants);
+    let playerNames;
+
+    if (seededPlayerNames && seededPlayerNames.length > 0) {
+        playerNames = seededPlayerNames;
+    } else {
+        const defaultNames = [
+          "CyberNinja", "PixelProwler", "QuantumLeap", "SynthWave",
+          "GigaGlitch", "VoidRunner", "DataDragon", "LogicLancer",
+          "BinaryBard", "CircuitSorcerer", "FirewallFury", "GridGuardian",
+          "MatrixMonarch", "NetworkNomad", "OracleKnight", "ProtocolPaladin",
+          "GlitchCat", "TechWarlock", "DataWrangler", "CodeComrade",
+          "ScriptKiddie", "ByteBrawler", "KernelKnight", "BugHunter",
+          "StackSmasher", "PointerProtector", "HeapHero", "CacheCommander",
+          "ArrayAvenger", "StringSamurai", "FunctionFighter", "ClassChampion",
+        ].slice(0, numParticipants);
+        playerNames = defaultNames.sort(() => Math.random() - 0.5);
+    }
     
     let n = 1;
     while (n < numParticipants) {
@@ -47,13 +54,14 @@ export const generateRounds = (numParticipants: number) => {
     const byes = bracketSize - numParticipants;
 
     let players = playerNames.map(name => ({ name }));
-    // Intersperse BYEs for more even distribution if needed, but for now just add to end
     for (let i = 0; i < byes; i++) {
         players.push({ name: "BYE" });
     }
     
     // Simple seeding for now
-    players.sort(() => Math.random() - 0.5);
+    if (!seededPlayerNames) {
+      players.sort(() => Math.random() - 0.5);
+    }
 
     const rounds = [];
     let currentPlayers = players;
