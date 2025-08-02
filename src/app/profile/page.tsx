@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -21,41 +22,68 @@ interface Tournament {
     id: string;
     name: string;
     game: string;
-    status: string;
+    status: string; // Tournament status
     image: string;
     dataAiHint: string;
     ownerEmail: string;
 }
 
+interface ParticipatingTournament extends Tournament {
+    participantStatus: ParticipantStatus; // Participant status
+}
+
+type ParticipantStatus = 'Aceptado' | 'Pendiente' | 'Rechazado';
+
 interface Participant {
     email: string;
     name: string;
     avatar: string;
-    status: 'Aceptado' | 'Pendiente' | 'Rechazado';
+    status: ParticipantStatus;
 }
 
-const TournamentListItem = ({ tournament }: { tournament: Tournament }) => (
-    <Card className="transition-all hover:shadow-md">
-        <div className="flex flex-col sm:flex-row items-center space-x-4 p-4">
-            <Image src={tournament.image} width={120} height={80} alt={tournament.name} data-ai-hint={tournament.dataAiHint} className="rounded-md w-full sm:w-32 h-24 object-cover" />
-            <div className="flex-grow pt-4 sm:pt-0 text-center sm:text-left">
-                <CardTitle className="text-lg">{tournament.name}</CardTitle>
-                <CardDescription className="flex items-center justify-center sm:justify-start pt-1"><Gamepad2 className="mr-2 h-4 w-4"/>{tournament.game}</CardDescription>
+const TournamentListItem = ({ tournament }: { tournament: ParticipatingTournament | Tournament }) => {
+    const isParticipating = 'participantStatus' in tournament;
+
+    const getStatusVariant = (status: ParticipantStatus) => {
+        switch (status) {
+            case 'Aceptado':
+                return 'default';
+            case 'Pendiente':
+                return 'secondary';
+            case 'Rechazado':
+                return 'destructive';
+            default:
+                return 'secondary';
+        }
+    };
+
+    return (
+        <Card className="transition-all hover:shadow-md">
+            <div className="flex flex-col sm:flex-row items-center space-x-4 p-4">
+                <Image src={tournament.image} width={120} height={80} alt={tournament.name} data-ai-hint={tournament.dataAiHint} className="rounded-md w-full sm:w-32 h-24 object-cover" />
+                <div className="flex-grow pt-4 sm:pt-0 text-center sm:text-left">
+                    <CardTitle className="text-lg">{tournament.name}</CardTitle>
+                    <CardDescription className="flex items-center justify-center sm:justify-start pt-1"><Gamepad2 className="mr-2 h-4 w-4"/>{tournament.game}</CardDescription>
+                </div>
+                <div className="flex items-center space-x-4 pt-4 sm:pt-0">
+                    {isParticipating ? (
+                         <Badge variant={getStatusVariant(tournament.participantStatus)}>{tournament.participantStatus}</Badge>
+                    ) : (
+                        <Badge variant={tournament.status === 'En curso' ? 'default' : 'secondary'}>{tournament.status}</Badge>
+                    )}
+                    <Button asChild variant="outline">
+                    <Link href={`/tournaments/${tournament.id}`}>Ver <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                    </Button>
+                </div>
             </div>
-            <div className="flex items-center space-x-4 pt-4 sm:pt-0">
-                <Badge variant={tournament.status === 'En curso' ? 'default' : 'secondary'}>{tournament.status}</Badge>
-                <Button asChild variant="outline">
-                <Link href={`/tournaments/${tournament.id}`}>Ver <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                </Button>
-            </div>
-        </div>
-    </Card>
-);
+        </Card>
+    );
+}
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
     const [createdTournaments, setCreatedTournaments] = useState<Tournament[]>([]);
-    const [participatingTournaments, setParticipatingTournaments] = useState<Tournament[]>([]);
+    const [participatingTournaments, setParticipatingTournaments] = useState<ParticipatingTournament[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -70,9 +98,17 @@ export default function ProfilePage() {
 
             const userCreated = allTournaments.filter(t => t.ownerEmail === parsedUser.email);
             
-            const userParticipating = allTournaments.filter(tournament => {
+            const userParticipating: ParticipatingTournament[] = [];
+            allTournaments.forEach(tournament => {
                 const participants = allParticipants[tournament.id] || [];
-                return participants.some(p => p.email === parsedUser.email);
+                const userAsParticipant = participants.find(p => p.email === parsedUser.email);
+                
+                if (userAsParticipant && userAsParticipant.status !== 'Rechazado') {
+                    userParticipating.push({
+                        ...tournament,
+                        participantStatus: userAsParticipant.status,
+                    });
+                }
             });
 
             setCreatedTournaments(userCreated);
