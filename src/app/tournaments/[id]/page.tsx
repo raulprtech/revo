@@ -33,7 +33,7 @@ const formatMapping = {
 };
 
 
-export default function TournamentPage({ params }: { params: Promise<{ id: string }> }) {
+export default function TournamentPage({ params }: { params: { id: string } }) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -120,7 +120,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   <Trophy className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Bolsa de Premios</p>
-                    <p className="text-lg text-foreground">$10,000</p>
+                    <p className="text-lg text-foreground">Por anunciar</p>
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
