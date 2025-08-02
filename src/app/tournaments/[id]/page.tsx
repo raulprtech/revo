@@ -12,19 +12,19 @@ const tournament = {
     id: '1',
     name: 'Summer Brawl 2024',
     game: 'Street Fighter 6',
-    description: 'The ultimate Street Fighter 6 tournament of the summer. Top players from around the world will compete for the grand prize and the title of champion. Join us for an epic showdown of skill and strategy.',
+    description: 'El torneo definitivo de Street Fighter 6 del verano. Los mejores jugadores de todo el mundo competirán por el gran premio y el título de campeón. Únete a nosotros para un enfrentamiento épico de habilidad y estrategia.',
     participants: 4,
     maxParticipants: 128,
-    startDate: 'July 20, 2024',
-    format: 'Single Elimination',
-    status: 'Ongoing',
+    startDate: 'Julio 20, 2024',
+    format: 'Eliminación Simple',
+    status: 'En curso',
     isOwner: true, 
     image: 'https://placehold.co/1200x400.png',
     dataAiHint: 'fighting game esports',
 };
 
 export default function TournamentPage({ params }: { params: { id: string } }) {
-  // In a real app, you would fetch tournament data using params.id
+  // En una aplicación real, obtendrías los datos del torneo usando params.id
   
   return (
     <div className="container mx-auto py-10 px-4">
@@ -39,15 +39,15 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="bracket">Bracket</TabsTrigger>
-          <TabsTrigger value="participants">Participants</TabsTrigger>
-          {tournament.isOwner && <TabsTrigger value="manage">Manage</TabsTrigger>}
+          <TabsTrigger value="participants">Participantes</TabsTrigger>
+          {tournament.isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
         </TabsList>
         <TabsContent value="overview" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Tournament Details</CardTitle>
+              <CardTitle>Detalles del Torneo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-muted-foreground">{tournament.description}</p>
@@ -55,49 +55,49 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
                 <div className="flex items-center space-x-3">
                   <Gamepad2 className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Game</p>
+                    <p className="text-sm font-medium">Juego</p>
                     <p className="text-lg text-foreground">{tournament.game}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Calendar className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Start Date</p>
+                    <p className="text-sm font-medium">Fecha de Inicio</p>
                     <p className="text-lg text-foreground">{tournament.startDate}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <GitBranch className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Format</p>
+                    <p className="text-sm font-medium">Formato</p>
                     <p className="text-lg text-foreground">{tournament.format}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Users className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Participants</p>
+                    <p className="text-sm font-medium">Participantes</p>
                     <p className="text-lg text-foreground">{tournament.participants} / {tournament.maxParticipants}</p>
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
                   <Trophy className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Prize Pool</p>
+                    <p className="text-sm font-medium">Bolsa de Premios</p>
                     <p className="text-lg text-foreground">$10,000</p>
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
                   <Shield className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Organizer</p>
+                    <p className="text-sm font-medium">Organizador</p>
                     <p className="text-lg text-foreground">AdminUser</p>
                   </div>
                 </div>
               </div>
-              {!tournament.isOwner && tournament.status !== 'Ongoing' && (
+              {!tournament.isOwner && tournament.status !== 'En curso' && (
                 <div className="pt-6 border-t">
-                    <Button size="lg">Join Tournament</Button>
+                    <Button size="lg">Unirse al Torneo</Button>
                 </div>
               )}
             </CardContent>

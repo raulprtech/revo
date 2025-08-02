@@ -13,18 +13,18 @@ type User = {
 };
 
 export function Header() {
-  // This is a mock auth state. In a real app, you'd use Firebase Auth context.
+  // Esto es un estado de autenticación simulado. En una aplicación real, usarías el contexto de Firebase Auth.
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Simulate fetching auth state
+    // Simular la obtención del estado de autenticación
     const timer = setTimeout(() => {
-      // To test both states, you can toggle this value
+      // Para probar ambos estados, puedes alternar este valor
       const isLoggedIn = false;
       if (isLoggedIn) {
         setUser({
-          displayName: "Test User",
+          displayName: "Usuario de Prueba",
           email: "test@example.com",
           photoURL: "https://placehold.co/40x40.png"
         });
@@ -55,10 +55,10 @@ export function Header() {
           ) : (
             <div className="flex items-center space-x-2">
               <Button variant="ghost" asChild>
-                <Link href="/login">Log In</Link>
+                <Link href="/login">Iniciar Sesión</Link>
               </Button>
               <Button asChild>
-                <Link href="/signup">Sign Up</Link>
+                <Link href="/signup">Registrarse</Link>
               </Button>
             </div>
           )}

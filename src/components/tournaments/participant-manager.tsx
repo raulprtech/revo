@@ -7,13 +7,13 @@ import { Button } from "../ui/button";
 import { Check, X, Shuffle } from "lucide-react";
 
 const mockParticipants = [
-  { id: 1, name: "CyberNinja", status: "Accepted", seed: 1, avatar: 'https://placehold.co/40x40.png' },
-  { id: 2, name: "SynthWave", status: "Accepted", seed: 2, avatar: 'https://placehold.co/40x40.png' },
-  { id: 3, name: "GigaGlitch", status: "Accepted", seed: 3, avatar: 'https://placehold.co/40x40.png' },
-  { id: 4, name: "LogicLancer", status: "Accepted", seed: 4, avatar: 'https://placehold.co/40x40.png' },
-  { id: 5, name: "QuantumLeap", status: "Pending", seed: null, avatar: 'https://placehold.co/40x40.png' },
-  { id: 6, name: "PixelProwler", status: "Pending", seed: null, avatar: 'https://placehold.co/40x40.png' },
-  { id: 7, name: "VoidRunner", status: "Rejected", seed: null, avatar: 'https://placehold.co/40x40.png' },
+  { id: 1, name: "CyberNinja", status: "Aceptado", seed: 1, avatar: 'https://placehold.co/40x40.png' },
+  { id: 2, name: "SynthWave", status: "Aceptado", seed: 2, avatar: 'https://placehold.co/40x40.png' },
+  { id: 3, name: "GigaGlitch", status: "Aceptado", seed: 3, avatar: 'https://placehold.co/40x40.png' },
+  { id: 4, name: "LogicLancer", status: "Aceptado", seed: 4, avatar: 'https://placehold.co/40x40.png' },
+  { id: 5, name: "QuantumLeap", status: "Pendiente", seed: null, avatar: 'https://placehold.co/40x40.png' },
+  { id: 6, name: "PixelProwler", status: "Pendiente", seed: null, avatar: 'https://placehold.co/40x40.png' },
+  { id: 7, name: "VoidRunner", status: "Rechazado", seed: null, avatar: 'https://placehold.co/40x40.png' },
 ];
 
 export default function ParticipantManager() {
@@ -22,12 +22,12 @@ export default function ParticipantManager() {
             <CardHeader>
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                     <div>
-                        <CardTitle>Manage Participants</CardTitle>
-                        <CardDescription>Accept or reject applicants and seed the tournament.</CardDescription>
+                        <CardTitle>Gestionar Participantes</CardTitle>
+                        <CardDescription>Acepta o rechaza solicitantes y asigna los seeds del torneo.</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline"><Shuffle className="mr-2 h-4 w-4" /> Seed Participants</Button>
-                        <Button>Start Tournament</Button>
+                        <Button variant="outline"><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
+                        <Button>Iniciar Torneo</Button>
                     </div>
                 </div>
             </CardHeader>
@@ -35,9 +35,9 @@ export default function ParticipantManager() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Player</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead>Jugador</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -53,10 +53,10 @@ export default function ParticipantManager() {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant={p.status === "Accepted" ? "default" : p.status === "Pending" ? "secondary" : "destructive"}>{p.status}</Badge>
+                                    <Badge variant={p.status === "Aceptado" ? "default" : p.status === "Pendiente" ? "secondary" : "destructive"}>{p.status}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    {p.status === "Pending" && (
+                                    {p.status === "Pendiente" && (
                                         <div className="space-x-2">
                                             <Button variant="ghost" size="icon" className="text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 hover:text-green-600">
                                                 <Check className="h-4 w-4" />

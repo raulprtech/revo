@@ -30,9 +30,9 @@ export function UserNav({ user }: { user: User }) {
   };
 
   const handleLogout = () => {
-    // In a real app, call Firebase signOut here
-    console.log("Logging out...");
-    window.location.href = '/'; //- or use router to refresh state
+    // En una aplicación real, llama a signOut de Firebase aquí
+    console.log("Cerrando sesión...");
+    window.location.href = '/'; //- o usa el router para refrescar el estado
   };
 
   return (
@@ -59,26 +59,26 @@ export function UserNav({ user }: { user: User }) {
           <DropdownMenuItem asChild>
             <Link href="/dashboard">
               <LayoutDashboard className="mr-2 h-4 w-4" />
-              <span>Dashboard</span>
+              <span>Panel</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/profile">
               <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
+              <span>Perfil</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/tournaments/create">
               <Wrench className="mr-2 h-4 w-4" />
-              <span>Create Tournament</span>
+              <span>Crear Torneo</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
+          <span>Cerrar Sesión</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -8,10 +8,10 @@ import { Trophy } from "lucide-react";
 import { useState } from "react";
 import { ReportScoreDialog } from "./report-score-dialog";
 
-// Mock data
+// Datos de ejemplo
 const initialRounds = [
   {
-    name: "Round 1",
+    name: "Ronda 1",
     matches: [
       { id: 1, top: { name: "CyberNinja", score: null }, bottom: { name: "PixelProwler", score: null }, winner: null },
       { id: 2, top: { name: "QuantumLeap", score: null }, bottom: { name: "SynthWave", score: null }, winner: null },
@@ -20,14 +20,14 @@ const initialRounds = [
     ],
   },
   {
-    name: "Semifinals",
+    name: "Semifinales",
     matches: [
       { id: 5, top: { name: "TBD", score: null }, bottom: { name: "TBD", score: null }, winner: null },
       { id: 6, top: { name: "TBD", score: null }, bottom: { name: "TBD", score: null }, winner: null },
     ],
   },
   {
-    name: "Finals",
+    name: "Finales",
     matches: [
       { id: 7, top: { name: "TBD", score: null }, bottom: { name: "TBD", score: null }, winner: null },
     ],
@@ -68,7 +68,7 @@ const MatchCard = ({ match, onScoreReported }: { match: Match, onScoreReported: 
                     </div>
                     {canReport && (
                         <Button size="sm" variant="outline" className="w-full mt-2 h-7 text-xs" onClick={() => setIsDialogOpen(true)}>
-                            Report Score
+                            Reportar Resultado
                         </Button>
                     )}
                 </CardContent>
@@ -88,11 +88,11 @@ export default function Bracket() {
   const tournamentWinner = rounds[rounds.length - 1].matches[0].winner;
 
   const handleScoreReported = () => {
-        // This is a placeholder. In a real app, you would re-fetch data
-        // or have a more sophisticated state management.
-        // For this demo, we'll just simulate a data refresh by re-applying the mock data logic.
+        // Esto es un marcador de posición. En una aplicación real, volverías a obtener los datos
+        // o tendrías una gestión de estado más sofisticada.
+        // Para esta demostración, simplemente simularemos una actualización de datos volviendo a aplicar la lógica de los datos de ejemplo.
         
-        // This is a simple simulation. A real implementation would be more complex.
+        // Esta es una simulación simple. Una implementación real sería más compleja.
         const newRounds = JSON.parse(JSON.stringify(initialRounds));
         newRounds[0].matches[0].score = { top: 2, bottom: 1 };
         newRounds[0].matches[0].winner = "CyberNinja";
@@ -135,7 +135,7 @@ export default function Bracket() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tournament Bracket</CardTitle>
+        <CardTitle>Bracket del Torneo</CardTitle>
       </CardHeader>
       <CardContent className="p-4">
         <div className="flex space-x-4 md:space-x-8 lg:space-x-12 overflow-x-auto pb-4">
@@ -150,7 +150,7 @@ export default function Bracket() {
             </div>
           ))}
           <div className="flex flex-col space-y-4 min-w-[250px] items-center justify-center">
-              <h3 className="text-xl font-bold text-center font-headline">Winner</h3>
+              <h3 className="text-xl font-bold text-center font-headline">Ganador</h3>
               <Trophy className="w-24 h-24 text-yellow-400" />
               <p className="font-bold text-lg">{tournamentWinner || 'TBD'}</p>
           </div>

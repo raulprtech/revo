@@ -26,10 +26,10 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const reportScoreSchema = z.object({
-  topScore: z.coerce.number().min(0, "Score must be non-negative."),
-  bottomScore: z.coerce.number().min(0, "Score must be non-negative."),
+  topScore: z.coerce.number().min(0, "El puntaje debe ser no negativo."),
+  bottomScore: z.coerce.number().min(0, "El puntaje debe ser no negativo."),
 }).refine(data => data.topScore !== data.bottomScore, {
-  message: "Scores cannot be the same (no ties allowed).",
+  message: "Los puntajes no pueden ser iguales (no se permiten empates).",
   path: ["topScore"],
 });
 
@@ -58,19 +58,19 @@ export function ReportScoreDialog({ isOpen, onOpenChange, match, onScoreReported
 
   async function onSubmit(values: z.infer<typeof reportScoreSchema>) {
     setLoading(true);
-    // Here you would call an API to save the score
+    // Aquí llamarías a una API para guardar el puntaje
     console.log({ matchId: match.id, scores: values });
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // This is where we would update the state.
-    // For now, we will just call the callback
+    // Aquí es donde actualizaríamos el estado.
+    // Por ahora, solo llamaremos al callback
     onScoreReported();
     
     setLoading(false);
     onOpenChange(false);
     toast({
-        title: "Score Reported",
-        description: `The score for ${match.top.name} vs ${match.bottom.name} has been submitted.`,
+        title: "Resultado Reportado",
+        description: `El resultado para ${match.top.name} vs ${match.bottom.name} ha sido enviado.`,
     });
     form.reset();
   }
@@ -84,9 +84,9 @@ export function ReportScoreDialog({ isOpen, onOpenChange, match, onScoreReported
     }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Report Match Score</DialogTitle>
+          <DialogTitle>Reportar Resultado de Partida</DialogTitle>
           <DialogDescription>
-            Enter the final score for the match between {match.top.name} and {match.bottom.name}.
+            Ingresa el resultado final para la partida entre {match.top.name} y {match.bottom.name}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -120,10 +120,10 @@ export function ReportScoreDialog({ isOpen, onOpenChange, match, onScoreReported
                 />
             </div>
              <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
                 <Button type="submit" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Submit Score
+                  Enviar Resultado
                 </Button>
             </DialogFooter>
           </form>

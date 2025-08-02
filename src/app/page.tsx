@@ -23,8 +23,8 @@ const featuredTournaments = [
   },
   {
     id: '3',
-    name: 'Grandmaster Gambit',
-    game: 'Chess',
+    name: 'Gambito de Gran Maestro',
+    game: 'Ajedrez',
     participants: 128,
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'chess board',
@@ -34,7 +34,7 @@ const featuredTournaments = [
 const communityTournaments = [
     {
       id: '4',
-      name: 'Fortnite Frenzy',
+      name: 'Frenesí de Fortnite',
       game: 'Fortnite',
       participants: 100,
       image: 'https://placehold.co/600x400.png',
@@ -50,8 +50,8 @@ const communityTournaments = [
     },
     {
       id: '6',
-      name: 'Amateur League',
-      game: 'Various',
+      name: 'Liga Amateur',
+      game: 'Varios',
       participants: 200,
       image: 'https://placehold.co/600x400.png',
       dataAiHint: 'esports league trophy',
@@ -74,24 +74,24 @@ export default function Home() {
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
-                  <p className="text-primary font-semibold tracking-wider">EVERY GAME, EVERY SPORT</p>
+                  <p className="text-primary font-semibold tracking-wider">CADA JUEGO, CADA DEPORTE</p>
                   <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                    SIMPLIFIED TOURNAMENT MANAGEMENT
+                    GESTIÓN DE TORNEOS SIMPLIFICADA
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    With a user-friendly bracket generator and comprehensive features, TournaVerse is the ultimate platform for organizing, managing, and participating in tournaments of any size.
+                    Con un generador de brackets fácil de usar y funciones completas, TournaVerse es la plataforma definitiva para organizar, gestionar y participar en torneos de cualquier tamaño.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button asChild size="lg" className="group">
                     <Link href="/tournaments/create">
-                      Create a Tournament
+                      Crear un Torneo
                       <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </Button>
                    <Button asChild size="lg" variant="link" className="text-foreground">
                     <Link href="#explore">
-                      Explore Tournaments <ArrowRight className="ml-2 h-4 w-4" />
+                      Explorar Torneos <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </div>
@@ -121,11 +121,11 @@ export default function Home() {
                         </div>
                     </div>
                     <div className="space-y-4">
-                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Your Tournament. Your Way.</h2>
-                        <p className="text-muted-foreground md:text-xl">Our bracket generator supports a wide range of formats, including single elimination, double elimination, Swiss, and round robin. Customize your event to match your needs.</p>
+                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Tu Torneo. A Tu Manera.</h2>
+                        <p className="text-muted-foreground md:text-xl">Nuestro generador de brackets admite una amplia gama de formatos, incluyendo eliminación simple, doble eliminación, suizo y todos contra todos. Personaliza tu evento para que se ajuste a tus necesidades.</p>
                         <Button asChild size="lg" variant="outline">
                             <Link href="/tournaments/create">
-                                Create Your Bracket
+                                Crea tu Bracket
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
                         </Button>
@@ -137,7 +137,7 @@ export default function Home() {
         {/* Partners Banner */}
         <section className="w-full py-12 bg-primary/90">
             <div className="container px-4 md:px-6">
-                 <p className="text-center text-primary-foreground/80 text-sm font-semibold uppercase tracking-wider mb-6">Trusted By Top Organizers</p>
+                 <p className="text-center text-primary-foreground/80 text-sm font-semibold uppercase tracking-wider mb-6">Con la Confianza de los Mejores Organizadores</p>
                 <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4 md:gap-x-12 lg:gap-x-16">
                    {partners.map(p => (
                        <Image key={p.name} src={p.logo} alt={p.name} width={130} height={40} className="opacity-80 hover:opacity-100 transition-opacity" />
@@ -151,9 +151,9 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Featured Tournaments</h2>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Torneos Destacados</h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Check out some of the exciting tournaments happening right now on TournaVerse.
+                  Echa un vistazo a algunos de los emocionantes torneos que están sucediendo ahora mismo en TournaVerse.
                 </p>
               </div>
             </div>
@@ -180,13 +180,13 @@ export default function Home() {
                   <CardContent>
                     <div className="flex items-center text-sm text-muted-foreground">
                         <Users className="mr-2 h-4 w-4" />
-                        <span>{tournament.participants} Participants</span>
+                        <span>{tournament.participants} Participantes</span>
                       </div>
                   </CardContent>
                   <CardFooter className="p-4">
                     <Button asChild className="w-full">
                       <Link href={`/tournaments/${tournament.id}`}>
-                        View Details
+                        Ver Detalles
                       </Link>
                     </Button>
                   </CardFooter>
@@ -201,33 +201,33 @@ export default function Home() {
             <div className="container px-4 md:px-6">
                 <div className="grid gap-10 lg:grid-cols-2 items-center">
                     <div className="space-y-4">
-                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Here&apos;s How It Works</h2>
+                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Así es Como Funciona</h2>
                         <ul className="space-y-6 text-muted-foreground md:text-lg">
                             <li className="flex items-start">
                                 <span className="text-primary font-bold text-2xl mr-4">1.</span>
                                 <div>
-                                    <h3 className="font-semibold text-foreground">Create Your Tournament</h3>
-                                    <p>Define your tournament&apos;s name, game, format, and schedule in minutes.</p>
+                                    <h3 className="font-semibold text-foreground">Crea tu Torneo</h3>
+                                    <p>Define el nombre, juego, formato y horario de tu torneo en minutos.</p>
                                 </div>
                             </li>
                              <li className="flex items-start">
                                 <span className="text-primary font-bold text-2xl mr-4">2.</span>
                                 <div>
-                                    <h3 className="font-semibold text-foreground">Invite Participants</h3>
-                                    <p>Share a link to let players register, or manually add them yourself.</p>
+                                    <h3 className="font-semibold text-foreground">Invita a los Participantes</h3>
+                                    <p>Comparte un enlace para que los jugadores se registren, o añádelos manualmente.</p>
                                 </div>
                             </li>
                              <li className="flex items-start">
                                 <span className="text-primary font-bold text-2xl mr-4">3.</span>
                                 <div>
-                                    <h3 className="font-semibold text-foreground">Start the Competition</h3>
-                                    <p>Generate brackets automatically and let players report their scores.</p>
+                                    <h3 className="font-semibold text-foreground">Comienza la Competición</h3>
+                                    <p>Genera los brackets automáticamente y deja que los jugadores reporten sus resultados.</p>
                                 </div>
                             </li>
                         </ul>
                          <Button asChild size="lg">
                             <Link href="/tournaments/create">
-                                Get Started Now <ArrowRight className="ml-2 h-4 w-4" />
+                                Empieza Ahora <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
                         </Button>
                     </div>
@@ -243,9 +243,9 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Build and Manage Your Community</h2>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Crea y Gestiona tu Comunidad</h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Discover tournaments organized by our vibrant community.
+                  Descubre torneos organizados por nuestra vibrante comunidad.
                 </p>
               </div>
             </div>
@@ -272,13 +272,13 @@ export default function Home() {
                   <CardContent>
                     <div className="flex items-center text-sm text-muted-foreground">
                         <Users className="mr-2 h-4 w-4" />
-                        <span>{tournament.participants} Participants</span>
+                        <span>{tournament.participants} Participantes</span>
                       </div>
                   </CardContent>
                    <CardFooter className="p-4">
                     <Button asChild variant="secondary" className="w-full">
                       <Link href={`/tournaments/${tournament.id}`}>
-                        View Tournament
+                        Ver Torneo
                       </Link>
                     </Button>
                   </CardFooter>
@@ -289,10 +289,10 @@ export default function Home() {
         </section>
 
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t border-border">
-        <p className="text-xs text-muted-foreground">&copy; 2024 TournaVerse. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">&copy; 2024 TournaVerse. Todos los derechos reservados.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-xs hover:underline underline-offset-4">Terms of Service</Link>
-          <Link href="#" className="text-xs hover:underline underline-offset-4">Privacy</Link>
+          <Link href="#" className="text-xs hover:underline underline-offset-4">Términos de Servicio</Link>
+          <Link href="#" className="text-xs hover:underline underline-offset-4">Privacidad</Link>
         </nav>
       </footer>
     </div>

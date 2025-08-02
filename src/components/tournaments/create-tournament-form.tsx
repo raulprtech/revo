@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { CalendarIcon, Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -32,15 +33,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 
 const stepOneSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters.").max(100),
+  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
   description: z.string().max(500).optional(),
-  game: z.string().min(1, "Game/Sport is required."),
+  game: z.string().min(1, "El juego/deporte es obligatorio."),
 });
 
 const stepTwoSchema = z.object({
   format: z.enum(["single-elimination", "double-elimination", "swiss"]),
-  startDate: z.date({ required_error: "A start date is required." }),
-  maxParticipants: z.coerce.number().min(2, "At least 2 participants are required.").max(256),
+  startDate: z.date({ required_error: "Se requiere una fecha de inicio." }),
+  maxParticipants: z.coerce.number().min(2, "Se requieren al menos 2 participantes.").max(256),
   registrationType: z.enum(["public", "private"]),
 });
 
@@ -73,14 +74,14 @@ export function CreateTournamentForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
-    console.log("Creating tournament:", values);
+    console.log("Creando torneo:", values);
     await new Promise(resolve => setTimeout(resolve, 2000));
     setLoading(false);
     toast({
-        title: "Tournament Created!",
-        description: `Your tournament "${values.name}" is now live.`,
+        title: "¡Torneo Creado!",
+        description: `Tu torneo "${values.name}" ahora está activo.`,
     });
-    router.push(`/tournaments/1`); // Redirect to a mock tournament page
+    router.push(`/tournaments/1`); // Redirigir a una página de torneo de ejemplo
   }
 
   return (
@@ -94,9 +95,9 @@ export function CreateTournamentForm() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tournament Name</FormLabel>
+                      <FormLabel>Nombre del Torneo</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Summer Showdown 2024" {...field} />
+                        <Input placeholder="ej., Summer Showdown 2024" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -107,9 +108,9 @@ export function CreateTournamentForm() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>Descripción (Opcional)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="A brief description of your tournament." {...field} />
+                        <Textarea placeholder="Una breve descripción de tu torneo." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -120,9 +121,9 @@ export function CreateTournamentForm() {
                   name="game"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Game / Sport</FormLabel>
+                      <FormLabel>Juego / Deporte</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Street Fighter 6, Chess" {...field} />
+                        <Input placeholder="ej., Street Fighter 6, Ajedrez" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -138,16 +139,16 @@ export function CreateTournamentForm() {
                   name="format"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
-                      <FormLabel>Tournament Format</FormLabel>
+                      <FormLabel>Formato del Torneo</FormLabel>
                       <FormControl>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                            <SelectTrigger>
-                             <SelectValue placeholder="Select a format" />
+                             <SelectValue placeholder="Selecciona un formato" />
                            </SelectTrigger>
                            <SelectContent>
-                             <SelectItem value="single-elimination">Single Elimination</SelectItem>
-                             <SelectItem value="double-elimination">Double Elimination</SelectItem>
-                             <SelectItem value="swiss">Swiss</SelectItem>
+                             <SelectItem value="single-elimination">Eliminación Simple</SelectItem>
+                             <SelectItem value="double-elimination">Doble Eliminación</SelectItem>
+                             <SelectItem value="swiss">Suizo</SelectItem>
                            </SelectContent>
                         </Select>
                       </FormControl>
@@ -160,7 +161,7 @@ export function CreateTournamentForm() {
                   name="startDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
+                      <FormLabel>Fecha de Inicio</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -172,9 +173,9 @@ export function CreateTournamentForm() {
                               )}
                             >
                               {field.value ? (
-                                format(field.value, "PPP")
+                                format(field.value, "PPP", { locale: es })
                               ) : (
-                                <span>Pick a date</span>
+                                <span>Elige una fecha</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -182,6 +183,7 @@ export function CreateTournamentForm() {
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
+                            locale={es}
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
@@ -201,7 +203,7 @@ export function CreateTournamentForm() {
                   name="maxParticipants"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Max Participants</FormLabel>
+                      <FormLabel>Máximo de Participantes</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -214,7 +216,7 @@ export function CreateTournamentForm() {
                   name="registrationType"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
-                      <FormLabel>Registration Type</FormLabel>
+                      <FormLabel>Tipo de Inscripción</FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
@@ -225,13 +227,13 @@ export function CreateTournamentForm() {
                             <FormControl>
                               <RadioGroupItem value="public" />
                             </FormControl>
-                            <FormLabel className="font-normal">Public</FormLabel>
+                            <FormLabel className="font-normal">Pública</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl>
                               <RadioGroupItem value="private" />
                             </FormControl>
-                            <FormLabel className="font-normal">Private</FormLabel>
+                            <FormLabel className="font-normal">Privada</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
@@ -246,22 +248,22 @@ export function CreateTournamentForm() {
         <div className="flex justify-between pt-4">
           {step === 1 ? (
              <Button type="button" variant="ghost" onClick={() => router.back()}>
-                Cancel
+                Cancelar
              </Button>
           ) : (
              <Button type="button" variant="outline" onClick={() => setStep(1)}>
-                Back
+                Atrás
              </Button>
           )}
 
           {step === 1 ? (
             <Button type="button" onClick={handleNext}>
-              Next
+              Siguiente
             </Button>
           ) : (
             <Button type="submit" disabled={loading}>
                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Tournament
+              Crear Torneo
             </Button>
           )}
         </div>

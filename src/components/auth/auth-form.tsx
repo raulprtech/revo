@@ -21,8 +21,8 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  email: z.string().email({ message: "Dirección de correo electrónico inválida." }),
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
 type AuthFormProps = {
@@ -44,26 +44,26 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
-    // Here you would call your Firebase auth functions
+    // Aquí llamarías a tus funciones de autenticación de Firebase
     console.log(values);
     await new Promise(resolve => setTimeout(resolve, 1000));
     setLoading(false);
     toast({
-        title: mode === 'login' ? "Login Successful" : "Account Created",
-        description: "Redirecting to your profile...",
+        title: mode === 'login' ? "Inicio de Sesión Exitoso" : "Cuenta Creada",
+        description: "Redirigiendo a tu perfil...",
     });
     router.push("/profile");
   }
 
   const googleSignIn = async () => {
     setLoading(true);
-    // Firebase Google sign-in logic here
+    // Lógica de inicio de sesión con Google de Firebase aquí
     console.log("Signing in with Google");
     await new Promise(resolve => setTimeout(resolve, 1000));
     setLoading(false);
     toast({
-        title: "Login Successful",
-        description: "Redirecting to your profile...",
+        title: "Inicio de Sesión Exitoso",
+        description: "Redirigiendo a tu perfil...",
     });
     router.push("/profile");
   };
@@ -72,11 +72,11 @@ export function AuthForm({ mode }: AuthFormProps) {
     <div className="flex grow items-center justify-center bg-background px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl">{mode === "login" ? "Welcome back!" : "Create an account"}</CardTitle>
+          <CardTitle className="text-2xl">{mode === "login" ? "¡Bienvenido de nuevo!" : "Crear una cuenta"}</CardTitle>
           <CardDescription>
             {mode === "login" 
-              ? "Enter your credentials to access your account." 
-              : "Enter your email below to create your account."}
+              ? "Ingresa tus credenciales para acceder a tu cuenta." 
+              : "Ingresa tu correo electrónico a continuación para crear tu cuenta."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -88,9 +88,9 @@ export function AuthForm({ mode }: AuthFormProps) {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>Correo Electrónico</FormLabel>
                       <FormControl>
-                        <Input placeholder="name@example.com" {...field} />
+                        <Input placeholder="nombre@ejemplo.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -101,7 +101,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>Contraseña</FormLabel>
                       <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
@@ -111,7 +111,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 />
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {mode === "login" ? "Log In" : "Sign Up"}
+                  {mode === "login" ? "Iniciar Sesión" : "Registrarse"}
                 </Button>
               </form>
             </Form>
@@ -122,7 +122,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
+                  O continuar con
                 </span>
               </div>
             </div>
@@ -135,16 +135,16 @@ export function AuthForm({ mode }: AuthFormProps) {
           <div className="mt-4 text-center text-sm">
             {mode === 'login' ? (
               <>
-                Don&apos;t have an account?{" "}
+                ¿No tienes una cuenta?{" "}
                 <Link href="/signup" className="underline text-primary">
-                  Sign up
+                  Regístrate
                 </Link>
               </>
             ) : (
               <>
-                Already have an account?{" "}
+                ¿Ya tienes una cuenta?{" "}
                 <Link href="/login" className="underline text-primary">
-                  Log in
+                  Inicia Sesión
                 </Link>
               </>
             )}
