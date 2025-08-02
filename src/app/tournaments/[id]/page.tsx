@@ -125,10 +125,10 @@ export default function TournamentPage() {
       text: `Únete a mi torneo "${tournament?.name}" en TournaVerse!`,
       url: window.location.href,
     };
-    
+
     const copyLink = async () => {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareData.url);
         toast({
           title: "¡Enlace Copiado!",
           description: "El enlace al torneo ha sido copiado a tu portapapeles.",
@@ -143,22 +143,21 @@ export default function TournamentPage() {
       }
     };
 
-    try {
-      if (navigator.share) {
+    if (navigator.share) {
+      try {
         await navigator.share(shareData);
-      } else {
-        await copyLink();
+      } catch (error) {
+        // Fallback to copying the link if share fails, unless the user cancelled the share action
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            console.log("El usuario canceló la acción de compartir.");
+        } else {
+          console.error("Error al compartir, copiando enlace como alternativa:", error);
+          await copyLink();
+        }
       }
-    } catch (error) {
-      // Si navigator.share falla (por ejemplo, por denegación de permiso),
-      // intenta copiar el enlace como alternativa.
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        // El usuario canceló la acción de compartir, no hacer nada.
-        console.log("El usuario canceló la acción de compartir.");
-      } else {
-         console.error("Error al compartir:", error);
-         await copyLink();
-      }
+    } else {
+      // Fallback for browsers that don't support navigator.share
+      await copyLink();
     }
   };
 
