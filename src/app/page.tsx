@@ -36,8 +36,8 @@ const tournaments = [
 
 export default function Home() {
   return (
-    <div className="flex flex-col">
-        <section className="w-full py-20 md:py-32 lg:py-40 xl:py-48 bg-gradient-to-br from-background to-secondary">
+    <div className="flex flex-col bg-background">
+        <section className="w-full py-20 md:py-32 lg:py-40 xl:py-48 bg-gradient-to-br from-background to-secondary/30">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
@@ -87,7 +87,7 @@ export default function Home() {
             </div>
             <div className="mx-auto grid grid-cols-1 gap-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
               {tournaments.map((tournament) => (
-                <Card key={tournament.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1">
+                <Card key={tournament.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 bg-card">
                   <Link href={`/tournaments/${tournament.id}`} className="block">
                     <Image
                       src={tournament.image}
