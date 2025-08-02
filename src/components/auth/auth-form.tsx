@@ -44,9 +44,19 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
-    // Aquí llamarías a tus funciones de autenticación de Firebase
-    console.log(values);
+    
+    // Simulación de autenticación
     await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const user = {
+      displayName: values.email.split('@')[0],
+      email: values.email,
+      photoURL: `https://placehold.co/128x128.png?text=${values.email[0].toUpperCase()}`,
+    };
+
+    localStorage.setItem("user", JSON.stringify(user));
+    window.dispatchEvent(new Event("storage")); // Notificar a otros componentes
+
     setLoading(false);
     toast({
         title: mode === 'login' ? "Inicio de Sesión Exitoso" : "Cuenta Creada",
@@ -57,9 +67,17 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   const googleSignIn = async () => {
     setLoading(true);
-    // Lógica de inicio de sesión con Google de Firebase aquí
-    console.log("Signing in with Google");
     await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const user = {
+      displayName: "Usuario de Google",
+      email: "google.user@example.com",
+      photoURL: "https://placehold.co/128x128.png?text=G",
+    };
+
+    localStorage.setItem("user", JSON.stringify(user));
+    window.dispatchEvent(new Event("storage"));
+
     setLoading(false);
     toast({
         title: "Inicio de Sesión Exitoso",

@@ -1,29 +1,33 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowRight, Edit, Gamepad2, Users } from "lucide-react";
+import { ArrowRight, Edit, Gamepad2, Loader2, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
-const user = {
-    displayName: "Campeón Ash",
-    email: "ash@tournaverse.com",
-    photoURL: "https://placehold.co/128x128.png",
-};
+interface User {
+    displayName: string;
+    email: string;
+    photoURL: string;
+}
 
-const createdTournaments = [
-    { id: '1', name: 'Summer Brawl 2024', game: 'Street Fighter 6', status: 'En curso', image: 'https://placehold.co/600x400.png', dataAiHint: 'fighting game' },
-    { id: '4', name: 'Torneo de Ajedrez Rook & Roll', game: 'Ajedrez', status: 'Próximo', image: 'https://placehold.co/600x400.png', dataAiHint: 'chess game' },
-];
+interface Tournament {
+    id: string;
+    name: string;
+    game: string;
+    status: string;
+    image: string;
+    dataAiHint: string;
+    ownerEmail: string;
+}
 
-const participatingTournaments = [
-    { id: '2', name: 'Valorant Champions Tour', game: 'Valorant', status: 'En curso', image: 'https://placehold.co/600x400.png', dataAiHint: 'esports gamers' },
-];
-
-
-const TournamentListItem = ({ tournament }: { tournament: typeof createdTournaments[0] }) => (
+const TournamentListItem = ({ tournament }: { tournament: Tournament }) => (
     <Card className="transition-all hover:shadow-md">
         <div className="flex flex-col sm:flex-row items-center space-x-4 p-4">
             <Image src={tournament.image} width={120} height={80} alt={tournament.name} data-ai-hint={tournament.dataAiHint} className="rounded-md w-full sm:w-32 h-24 object-cover" />
@@ -42,6 +46,32 @@ const TournamentListItem = ({ tournament }: { tournament: typeof createdTourname
 );
 
 export default function ProfilePage() {
+    const [user, setUser] = useState<User | null>(null);
+    const [createdTournaments, setCreatedTournaments] = useState<Tournament[]>([]);
+    const [participatingTournaments, setParticipatingTournaments] = useState<Tournament[]>([]);
+    const [loading, setLoading] = useState(true);
+    const router = useRouter();
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+
+            const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+            const userCreated = allTournaments.filter(t => t.ownerEmail === parsedUser.email);
+            // Simulación de participación
+            const userParticipating = allTournaments.filter(t => t.id === '2'); 
+
+            setCreatedTournaments(userCreated);
+            setParticipatingTournaments(userParticipating);
+
+        } else {
+            router.push("/login");
+        }
+        setLoading(false);
+    }, [router]);
+
     const getInitials = (name?: string | null) => {
         if (!name) return "U";
         const names = name.split(" ");
@@ -49,6 +79,14 @@ export default function ProfilePage() {
           ? `${names[0][0]}${names[names.length - 1][0]}`
           : names[0][0];
     };
+
+    if (loading || !user) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="h-16 w-16 animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto py-10 px-4">
@@ -76,8 +114,11 @@ export default function ProfilePage() {
                         {createdTournaments.length > 0 ? (
                              createdTournaments.map(t => <TournamentListItem key={t.id} tournament={t} />)
                         ) : (
-                            <Card className="flex items-center justify-center h-40">
+                            <Card className="flex items-center justify-center h-40 flex-col gap-4">
                                 <p className="text-muted-foreground">Aún no has creado ningún torneo.</p>
+                                <Button asChild>
+                                    <Link href="/tournaments/create">Crear uno ahora</Link>
+                                </Button>
                             </Card>
                         )}
                     </div>

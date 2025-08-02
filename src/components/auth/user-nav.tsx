@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { LogOut, User, Wrench, LayoutDashboard } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type User = {
   displayName?: string | null;
@@ -21,6 +22,8 @@ type User = {
 };
 
 export function UserNav({ user }: { user: User }) {
+  const router = useRouter();
+
   const getInitials = (name?: string | null) => {
     if (!name) return "U";
     const names = name.split(" ");
@@ -30,9 +33,9 @@ export function UserNav({ user }: { user: User }) {
   };
 
   const handleLogout = () => {
-    // En una aplicación real, llama a signOut de Firebase aquí
-    console.log("Cerrando sesión...");
-    window.location.href = '/'; //- o usa el router para refrescar el estado
+    localStorage.removeItem("user");
+    window.dispatchEvent(new Event("storage"));
+    router.push('/');
   };
 
   return (

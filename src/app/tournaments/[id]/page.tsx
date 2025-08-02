@@ -1,30 +1,65 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket from "@/components/tournaments/bracket";
 import ParticipantList from "@/components/tournaments/participant-list";
 import ParticipantManager from "@/components/tournaments/participant-manager";
 import Image from "next/image";
 
-const tournament = {
-    id: '1',
-    name: 'Summer Brawl 2024',
-    game: 'Street Fighter 6',
-    description: 'El torneo definitivo de Street Fighter 6 del verano. Los mejores jugadores de todo el mundo competirán por el gran premio y el título de campeón. Únete a nosotros para un enfrentamiento épico de habilidad y estrategia.',
-    participants: 4,
-    maxParticipants: 128,
-    startDate: 'Julio 20, 2024',
-    format: 'Eliminación Simple',
-    status: 'En curso',
-    isOwner: true, 
-    image: 'https://placehold.co/1200x400.png',
-    dataAiHint: 'fighting game esports',
+interface Tournament {
+    id: string;
+    name: string;
+    description: string;
+    game: string;
+    participants: number;
+    maxParticipants: number;
+    startDate: string;
+    format: 'single-elimination' | 'double-elimination' | 'swiss';
+    status: string;
+    ownerEmail: string;
+    image: string;
+    dataAiHint: string;
+}
+
+const formatMapping = {
+    'single-elimination': 'Eliminación Simple',
+    'double-elimination': 'Doble Eliminación',
+    'swiss': 'Suizo'
 };
 
+
 export default function TournamentPage({ params }: { params: { id: string } }) {
-  // En una aplicación real, obtendrías los datos del torneo usando params.id
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+    const currentTournament = allTournaments.find(t => t.id === params.id);
+
+    if (currentTournament) {
+        setTournament(currentTournament);
+        const storedUser = localStorage.getItem("user");
+        if(storedUser) {
+            const user = JSON.parse(storedUser);
+            setIsOwner(user.email === currentTournament.ownerEmail);
+        }
+    }
+    setLoading(false);
+  }, [params.id]);
+  
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
+  }
+
+  if (!tournament) {
+    return <div className="text-center py-10">Torneo no encontrado.</div>;
+  }
   
   return (
     <div className="container mx-auto py-10 px-4">
@@ -42,7 +77,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="bracket">Bracket</TabsTrigger>
           <TabsTrigger value="participants">Participantes</TabsTrigger>
-          {tournament.isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
+          {isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
         </TabsList>
         <TabsContent value="overview" className="mt-6">
           <Card>
@@ -63,14 +98,14 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
                   <Calendar className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Fecha de Inicio</p>
-                    <p className="text-lg text-foreground">{tournament.startDate}</p>
+                    <p className="text-lg text-foreground">{new Date(tournament.startDate).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <GitBranch className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Formato</p>
-                    <p className="text-lg text-foreground">{tournament.format}</p>
+                    <p className="text-lg text-foreground">{formatMapping[tournament.format]}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -91,11 +126,11 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
                   <Shield className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Organizador</p>
-                    <p className="text-lg text-foreground">AdminUser</p>
+                    <p className="text-lg text-foreground">{tournament.ownerEmail.split('@')[0]}</p>
                   </div>
                 </div>
               </div>
-              {!tournament.isOwner && tournament.status !== 'En curso' && (
+              {!isOwner && tournament.status !== 'En curso' && (
                 <div className="pt-6 border-t">
                     <Button size="lg">Unirse al Torneo</Button>
                 </div>
@@ -109,7 +144,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
         <TabsContent value="participants" className="mt-6">
           <ParticipantList />
         </TabsContent>
-        {tournament.isOwner && (
+        {isOwner && (
           <TabsContent value="manage" className="mt-6">
             <ParticipantManager />
           </TabsContent>

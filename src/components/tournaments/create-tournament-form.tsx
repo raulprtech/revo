@@ -74,14 +74,42 @@ export function CreateTournamentForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
-    console.log("Creando torneo:", values);
-    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const userStr = localStorage.getItem("user");
+    if (!userStr) {
+        toast({
+            title: "Error",
+            description: "Debes iniciar sesión para crear un torneo.",
+            variant: "destructive"
+        });
+        setLoading(false);
+        router.push('/login');
+        return;
+    }
+    const user = JSON.parse(userStr);
+
+    const newTournament = {
+        id: new Date().getTime().toString(), // ID único simple
+        ...values,
+        ownerEmail: user.email,
+        status: "Próximo",
+        participants: 0,
+        image: 'https://placehold.co/1200x400.png',
+        dataAiHint: `${values.game} tournament`,
+        avatar: `https://placehold.co/40x40.png?text=${values.game.substring(0,2)}`
+    };
+
+    const tournaments = JSON.parse(localStorage.getItem("tournaments") || "[]");
+    tournaments.push(newTournament);
+    localStorage.setItem("tournaments", JSON.stringify(tournaments));
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setLoading(false);
     toast({
         title: "¡Torneo Creado!",
         description: `Tu torneo "${values.name}" ahora está activo.`,
     });
-    router.push(`/tournaments/1`); // Redirigir a una página de torneo de ejemplo
+    router.push(`/tournaments/${newTournament.id}`);
   }
 
   return (

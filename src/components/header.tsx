@@ -13,28 +13,45 @@ type User = {
 };
 
 export function Header() {
-  // Esto es un estado de autenticación simulado. En una aplicación real, usarías el contexto de Firebase Auth.
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Simular la obtención del estado de autenticación
-    const timer = setTimeout(() => {
-      // Para probar ambos estados, puedes alternar este valor
-      const isLoggedIn = false;
-      if (isLoggedIn) {
-        setUser({
-          displayName: "Usuario de Prueba",
-          email: "test@example.com",
-          photoURL: "https://placehold.co/40x40.png"
-        });
+    setLoading(true);
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
       } else {
         setUser(null);
       }
-      setLoading(false);
-    }, 500);
+    } catch (error) {
+        console.error("Failed to parse user from localStorage", error);
+        setUser(null);
+    } finally {
+        setLoading(false);
+    }
 
-    return () => clearTimeout(timer);
+    const handleStorageChange = () => {
+        try {
+            const storedUser = localStorage.getItem("user");
+            if (storedUser) {
+                setUser(JSON.parse(storedUser));
+            } else {
+                setUser(null);
+            }
+        } catch (error) {
+            console.error("Failed to parse user from localStorage on storage event", error);
+            setUser(null);
+        }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+    }
+
   }, []);
 
   return (
