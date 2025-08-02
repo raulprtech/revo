@@ -43,6 +43,7 @@ const stepTwoSchema = z.object({
   startDate: z.date({ required_error: "Se requiere una fecha de inicio." }),
   maxParticipants: z.coerce.number().min(2, "Se requieren al menos 2 participantes.").max(256),
   registrationType: z.enum(["public", "private"]),
+  prizePool: z.string().optional(),
 });
 
 const formSchema = stepOneSchema.merge(stepTwoSchema);
@@ -62,6 +63,7 @@ export function CreateTournamentForm() {
       format: "single-elimination",
       registrationType: "public",
       maxParticipants: 16,
+      prizePool: "",
     },
   });
 
@@ -234,6 +236,19 @@ export function CreateTournamentForm() {
                       <FormLabel>Máximo de Participantes</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="prizePool"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bolsa de Premios (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ej., $1000, 50% de las inscripciones" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

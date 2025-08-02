@@ -24,6 +24,7 @@ interface Tournament {
     ownerEmail: string;
     image: string;
     dataAiHint: string;
+    prizePool?: string;
 }
 
 const formatMapping = {
@@ -120,7 +121,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
                   <Trophy className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Bolsa de Premios</p>
-                    <p className="text-lg text-foreground">Por anunciar</p>
+                    <p className="text-lg text-foreground">{tournament.prizePool || 'Por anunciar'}</p>
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
