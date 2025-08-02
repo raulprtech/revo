@@ -37,10 +37,11 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { id } = params;
 
   useEffect(() => {
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-    const currentTournament = allTournaments.find(t => t.id === params.id);
+    const currentTournament = allTournaments.find(t => t.id === id);
 
     if (currentTournament) {
         setTournament(currentTournament);
@@ -51,7 +52,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
         }
     }
     setLoading(false);
-  }, [params.id]);
+  }, [id]);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
