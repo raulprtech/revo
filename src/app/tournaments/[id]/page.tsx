@@ -1,16 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2 } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket from "@/components/tournaments/bracket";
 import ParticipantList from "@/components/tournaments/participant-list";
 import ParticipantManager from "@/components/tournaments/participant-manager";
 import Image from "next/image";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast";
+
 
 interface Tournament {
     id: string;
@@ -40,7 +54,9 @@ export default function TournamentPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!id) return;
@@ -58,6 +74,18 @@ export default function TournamentPage() {
     }
     setLoading(false);
   }, [id]);
+
+  const handleDelete = () => {
+    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+    const updatedTournaments = allTournaments.filter(t => t.id !== id);
+    localStorage.setItem("tournaments", JSON.stringify(updatedTournaments));
+    toast({
+      title: "Torneo eliminado",
+      description: `El torneo "${tournament?.name}" ha sido eliminado.`,
+      variant: "destructive"
+    });
+    router.push("/dashboard");
+  }
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
@@ -87,8 +115,39 @@ export default function TournamentPage() {
         </TabsList>
         <TabsContent value="overview" className="mt-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row justify-between items-start">
               <CardTitle>Detalles del Torneo</CardTitle>
+               {isOwner && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/tournaments/${tournament.id}/edit`}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </Link>
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción no se puede deshacer. Esto eliminará permanentemente tu torneo
+                          y todos sus datos de nuestros servidores.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>Continuar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-muted-foreground">{tournament.description}</p>
