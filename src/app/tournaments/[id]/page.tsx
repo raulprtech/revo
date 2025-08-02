@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,10 +38,11 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
-  const resolvedParams = use(Promise.resolve(params));
-  const id = resolvedParams.id;
+  const { id } = params;
 
   useEffect(() => {
+    if (!id) return;
+    
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
     const currentTournament = allTournaments.find(t => t.id === id);
 
