@@ -38,7 +38,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { id } = use(params);
+  const id = use(params.id);
 
   useEffect(() => {
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
@@ -141,7 +141,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
           </Card>
         </TabsContent>
         <TabsContent value="bracket" className="mt-6">
-          <Bracket />
+          <Bracket tournament={tournament} />
         </TabsContent>
         <TabsContent value="participants" className="mt-6">
           <ParticipantList />

@@ -41,7 +41,7 @@ type ReportScoreDialogProps = {
     top: { name: string };
     bottom: { name: string };
   };
-  onScoreReported: () => void;
+  onScoreReported: (scores: { top: number; bottom: number }) => void;
 };
 
 export function ReportScoreDialog({ isOpen, onOpenChange, match, onScoreReported }: ReportScoreDialogProps) {
@@ -58,13 +58,10 @@ export function ReportScoreDialog({ isOpen, onOpenChange, match, onScoreReported
 
   async function onSubmit(values: z.infer<typeof reportScoreSchema>) {
     setLoading(true);
-    // Aquí llamarías a una API para guardar el puntaje
-    console.log({ matchId: match.id, scores: values });
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulación de una llamada a la API
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Aquí es donde actualizaríamos el estado.
-    // Por ahora, solo llamaremos al callback
-    onScoreReported();
+    onScoreReported({ top: values.topScore, bottom: values.bottomScore });
     
     setLoading(false);
     onOpenChange(false);

@@ -5,34 +5,68 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { Trophy } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ReportScoreDialog } from "./report-score-dialog";
 
-// Datos de ejemplo
-const initialRounds = [
-  {
-    name: "Ronda 1",
-    matches: [
-      { id: 1, top: { name: "CyberNinja", score: null }, bottom: { name: "PixelProwler", score: null }, winner: null },
-      { id: 2, top: { name: "QuantumLeap", score: null }, bottom: { name: "SynthWave", score: null }, winner: null },
-      { id: 3, top: { name: "GigaGlitch", score: null }, bottom: { name: "VoidRunner", score: null }, winner: null },
-      { id: 4, top: { name: "DataDragon", score: null }, bottom: { name: "LogicLancer", score: null }, winner: null },
-    ],
-  },
-  {
-    name: "Semifinales",
-    matches: [
-      { id: 5, top: { name: "TBD", score: null }, bottom: { name: "TBD", score: null }, winner: null },
-      { id: 6, top: { name: "TBD", score: null }, bottom: { name: "TBD", score: null }, winner: null },
-    ],
-  },
-  {
-    name: "Finales",
-    matches: [
-      { id: 7, top: { name: "TBD", score: null }, bottom: { name: "TBD", score: null }, winner: null },
-    ],
-  },
-];
+interface Tournament {
+    id: string;
+    name: string;
+    description: string;
+    game: string;
+    participants: number;
+    maxParticipants: number;
+    startDate: string;
+    format: 'single-elimination' | 'double-elimination' | 'swiss';
+    status: string;
+    ownerEmail: string;
+    image: string;
+    dataAiHint: string;
+    prizePool?: string;
+}
+
+const generateRounds = (numParticipants: number) => {
+    if (numParticipants < 2) return [];
+    
+    // For simplicity, we'll use mock player names for now
+    const playerNames = [
+      "CyberNinja", "PixelProwler", "QuantumLeap", "SynthWave",
+      "GigaGlitch", "VoidRunner", "DataDragon", "LogicLancer",
+      "BinaryBard", "CircuitSorcerer", "FirewallFury", "GridGuardian",
+      "MatrixMonarch", "NetworkNomad", "OracleKnight", "ProtocolPaladin"
+    ];
+
+    const actualParticipants = playerNames.slice(0, numParticipants).map(name => ({ name }));
+
+    const rounds = [];
+    let currentPlayers = [...actualParticipants];
+    let roundIndex = 1;
+    let matchId = 1;
+
+    while (currentPlayers.length > 1) {
+        const roundName = currentPlayers.length === 2 ? "Finales" : currentPlayers.length === 4 ? "Semifinales" : `Ronda ${roundIndex}`;
+        const matches = [];
+        const nextRoundPlayers = [];
+
+        for (let i = 0; i < currentPlayers.length; i += 2) {
+            const top = currentPlayers[i];
+            const bottom = currentPlayers[i + 1] || { name: "BYE" }; // Handle byes for odd numbers
+            matches.push({
+                id: matchId++,
+                top: { name: top.name, score: null },
+                bottom: { name: bottom.name, score: null },
+                winner: bottom.name === "BYE" ? top.name : null,
+            });
+            nextRoundPlayers.push({ name: "TBD" });
+        }
+        
+        rounds.push({ name: roundName, matches });
+        currentPlayers = nextRoundPlayers;
+        roundIndex++;
+    }
+    
+    return rounds;
+}
+
 
 type Match = {
     id: number;
@@ -46,12 +80,16 @@ type Round = {
     matches: Match[];
 };
 
-const MatchCard = ({ match, onScoreReported }: { match: Match, onScoreReported: () => void }) => {
+const MatchCard = ({ match, onScoreReported }: { match: Match, onScoreReported: (matchId: number, scores: { top: number, bottom: number }) => void }) => {
     const isTopWinner = match.winner === match.top.name;
     const isBottomWinner = match.winner === match.bottom.name;
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const canReport = match.top.name !== 'TBD' && match.bottom.name !== 'TBD' && !match.winner;
+    const canReport = match.top.name !== 'TBD' && match.bottom.name !== 'TBD' && !match.winner && match.bottom.name !== 'BYE';
+
+    const handleReport = () => {
+        setIsDialogOpen(true);
+    };
 
     return (
         <>
@@ -67,7 +105,7 @@ const MatchCard = ({ match, onScoreReported }: { match: Match, onScoreReported: 
                         <span className={cn("text-sm font-mono px-2 py-0.5 rounded", isBottomWinner ? "bg-primary/20 text-primary" : "bg-muted")}>{match.bottom.score ?? '-'}</span>
                     </div>
                     {canReport && (
-                        <Button size="sm" variant="outline" className="w-full mt-2 h-7 text-xs" onClick={() => setIsDialogOpen(true)}>
+                        <Button size="sm" variant="outline" className="w-full mt-2 h-7 text-xs" onClick={handleReport}>
                             Reportar Resultado
                         </Button>
                     )}
@@ -77,60 +115,57 @@ const MatchCard = ({ match, onScoreReported }: { match: Match, onScoreReported: 
                 isOpen={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
                 match={match}
-                onScoreReported={onScoreReported}
+                onScoreReported={(scores) => onScoreReported(match.id, scores)}
             />
         </>
     )
 }
 
-export default function Bracket() {
-  const [rounds, setRounds] = useState<Round[]>(initialRounds);
-  const tournamentWinner = rounds[rounds.length - 1].matches[0].winner;
+export default function Bracket({ tournament }: { tournament: Tournament }) {
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const tournamentWinner = rounds.length > 0 ? rounds[rounds.length - 1].matches[0].winner : null;
 
-  const handleScoreReported = () => {
-        // Esto es un marcador de posición. En una aplicación real, volverías a obtener los datos
-        // o tendrías una gestión de estado más sofisticada.
-        // Para esta demostración, simplemente simularemos una actualización de datos volviendo a aplicar la lógica de los datos de ejemplo.
-        
-        // Esta es una simulación simple. Una implementación real sería más compleja.
-        const newRounds = JSON.parse(JSON.stringify(initialRounds));
-        newRounds[0].matches[0].score = { top: 2, bottom: 1 };
-        newRounds[0].matches[0].winner = "CyberNinja";
-        newRounds[0].matches[0].top.score = 2;
-        newRounds[0].matches[0].bottom.score = 1;
-        
-        newRounds[0].matches[1].score = { top: 0, bottom: 2 };
-        newRounds[0].matches[1].winner = "SynthWave";
-        newRounds[0].matches[1].top.score = 0;
-        newRounds[0].matches[1].bottom.score = 2;
+  useEffect(() => {
+    if (tournament) {
+      setRounds(generateRounds(tournament.maxParticipants));
+    }
+  }, [tournament]);
 
-        newRounds[0].matches[2].score = { top: 2, bottom: 0 };
-        newRounds[0].matches[2].winner = "GigaGlitch";
-        newRounds[0].matches[2].top.score = 2;
-        newRounds[0].matches[2].bottom.score = 0;
+  const handleScoreReported = (matchId: number, scores: {top: number, bottom: number}) => {
+      setRounds(prevRounds => {
+          const newRounds = JSON.parse(JSON.stringify(prevRounds));
+          let matchFound = false;
 
-        newRounds[0].matches[3].score = { top: 1, bottom: 2 };
-        newRounds[0].matches[3].winner = "LogicLancer";
-        newRounds[0].matches[3].top.score = 1;
-        newRounds[0].matches[3].bottom.score = 2;
-
-        newRounds[1].matches[0].top.name = "CyberNinja";
-        newRounds[1].matches[0].bottom.name = "SynthWave";
-        newRounds[1].matches[0].winner = "CyberNinja";
-        newRounds[1].matches[0].top.score = 2;
-        newRounds[1].matches[0].bottom.score = 1;
-
-        newRounds[1].matches[1].top.name = "GigaGlitch";
-        newRounds[1].matches[1].bottom.name = "LogicLancer";
-        newRounds[1].matches[1].winner = "LogicLancer";
-        newRounds[1].matches[1].top.score = 0;
-        newRounds[1].matches[1].bottom.score = 2;
-        
-        newRounds[2].matches[0].top.name = "CyberNinja";
-        newRounds[2].matches[0].bottom.name = "LogicLancer";
-
-        setRounds(newRounds);
+          for (let i = 0; i < newRounds.length; i++) {
+              const round = newRounds[i];
+              const match = round.matches.find(m => m.id === matchId);
+              
+              if (match) {
+                  match.top.score = scores.top;
+                  match.bottom.score = scores.bottom;
+                  match.winner = scores.top > scores.bottom ? match.top.name : match.bottom.name;
+                  
+                  // Propagate winner to next round
+                  if (i + 1 < newRounds.length) {
+                      const nextRound = newRounds[i+1];
+                      const matchInNextRoundIndex = Math.floor(round.matches.indexOf(match) / 2);
+                      const nextMatch = nextRound.matches[matchInNextRoundIndex];
+                      
+                      if (round.matches.indexOf(match) % 2 === 0) {
+                          nextMatch.top.name = match.winner;
+                      } else {
+                          nextMatch.bottom.name = match.winner;
+                      }
+                  }
+                  matchFound = true;
+                  break;
+              }
+          }
+          return newRounds;
+      });
   };
+
+  if (!tournament) return null;
 
   return (
     <Card>
