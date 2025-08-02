@@ -68,6 +68,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
       registrationType: "public",
       maxParticipants: 16,
       prizePool: "",
+      startDate: new Date(),
     },
   });
 
@@ -89,7 +90,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
         const user = JSON.parse(userStr);
 
         const newTournament = {
-            id: new Date().getTime().toString(), // ID único simple
+            id: new Date().getTime().toString(), 
             ...values,
             ownerEmail: user.email,
             status: "Próximo",
@@ -102,6 +103,11 @@ export function CreateTournamentForm({ mode = "create", tournamentData }: Create
         const tournaments = JSON.parse(localStorage.getItem("tournaments") || "[]");
         tournaments.push(newTournament);
         localStorage.setItem("tournaments", JSON.stringify(tournaments));
+        
+        const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}");
+        participantsData[newTournament.id] = [];
+        localStorage.setItem("participantsData", JSON.stringify(participantsData));
+
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         setLoading(false);

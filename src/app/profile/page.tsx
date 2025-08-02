@@ -27,6 +27,13 @@ interface Tournament {
     ownerEmail: string;
 }
 
+interface Participant {
+    email: string;
+    name: string;
+    avatar: string;
+    status: 'Aceptado' | 'Pendiente' | 'Rechazado';
+}
+
 const TournamentListItem = ({ tournament }: { tournament: Tournament }) => (
     <Card className="transition-all hover:shadow-md">
         <div className="flex flex-col sm:flex-row items-center space-x-4 p-4">
@@ -59,9 +66,14 @@ export default function ProfilePage() {
             setUser(parsedUser);
 
             const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+            const allParticipants: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+
             const userCreated = allTournaments.filter(t => t.ownerEmail === parsedUser.email);
-            // Simulación de participación
-            const userParticipating = allTournaments.filter(t => t.id === '2'); 
+            
+            const userParticipating = allTournaments.filter(tournament => {
+                const participants = allParticipants[tournament.id] || [];
+                return participants.some(p => p.email === parsedUser.email);
+            });
 
             setCreatedTournaments(userCreated);
             setParticipatingTournaments(userParticipating);

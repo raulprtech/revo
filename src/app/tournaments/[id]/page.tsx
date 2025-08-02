@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
@@ -42,6 +42,19 @@ interface Tournament {
     prizePool?: string;
 }
 
+interface User {
+    displayName: string;
+    email: string;
+    photoURL: string;
+}
+
+interface Participant {
+    email: string;
+    name: string;
+    avatar: string;
+    status: 'Aceptado' | 'Pendiente' | 'Rechazado';
+}
+
 const formatMapping = {
     'single-elimination': 'Eliminación Simple',
     'double-elimination': 'Doble Eliminación',
@@ -58,6 +71,8 @@ export default function TournamentPage() {
   const id = params.id as string;
   const { toast } = useToast();
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isParticipant, setIsParticipant] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,7 +85,12 @@ export default function TournamentPage() {
         const storedUser = localStorage.getItem("user");
         if(storedUser) {
             const user = JSON.parse(storedUser);
+            setCurrentUser(user);
             setIsOwner(user.email === currentTournament.ownerEmail);
+
+            const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+            const tournamentParticipants = participantsData[id] || [];
+            setIsParticipant(tournamentParticipants.some(p => p.email === user.email));
         }
         setRounds(generateRounds(currentTournament.maxParticipants));
     }
@@ -81,6 +101,11 @@ export default function TournamentPage() {
     const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
     const updatedTournaments = allTournaments.filter(t => t.id !== id);
     localStorage.setItem("tournaments", JSON.stringify(updatedTournaments));
+
+    const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+    delete participantsData[id];
+    localStorage.setItem("participantsData", JSON.stringify(participantsData));
+
     toast({
       title: "Torneo eliminado",
       description: `El torneo "${tournament?.name}" ha sido eliminado.`,
@@ -117,7 +142,6 @@ export default function TournamentPage() {
                               nextMatch.bottom.name = match.winner;
                           }
 
-                          // If both players for the next match are decided, determine winner if one is a BYE
                           if(nextMatch.top.name !== 'TBD' && nextMatch.bottom.name !== 'TBD') {
                               if(nextMatch.bottom.name === 'BYE') nextMatch.winner = nextMatch.top.name;
                               if(nextMatch.top.name === 'BYE') nextMatch.winner = nextMatch.bottom.name;
@@ -128,8 +152,8 @@ export default function TournamentPage() {
                   break;
               }
           }
-          // This part is for handling bye propagation when winner is set in nextMatch
-           let roundsUpdated = true;
+
+            let roundsUpdated = true;
             while(roundsUpdated) {
                 roundsUpdated = false;
                 for (let i = 0; i < newRounds.length - 1; i++) {
@@ -170,6 +194,48 @@ export default function TournamentPage() {
           return newRounds;
       });
   };
+
+  const handleJoinTournament = () => {
+    if (!currentUser) {
+        toast({ title: "Debes iniciar sesión", description: "Inicia sesión para unirte a un torneo.", variant: "destructive" });
+        router.push('/login');
+        return;
+    }
+    if (!tournament) return;
+
+    if (tournament.participants >= tournament.maxParticipants) {
+        toast({ title: "Torneo Lleno", description: "Este torneo ya ha alcanzado el máximo de participantes.", variant: "destructive" });
+        return;
+    }
+
+    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+    const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+    
+    const tournamentIndex = allTournaments.findIndex(t => t.id === id);
+    if (tournamentIndex === -1) return;
+
+    const tournamentToUpdate = allTournaments[tournamentIndex];
+    tournamentToUpdate.participants++;
+    
+    if (!participantsData[id]) {
+        participantsData[id] = [];
+    }
+    
+    participantsData[id].push({
+        email: currentUser.email,
+        name: currentUser.displayName,
+        avatar: currentUser.photoURL,
+        status: 'Pendiente'
+    });
+
+    localStorage.setItem("tournaments", JSON.stringify(allTournaments));
+    localStorage.setItem("participantsData", JSON.stringify(participantsData));
+
+    setTournament(tournamentToUpdate);
+    setIsParticipant(true);
+    
+    toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
+  }
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
@@ -179,6 +245,8 @@ export default function TournamentPage() {
     return <div className="text-center py-10">Torneo no encontrado.</div>;
   }
   
+  const canJoin = !isOwner && !isParticipant && tournament.status !== 'En curso';
+
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="relative w-full h-48 md:h-64 lg:h-80 rounded-lg overflow-hidden mb-8 shadow-lg">
@@ -279,11 +347,10 @@ export default function TournamentPage() {
                   </div>
                 </div>
               </div>
-              {!isOwner && tournament.status !== 'En curso' && (
-                <div className="pt-6 border-t">
-                    <Button size="lg">Unirse al Torneo</Button>
-                </div>
-              )}
+              <div className="pt-6 border-t">
+                  {canJoin && <Button size="lg" onClick={handleJoinTournament}>Unirse al Torneo</Button>}
+                  {isParticipant && <Button size="lg" variant="secondary" disabled><CheckCircle2 className="mr-2 h-5 w-5"/> Ya estás inscrito</Button>}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -295,7 +362,7 @@ export default function TournamentPage() {
         </TabsContent>
         {isOwner && (
           <TabsContent value="manage" className="mt-6">
-            <ParticipantManager />
+            <ParticipantManager tournamentId={id}/>
           </TabsContent>
         )}
       </Tabs>

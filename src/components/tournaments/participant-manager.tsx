@@ -5,18 +5,50 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../ui/button";
 import { Check, X, Shuffle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
-const mockParticipants = [
-  { id: 1, name: "CyberNinja", status: "Aceptado", seed: 1, avatar: 'https://placehold.co/40x40.png' },
-  { id: 2, name: "SynthWave", status: "Aceptado", seed: 2, avatar: 'https://placehold.co/40x40.png' },
-  { id: 3, name: "GigaGlitch", status: "Aceptado", seed: 3, avatar: 'https://placehold.co/40x40.png' },
-  { id: 4, name: "LogicLancer", status: "Aceptado", seed: 4, avatar: 'https://placehold.co/40x40.png' },
-  { id: 5, name: "QuantumLeap", status: "Pendiente", seed: null, avatar: 'https://placehold.co/40x40.png' },
-  { id: 6, name: "PixelProwler", status: "Pendiente", seed: null, avatar: 'https://placehold.co/40x40.png' },
-  { id: 7, name: "VoidRunner", status: "Rechazado", seed: null, avatar: 'https://placehold.co/40x40.png' },
-];
+interface Participant {
+    email: string;
+    name: string;
+    avatar: string;
+    status: 'Aceptado' | 'Pendiente' | 'Rechazado';
+}
 
-export default function ParticipantManager() {
+interface ParticipantManagerProps {
+    tournamentId: string;
+}
+
+export default function ParticipantManager({ tournamentId }: ParticipantManagerProps) {
+    const [participants, setParticipants] = useState<Participant[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+        setParticipants(participantsData[tournamentId] || []);
+        setLoading(false);
+    }, [tournamentId]);
+
+    const handleParticipantStatusChange = (email: string, newStatus: 'Aceptado' | 'Rechazado') => {
+        const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+        const tournamentParticipants = participantsData[tournamentId] || [];
+        const participantIndex = tournamentParticipants.findIndex(p => p.email === email);
+
+        if (participantIndex !== -1) {
+            tournamentParticipants[participantIndex].status = newStatus;
+            participantsData[tournamentId] = tournamentParticipants;
+            localStorage.setItem("participantsData", JSON.stringify(participantsData));
+            setParticipants([...tournamentParticipants]);
+
+            toast({
+                title: "Participante actualizado",
+                description: `El estado de ${email} ha sido cambiado a ${newStatus}.`,
+            });
+        }
+    };
+
+
     return (
         <Card>
             <CardHeader>
@@ -41,8 +73,8 @@ export default function ParticipantManager() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {mockParticipants.map((p) => (
-                            <TableRow key={p.id}>
+                        {participants.length > 0 ? participants.map((p) => (
+                            <TableRow key={p.email}>
                                 <TableCell>
                                     <div className="flex items-center space-x-3">
                                         <Avatar>
@@ -58,17 +90,21 @@ export default function ParticipantManager() {
                                 <TableCell className="text-right">
                                     {p.status === "Pendiente" && (
                                         <div className="space-x-2">
-                                            <Button variant="ghost" size="icon" className="text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 hover:text-green-600">
+                                            <Button variant="ghost" size="icon" className="text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 hover:text-green-600" onClick={() => handleParticipantStatusChange(p.email, "Aceptado")}>
                                                 <Check className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600">
+                                            <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600" onClick={() => handleParticipantStatusChange(p.email, "Rechazado")}>
                                                 <X className="h-4 w-4" />
                                             </Button>
                                         </div>
                                     )}
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={3} className="text-center h-24">No hay participantes aún.</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>
