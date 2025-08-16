@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Dirección de correo electrónico inválida." }),
@@ -35,6 +36,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const supabase = createClient();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,47 +50,69 @@ export function AuthForm({ mode }: AuthFormProps) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     
-    // Simulación de autenticación
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user = {
-      displayName: values.email.split('@')[0],
-      email: values.email,
-      photoURL: `https://placehold.co/128x128.png?text=${values.email[0].toUpperCase()}`,
-      location: values.location,
-    };
+    if (mode === 'signup') {
+      const { error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            location: values.location,
+          },
+        },
+      });
 
-    localStorage.setItem("user", JSON.stringify(user));
-    window.dispatchEvent(new Event("storage")); // Notificar a otros componentes
+      if (error) {
+        toast({
+          title: "Error al crear la cuenta",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Cuenta Creada",
+          description: "Revisa tu correo para verificar tu cuenta.",
+        });
+        router.push("/profile");
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (error) {
+        toast({
+          title: "Error al iniciar sesión",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Inicio de Sesión Exitoso",
+          description: "Redirigiendo a tu perfil...",
+        });
+        router.push("/profile");
+      }
+    }
 
     setLoading(false);
-    toast({
-        title: mode === 'login' ? "Inicio de Sesión Exitoso" : "Cuenta Creada",
-        description: "Redirigiendo a tu perfil...",
-    });
-    router.push("/profile");
   }
 
   const googleSignIn = async () => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user = {
-      displayName: "Usuario de Google",
-      email: "google.user@example.com",
-      photoURL: "https://placehold.co/128x128.png?text=G",
-      location: "Mountain View, CA",
-    };
-
-    localStorage.setItem("user", JSON.stringify(user));
-    window.dispatchEvent(new Event("storage"));
-
-    setLoading(false);
-    toast({
-        title: "Inicio de Sesión Exitoso",
-        description: "Redirigiendo a tu perfil...",
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
     });
-    router.push("/profile");
+
+    if (error) {
+      toast({
+        title: "Error al iniciar sesión con Google",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+    // Redirect handled by Supabase
+    setLoading(false);
   };
 
   return (

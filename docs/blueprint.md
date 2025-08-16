@@ -2,7 +2,7 @@
 
 ## Core Features:
 
-- User Authentication: User authentication with Firebase (email/password, Google) with profile page to view created/participating tournaments.
+- User Authentication: User authentication with Supabase (email/password, Google) with profile page to view created/participating tournaments.
 - Tournament Creation: Multi-stage form for creating new tournaments: name, description, game/sport, start date, format (single/double elimination, Swiss), max participants, public/private.
 - Participant Management: Management panel to view, accept/reject participants and seed them into the tournament bracket.
 - Bracket Generation: Automatically generate interactive bracket based on tournament format and participants.
