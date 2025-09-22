@@ -160,9 +160,12 @@ export default function TournamentPage() {
 
     if (currentTournament) {
         const normalizedTournament = normalizeTournament(currentTournament);
-        const maxParticipants = normalizedTournament?.max_participants ?? 0;
-        const participantCount = seededPlayerNames.length > 0 ? seededPlayerNames.length : maxParticipants;
-        setRounds(generateRounds(participantCount, seededPlayerNames));
+        // Solo generar bracket si hay participantes reales registrados
+        if (seededPlayerNames.length > 0) {
+            setRounds(generateRounds(seededPlayerNames.length, seededPlayerNames));
+        } else {
+            setRounds([]);
+        }
     }
   }, [id]);
 

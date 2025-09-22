@@ -88,7 +88,7 @@ export default function StandingsTable({ rounds }: { rounds: Round[] }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {standings.map((p) => (
+                        {standings.length > 0 ? standings.map((p) => (
                             <TableRow key={p.id}>
                                 <TableCell className="font-medium text-center">{p.rank}</TableCell>
                                 <TableCell>
@@ -103,7 +103,13 @@ export default function StandingsTable({ rounds }: { rounds: Round[] }) {
                                 <TableCell className="text-center font-mono text-green-400">{p.wins}</TableCell>
                                 <TableCell className="text-center font-mono text-red-400">{p.losses}</TableCell>
                             </TableRow>
-                        ))}
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                    No hay participantes registrados aún
+                                </TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>

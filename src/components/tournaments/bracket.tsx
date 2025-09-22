@@ -17,17 +17,8 @@ export const generateRounds = (numParticipants: number, seededPlayerNames?: stri
     if (seededPlayerNames && seededPlayerNames.length > 0) {
         playerNames = seededPlayerNames;
     } else {
-        const defaultNames = [
-          "CyberNinja", "PixelProwler", "QuantumLeap", "SynthWave",
-          "GigaGlitch", "VoidRunner", "DataDragon", "LogicLancer",
-          "BinaryBard", "CircuitSorcerer", "FirewallFury", "GridGuardian",
-          "MatrixMonarch", "NetworkNomad", "OracleKnight", "ProtocolPaladin",
-          "GlitchCat", "TechWarlock", "DataWrangler", "CodeComrade",
-          "ScriptKiddie", "ByteBrawler", "KernelKnight", "BugHunter",
-          "StackSmasher", "PointerProtector", "HeapHero", "CacheCommander",
-          "ArrayAvenger", "StringSamurai", "FunctionFighter", "ClassChampion",
-        ].slice(0, numParticipants);
-        playerNames = defaultNames.sort(() => Math.random() - 0.5);
+        // Si no hay participantes reales, no generar bracket con nombres falsos
+        return [];
     }
     
     let n = 1;
