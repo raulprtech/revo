@@ -68,6 +68,20 @@ export function AuthForm({ mode }: AuthFormProps) {
           variant: "destructive",
         });
       } else {
+        // Get user data from Supabase and save to localStorage (for signup)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const userData = {
+            displayName: user.user_metadata?.full_name || values.email.split('@')[0] || 'Usuario',
+            email: user.email || values.email,
+            photoURL: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${values.email}`
+          };
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          // Trigger storage event for header to update
+          window.dispatchEvent(new Event('storage'));
+        }
+
         toast({
           title: "Cuenta Creada",
           description: "Revisa tu correo para verificar tu cuenta.",
@@ -87,6 +101,20 @@ export function AuthForm({ mode }: AuthFormProps) {
           variant: "destructive",
         });
       } else {
+        // Get user data from Supabase and save to localStorage
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const userData = {
+            displayName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
+            email: user.email || '',
+            photoURL: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`
+          };
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          // Trigger storage event for header to update
+          window.dispatchEvent(new Event('storage'));
+        }
+
         toast({
           title: "Inicio de Sesión Exitoso",
           description: "Redirigiendo a tu perfil...",
@@ -98,22 +126,26 @@ export function AuthForm({ mode }: AuthFormProps) {
     setLoading(false);
   }
 
-  const googleSignIn = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    });
+  // Temporarily commented out Google OAuth
+  // const googleSignIn = async () => {
+  //   setLoading(true);
+  //   const { error } = await supabase.auth.signInWithOAuth({
+  //     provider: 'google',
+  //     options: {
+  //       redirectTo: `${window.location.origin}/auth/callback`
+  //     }
+  //   });
 
-    if (error) {
-      toast({
-        title: "Error al iniciar sesión con Google",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-    // Redirect handled by Supabase
-    setLoading(false);
-  };
+  //   if (error) {
+  //     toast({
+  //       title: "Error al iniciar sesión con Google",
+  //       description: error.message,
+  //       variant: "destructive",
+  //     });
+  //     setLoading(false);
+  //   }
+  //   // Redirect handled by Supabase, loading state will be reset by callback
+  // };
 
   return (
     <div className="flex grow items-center justify-center bg-background px-4 py-12">
@@ -178,7 +210,8 @@ export function AuthForm({ mode }: AuthFormProps) {
               </form>
             </Form>
             
-            <div className="relative">
+            {/* Temporarily commented out Google OAuth */}
+            {/* <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
@@ -188,11 +221,11 @@ export function AuthForm({ mode }: AuthFormProps) {
                 </span>
               </div>
             </div>
-            
+
             <Button variant="outline" className="w-full" onClick={googleSignIn} disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 62.3l-67.9 67.9C293.7 109.2 272.1 104 248 104c-58.4 0-108.3 49.3-115.9 108.2H129.5v66.4h118.5c2.3 12.7 3.5 25.8 3.5 39.4z"></path></svg>}
               Google
-            </Button>
+            </Button> */}
           </div>
           <div className="mt-4 text-center text-sm">
             {mode === 'login' ? (

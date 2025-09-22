@@ -7,22 +7,7 @@ import { cn } from "@/lib/utils";
 import { Trophy, Expand } from "lucide-react";
 import { useState, useRef } from "react";
 import { ReportScoreDialog } from "./report-score-dialog";
-
-interface Tournament {
-    id: string;
-    name: string;
-    description: string;
-    game: string;
-    participants: number;
-    maxParticipants: number;
-    startDate: string;
-    format: 'single-elimination' | 'double-elimination' | 'swiss';
-    status: string;
-    ownerEmail: string;
-    image: string;
-    dataAiHint: string;
-    prizePool?: string;
-}
+import type { Tournament } from "@/lib/database";
 
 export const generateRounds = (numParticipants: number, seededPlayerNames?: string[]) => {
     if (numParticipants < 2) return [];

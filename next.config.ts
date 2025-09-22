@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  turbopack: {
+    root: '/home/raulprtech/projects/web/revo'
+  }
 };
 
 export default nextConfig;

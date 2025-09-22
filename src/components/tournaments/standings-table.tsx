@@ -63,7 +63,7 @@ const calculateStandings = (rounds: Round[]): StandingsEntry[] => {
         return {
             ...player,
             rank,
-            avatar: `https://placehold.co/40x40.png?text=${player.name.substring(0,2)}`
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${player.name}`
         };
     });
 };

@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
 import ParticipantManager from "@/components/tournaments/participant-manager";
+import { InvitationManager } from "@/components/tournaments/invitation-manager";
+import ParticipantsList from "@/components/tournaments/participants-list";
 import Image from "next/image";
 import {
   AlertDialog,
@@ -25,24 +27,26 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast";
+import { db, type Tournament, type Participant } from "@/lib/database";
+import { createClient } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
+
+const getDefaultTournamentImage = (gameName: string) => {
+  const colors = [
+    'from-blue-500 to-purple-600',
+    'from-green-500 to-teal-600',
+    'from-red-500 to-pink-600',
+    'from-yellow-500 to-orange-600',
+    'from-indigo-500 to-blue-600',
+    'from-purple-500 to-indigo-600'
+  ];
+
+  const colorIndex = gameName.length % colors.length;
+  return colors[colorIndex];
+};
 
 
-interface Tournament {
-    id: string;
-    name: string;
-    description: string;
-    game: string;
-    participants: number;
-    maxParticipants: number;
-    startDate: string;
-    format: 'single-elimination' | 'double-elimination' | 'swiss';
-    status: string;
-    ownerEmail: string;
-    image: string;
-    dataAiHint: string;
-    prizePool?: string;
-    location?: string;
-}
+// Interfaces are now imported from database
 
 interface User {
     displayName: string;
@@ -50,17 +54,87 @@ interface User {
     photoURL: string;
 }
 
-interface Participant {
-    email: string;
-    name: string;
-    avatar: string;
-    status: 'Aceptado' | 'Pendiente' | 'Rechazado';
-}
-
 const formatMapping = {
     'single-elimination': 'Eliminación Simple',
     'double-elimination': 'Doble Eliminación',
     'swiss': 'Suizo'
+};
+
+const SUPABASE_SESSION_KEY = (() => {
+  if (typeof process === 'undefined') return null;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  const match = supabaseUrl.match(/^https?:\/\/([^.]+)\.supabase\.co/);
+  return match ? `sb-${match[1]}-auth-token` : null;
+})();
+
+const readStoredSession = (): Session | null => {
+  if (typeof window === 'undefined' || !SUPABASE_SESSION_KEY) {
+    return null;
+  }
+
+  try {
+    const raw = localStorage.getItem(SUPABASE_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const session = parsed?.currentSession;
+    if (session && typeof session === 'object') {
+      return session as Session;
+    }
+  } catch (error) {
+    console.warn('Unable to parse stored Supabase session.', error);
+  }
+
+  return null;
+};
+
+type StoredTournamentShape = Partial<Tournament> & {
+  id?: string;
+  name?: string;
+  game?: string;
+  maxParticipants?: number;
+  startDate?: string;
+  startTime?: string;
+  ownerEmail?: string;
+  prizePool?: string;
+  registrationType?: 'public' | 'private';
+  invitedUsers?: string[];
+  dataAiHint?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type LocalParticipant = Omit<Participant, 'id' | 'created_at' | 'tournament_id'> & { tournament_id?: string };
+
+const normalizeTournament = (raw: StoredTournamentShape | null | undefined): Tournament | null => {
+  if (!raw?.id || !raw.name || !raw.game) {
+    return null;
+  }
+
+  const format = (raw.format ?? 'single-elimination') as Tournament['format'];
+  const registrationType = (raw.registration_type ?? raw.registrationType ?? 'public') as Tournament['registration_type'];
+
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description,
+    game: raw.game,
+    participants: raw.participants ?? 0,
+    max_participants: raw.max_participants ?? raw.maxParticipants ?? 0,
+    start_date: raw.start_date ?? raw.startDate ?? '',
+    start_time: raw.start_time ?? raw.startTime,
+    format,
+    status: raw.status ?? 'Próximo',
+    owner_email: raw.owner_email ?? raw.ownerEmail ?? '',
+    image: raw.image,
+    data_ai_hint: raw.data_ai_hint ?? raw.dataAiHint,
+    registration_type: registrationType,
+    prize_pool: raw.prize_pool ?? raw.prizePool,
+    location: raw.location,
+    invited_users: raw.invited_users ?? raw.invitedUsers ?? [],
+    created_at: raw.created_at ?? raw.createdAt,
+    updated_at: raw.updated_at ?? raw.updatedAt,
+  };
 };
 
 
@@ -81,43 +155,171 @@ export default function TournamentPage() {
     const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
     const seededPlayerNames = seededParticipantsData[id] || [];
 
-    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-    const currentTournament = allTournaments.find(t => t.id === id);
+    const allTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
+    const currentTournament = allTournaments.find(t => t?.id === id);
 
     if (currentTournament) {
-        const participantCount = seededPlayerNames.length > 0 ? seededPlayerNames.length : currentTournament.maxParticipants;
+        const normalizedTournament = normalizeTournament(currentTournament);
+        const maxParticipants = normalizedTournament?.max_participants ?? 0;
+        const participantCount = seededPlayerNames.length > 0 ? seededPlayerNames.length : maxParticipants;
         setRounds(generateRounds(participantCount, seededPlayerNames));
     }
   }, [id]);
 
 
   useEffect(() => {
-    if (!id) return;
-    
-    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-    const currentTournament = allTournaments.find(t => t.id === id);
+    const loadTournament = async () => {
+      if (!id) return;
 
-    if (currentTournament) {
-        setTournament(currentTournament);
-        const storedUser = localStorage.getItem("user");
-        if(storedUser) {
-            const user = JSON.parse(storedUser);
-            setCurrentUser(user);
-            setIsOwner(user.email === currentTournament.ownerEmail);
+      try {
+        const supabase = createClient();
+        let session: Session | null = readStoredSession();
+        const hasStoredSession =
+          !!session ||
+          (typeof window !== 'undefined' && SUPABASE_SESSION_KEY
+            ? !!localStorage.getItem(SUPABASE_SESSION_KEY)
+            : false);
+        let authenticatedUser: Session['user'] | null = session?.user ?? null;
 
-            const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
-            const tournamentParticipants = participantsData[id] || [];
-            setIsParticipant(tournamentParticipants.some(p => p.email === user.email));
+        if (!authenticatedUser && hasStoredSession) {
+          try {
+            const { data } = await supabase.auth.getSession();
+            session = data.session ?? session;
+            authenticatedUser = session?.user ?? null;
+          } catch (sessionError) {
+            console.warn('Unable to load Supabase session from client.', sessionError);
+          }
         }
-        loadBracketData();
-    }
-    setLoading(false);
-    
+
+        const tournamentResult = await db.getTournament(id);
+
+        if (!tournamentResult.tournament) {
+          if (tournamentResult.status === 401 || tournamentResult.status === 403) {
+            if (!session) {
+              toast({
+                title: "Acceso restringido",
+                description: "Inicia sesión con una cuenta autorizada para ver este torneo.",
+                variant: "destructive"
+              });
+              router.push('/login');
+              return;
+            }
+
+            toast({
+              title: "Acceso restringido",
+              description: "No tienes permisos para ver este torneo.",
+              variant: "destructive"
+            });
+            router.push('/tournaments');
+            return;
+          }
+
+          if (tournamentResult.status === 404) {
+            toast({
+              title: "Torneo no encontrado",
+              description: "El torneo que buscas no existe.",
+              variant: "destructive"
+            });
+            router.push("/tournaments");
+            return;
+          }
+
+          console.error('No se pudo obtener el torneo', tournamentResult.error);
+          toast({
+            title: "Error",
+            description: "Error al cargar el torneo.",
+            variant: "destructive"
+          });
+          router.push("/tournaments");
+          return;
+        }
+
+        const currentTournament = tournamentResult.tournament;
+
+        if (!authenticatedUser) {
+          session = readStoredSession();
+          authenticatedUser = session?.user ?? null;
+        }
+
+        if (currentTournament) {
+          // Check access permissions
+          let canAccessTournament = false;
+
+          if (currentTournament.registration_type === 'public') {
+            // Public tournaments are accessible to everyone
+            canAccessTournament = true;
+          } else if (currentTournament.registration_type === 'private') {
+            if (authenticatedUser) {
+              // Private tournament: allow access only to owner and invited users
+              canAccessTournament =
+                authenticatedUser.email === currentTournament.owner_email ||
+                (currentTournament.invited_users?.includes(authenticatedUser.email!) ?? false);
+            } else {
+              // No user logged in and it's a private tournament
+              canAccessTournament = false;
+            }
+          }
+
+          if (!canAccessTournament) {
+            toast({
+              title: "Acceso restringido",
+              description: "Este torneo es privado y requiere invitación.",
+              variant: "destructive"
+            });
+            router.push("/tournaments");
+            return;
+          }
+
+          setTournament(currentTournament);
+
+          if (authenticatedUser) {
+            // Get user data from localStorage as fallback
+            const storedUser = localStorage.getItem("user");
+            if (storedUser) {
+              const userData = JSON.parse(storedUser);
+              setCurrentUser(userData);
+            } else {
+              const userData = {
+                displayName: authenticatedUser.user_metadata?.full_name || authenticatedUser.email?.split('@')[0] || '',
+                email: authenticatedUser.email ?? '',
+                photoURL: authenticatedUser.user_metadata?.avatar_url || ''
+              } satisfies User;
+              setCurrentUser(userData);
+              localStorage.setItem("user", JSON.stringify(userData));
+            }
+
+            setIsOwner(authenticatedUser.email === currentTournament.owner_email);
+
+            // Check if user is participant
+            const isParticipating = await db.isUserParticipating(id, authenticatedUser.email!);
+            setIsParticipant(isParticipating);
+          } else {
+            localStorage.removeItem("user");
+            setCurrentUser(null);
+          }
+
+          loadBracketData();
+        }
+      } catch (error) {
+        console.error('Error loading tournament:', error);
+        toast({
+          title: "Error",
+          description: "Error al cargar el torneo.",
+          variant: "destructive"
+        });
+        router.push("/tournaments");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTournament();
+
     window.addEventListener('seedsAssigned', loadBracketData);
     return () => {
         window.removeEventListener('seedsAssigned', loadBracketData);
     }
-  }, [id, loadBracketData]);
+  }, [id, loadBracketData, router, toast]);
 
   const handleShare = async () => {
     const shareData = {
@@ -163,11 +365,11 @@ export default function TournamentPage() {
 
 
   const handleDelete = () => {
-    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-    const updatedTournaments = allTournaments.filter(t => t.id !== id);
+    const allTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
+    const updatedTournaments = allTournaments.filter(t => t?.id !== id);
     localStorage.setItem("tournaments", JSON.stringify(updatedTournaments));
 
-    const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+    const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}") as Record<string, LocalParticipant[]>;
     delete participantsData[id];
     localStorage.setItem("participantsData", JSON.stringify(participantsData));
 
@@ -260,7 +462,7 @@ export default function TournamentPage() {
       });
   };
 
-  const handleJoinTournament = () => {
+  const handleJoinTournament = async () => {
     if (!currentUser) {
         toast({ title: "Debes iniciar sesión", description: "Inicia sesión para unirte a un torneo.", variant: "destructive" });
         router.push('/login');
@@ -268,44 +470,96 @@ export default function TournamentPage() {
     }
     if (!tournament) return;
 
-    if (tournament.participants >= tournament.maxParticipants) {
+    const capacity = tournament.max_participants;
+    if (tournament.participants >= capacity) {
         toast({ title: "Torneo Lleno", description: "Este torneo ya ha alcanzado el máximo de participantes.", variant: "destructive" });
         return;
     }
 
-    const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-    const participantsData: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
-    
-    const tournamentIndex = allTournaments.findIndex(t => t.id === id);
-    if (tournamentIndex === -1) return;
-
-    const tournamentToUpdate = allTournaments[tournamentIndex];
-    tournamentToUpdate.participants++;
-    
-    if (!participantsData[id]) {
-        participantsData[id] = [];
-    }
-    
-    participantsData[id].push({
+    try {
+      await db.addParticipant({
+        tournament_id: tournament.id,
         email: currentUser.email,
         name: currentUser.displayName,
         avatar: currentUser.photoURL,
         status: 'Pendiente'
-    });
+      });
 
-    localStorage.setItem("tournaments", JSON.stringify(allTournaments));
-    localStorage.setItem("participantsData", JSON.stringify(participantsData));
+      const refreshed = await db.getTournament(id);
+      if (refreshed.tournament) {
+        setTournament(refreshed.tournament);
 
-    setTournament(tournamentToUpdate);
-    setIsParticipant(true);
-    
-    toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
+        const storedTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
+        const storedIndex = storedTournaments.findIndex(t => t?.id === id);
+        const updatedStoredTournament: StoredTournamentShape = {
+          ...(storedTournaments[storedIndex] ?? {}),
+          ...refreshed.tournament,
+          maxParticipants: refreshed.tournament.max_participants,
+          startDate: refreshed.tournament.start_date,
+          startTime: refreshed.tournament.start_time,
+          ownerEmail: refreshed.tournament.owner_email,
+          prizePool: refreshed.tournament.prize_pool,
+          registrationType: refreshed.tournament.registration_type,
+          invitedUsers: refreshed.tournament.invited_users,
+          dataAiHint: refreshed.tournament.data_ai_hint,
+          createdAt: refreshed.tournament.created_at,
+          updatedAt: refreshed.tournament.updated_at,
+        };
+
+        if (storedIndex !== -1) {
+          storedTournaments[storedIndex] = updatedStoredTournament;
+        } else {
+          storedTournaments.push(updatedStoredTournament);
+        }
+
+        localStorage.setItem("tournaments", JSON.stringify(storedTournaments));
+      }
+
+      const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}") as Record<string, LocalParticipant[]>;
+      const currentList = participantsData[id] ?? [];
+      const participantIndex = currentList.findIndex(participant => participant.email === currentUser.email);
+      const participantPayload: LocalParticipant = {
+        email: currentUser.email,
+        name: currentUser.displayName,
+        avatar: currentUser.photoURL,
+        status: 'Pendiente'
+      };
+
+      if (participantIndex !== -1) {
+        currentList[participantIndex] = participantPayload;
+      } else {
+        currentList.push(participantPayload);
+      }
+
+      participantsData[id] = currentList;
+      localStorage.setItem("participantsData", JSON.stringify(participantsData));
+
+      setIsParticipant(true);
+      toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
+      window.dispatchEvent(new CustomEvent('participantsUpdated'));
+    } catch (error) {
+      console.error('Error joining tournament:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo procesar tu inscripción. Inténtalo de nuevo.",
+        variant: "destructive"
+      });
+    }
   }
 
   const handleTournamentStatusChange = (newStatus: string) => {
     if(tournament){
         const updatedTournament = { ...tournament, status: newStatus };
         setTournament(updatedTournament);
+    }
+  }
+
+  const handleInvitationUpdate = (updatedInvitations: string[]) => {
+    if (tournament) {
+        setTournament({
+            ...tournament,
+            invited_users: updatedInvitations
+        });
     }
   }
   
@@ -322,7 +576,16 @@ export default function TournamentPage() {
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="relative w-full h-48 md:h-64 lg:h-80 rounded-lg overflow-hidden mb-8 shadow-lg">
-        <Image src={tournament.image} layout="fill" objectFit="cover" alt={tournament.name} data-ai-hint={tournament.dataAiHint} />
+        {tournament.image && tournament.image.trim() !== '' ? (
+          <Image src={tournament.image} layout="fill" objectFit="cover" alt={tournament.name} data-ai-hint={tournament.data_ai_hint} />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${getDefaultTournamentImage(tournament.game)} flex items-center justify-center`}>
+            <div className="text-center text-white">
+              <Gamepad2 className="h-16 w-16 mx-auto mb-4 opacity-80" />
+              <p className="font-semibold text-lg opacity-90">{tournament.game}</p>
+            </div>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">{tournament.name}</h1>
@@ -331,11 +594,13 @@ export default function TournamentPage() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-6">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
+          <TabsTrigger value="participants">Participantes</TabsTrigger>
           <TabsTrigger value="bracket">Bracket</TabsTrigger>
           <TabsTrigger value="standings">Posiciones</TabsTrigger>
           {isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
+          {isOwner && tournament.registration_type === 'private' && <TabsTrigger value="invitations">Invitaciones</TabsTrigger>}
         </TabsList>
         <TabsContent value="overview" className="mt-6">
           <Card>
@@ -391,7 +656,7 @@ export default function TournamentPage() {
                   <Calendar className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Fecha de Inicio</p>
-                    <p className="text-lg text-foreground">{new Date(tournament.startDate).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p className="text-lg text-foreground">{tournament.start_date ? new Date(tournament.start_date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Por anunciar'}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -405,21 +670,21 @@ export default function TournamentPage() {
                   <Users className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Participantes</p>
-                    <p className="text-lg text-foreground">{tournament.participants} / {tournament.maxParticipants}</p>
+                    <p className="text-lg text-foreground">{tournament.participants} / {tournament.max_participants}</p>
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
                   <Trophy className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Bolsa de Premios</p>
-                    <p className="text-lg text-foreground">{tournament.prizePool || 'Por anunciar'}</p>
+                    <p className="text-lg text-foreground">{tournament.prize_pool || 'Por anunciar'}</p>
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
                   <Shield className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Organizador</p>
-                    <p className="text-lg text-foreground">{tournament.ownerEmail.split('@')[0]}</p>
+                    <p className="text-lg text-foreground">{tournament.owner_email?.split('@')[0]}</p>
                   </div>
                 </div>
                 {tournament.location && (
@@ -439,6 +704,9 @@ export default function TournamentPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="participants" className="mt-6">
+          <ParticipantsList tournamentId={id} />
+        </TabsContent>
         <TabsContent value="bracket" className="mt-6">
           <Bracket tournament={tournament} isOwner={isOwner} rounds={rounds} onScoreReported={handleScoreReported} />
         </TabsContent>
@@ -448,6 +716,15 @@ export default function TournamentPage() {
         {isOwner && (
           <TabsContent value="manage" className="mt-6">
             <ParticipantManager tournamentId={id} onTournamentStart={handleTournamentStatusChange}/>
+          </TabsContent>
+        )}
+        {isOwner && tournament.registration_type === 'private' && (
+          <TabsContent value="invitations" className="mt-6">
+            <InvitationManager
+              tournamentId={id}
+              invitedUsers={tournament.invited_users || []}
+              onInvitationUpdate={handleInvitationUpdate}
+            />
           </TabsContent>
         )}
       </Tabs>

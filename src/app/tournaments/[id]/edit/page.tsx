@@ -14,10 +14,11 @@ interface Tournament {
     participants: number;
     maxParticipants: number;
     startDate: string;
+    startTime?: string;
     format: 'single-elimination' | 'double-elimination' | 'swiss';
     status: string;
-    ownerEmail: string;
-    image: string;
+    owner_email: string;
+    image?: string;
     dataAiHint: string;
     prizePool?: string;
     registrationType: 'public' | 'private';
@@ -43,7 +44,7 @@ export default function EditTournamentPage() {
         const currentTournament = allTournaments.find(t => t.id === id);
 
         if (currentTournament) {
-            if (currentTournament.ownerEmail !== user.email) {
+            if (currentTournament.owner_email !== user.email) {
                 router.push(`/tournaments/${id}`);
                 return;
             }
@@ -72,7 +73,12 @@ export default function EditTournamentPage() {
                 </div>
                 <Card>
                     <CardContent className="p-8">
-                        <CreateTournamentForm mode="edit" tournamentData={tournament} />
+                        <CreateTournamentForm mode="edit" tournamentData={{
+                            ...tournament,
+                            startDate: new Date(tournament.startDate),
+                            startTime: tournament.startTime || '10:00',
+                            image: tournament.image || ''
+                        }} />
                     </CardContent>
                 </Card>
             </div>

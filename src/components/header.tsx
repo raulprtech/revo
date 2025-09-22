@@ -57,7 +57,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card">
-      <div className="container flex h-16 items-center">
+      <div className="container mx-auto flex h-16 items-center">
         <div className="mr-8 flex items-center gap-6">
           <Link href="/" className="flex items-center space-x-2">
             <Swords className="h-6 w-6 text-primary" />

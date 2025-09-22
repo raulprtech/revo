@@ -16,7 +16,7 @@ interface Tournament {
     maxParticipants: number;
     startDate: string;
     avatar: string;
-    ownerEmail: string;
+    owner_email: string;
 }
 
 export default function DashboardPage() {
@@ -34,7 +34,7 @@ export default function DashboardPage() {
 
         const user = JSON.parse(storedUser);
         const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-        const userTournaments = allTournaments.filter(t => t.ownerEmail === user.email);
+        const userTournaments = allTournaments.filter(t => t.owner_email === user.email);
         setTournaments(userTournaments);
         setLoading(false);
     }, [router]);

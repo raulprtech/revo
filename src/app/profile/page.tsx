@@ -11,6 +11,8 @@ import { ArrowRight, Edit, Gamepad2, Loader2, Users, MapPin } from "lucide-react
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { EditProfileForm } from "@/components/profile/edit-profile-form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface User {
     displayName: string;
@@ -26,7 +28,7 @@ interface Tournament {
     status: string; // Tournament status
     image: string;
     dataAiHint: string;
-    ownerEmail: string;
+    owner_email: string;
 }
 
 interface ParticipatingTournament extends Tournament {
@@ -86,40 +88,64 @@ export default function ProfilePage() {
     const [createdTournaments, setCreatedTournaments] = useState<Tournament[]>([]);
     const [participatingTournaments, setParticipatingTournaments] = useState<ParticipatingTournament[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
+        const loadUserData = () => {
+            const storedUser = localStorage.getItem("user");
+            if (storedUser) {
+                const parsedUser = JSON.parse(storedUser);
+                setUser(parsedUser);
 
-            const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-            const allParticipants: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
+                const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
+                const allParticipants: Record<string, Participant[]> = JSON.parse(localStorage.getItem("participantsData") || "{}");
 
-            const userCreated = allTournaments.filter(t => t.ownerEmail === parsedUser.email);
-            
-            const userParticipating: ParticipatingTournament[] = [];
-            allTournaments.forEach(tournament => {
-                const participants = allParticipants[tournament.id] || [];
-                const userAsParticipant = participants.find(p => p.email === parsedUser.email);
-                
-                if (userAsParticipant && userAsParticipant.status !== 'Rechazado') {
-                    userParticipating.push({
-                        ...tournament,
-                        participantStatus: userAsParticipant.status,
-                    });
-                }
-            });
+                const userCreated = allTournaments.filter(t => t.owner_email === parsedUser.email);
 
-            setCreatedTournaments(userCreated);
-            setParticipatingTournaments(userParticipating);
+                const userParticipating: ParticipatingTournament[] = [];
+                allTournaments.forEach(tournament => {
+                    const participants = allParticipants[tournament.id] || [];
+                    const userAsParticipant = participants.find(p => p.email === parsedUser.email);
 
-        } else {
-            router.push("/login");
-        }
-        setLoading(false);
+                    if (userAsParticipant && userAsParticipant.status !== 'Rechazado') {
+                        userParticipating.push({
+                            ...tournament,
+                            participantStatus: userAsParticipant.status,
+                        });
+                    }
+                });
+
+                setCreatedTournaments(userCreated);
+                setParticipatingTournaments(userParticipating);
+            } else {
+                router.push("/login");
+            }
+            setLoading(false);
+        };
+
+        loadUserData();
+
+        // Listen for storage changes to update profile in real-time
+        const handleStorageChange = () => {
+            loadUserData();
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
     }, [router]);
+
+    const handleProfileSave = (updatedUser: User) => {
+        setUser(updatedUser);
+        setIsEditingProfile(false);
+    };
+
+    const handleProfileCancel = () => {
+        setIsEditingProfile(false);
+    };
 
     const getInitials = (name?: string | null) => {
         if (!name) return "U";
@@ -155,7 +181,9 @@ export default function ProfilePage() {
                             </div>
                         )}
                     </div>
-                    <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Editar Perfil</Button>
+                    <Button variant="outline" onClick={() => setIsEditingProfile(true)}>
+                        <Edit className="mr-2 h-4 w-4" /> Editar Perfil
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -190,6 +218,22 @@ export default function ProfilePage() {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* Edit Profile Dialog */}
+            <Dialog open={isEditingProfile} onOpenChange={setIsEditingProfile}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Editar Perfil</DialogTitle>
+                    </DialogHeader>
+                    {user && (
+                        <EditProfileForm
+                            user={user}
+                            onSave={handleProfileSave}
+                            onCancel={handleProfileCancel}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

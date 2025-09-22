@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { LogOut, User, Wrench, LayoutDashboard } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 type User = {
   displayName?: string | null;
@@ -23,6 +24,7 @@ type User = {
 
 export function UserNav({ user }: { user: User }) {
   const router = useRouter();
+  const supabase = createClient();
 
   const getInitials = (name?: string | null) => {
     if (!name) return "U";
@@ -32,10 +34,26 @@ export function UserNav({ user }: { user: User }) {
       : names[0][0];
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    window.dispatchEvent(new Event("storage"));
-    router.push('/');
+  const handleLogout = async () => {
+    try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+
+      // Clear localStorage
+      localStorage.removeItem("user");
+
+      // Trigger storage event for header to update
+      window.dispatchEvent(new Event("storage"));
+
+      // Redirect to home page
+      router.push('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Even if Supabase signout fails, clear local storage
+      localStorage.removeItem("user");
+      window.dispatchEvent(new Event("storage"));
+      router.push('/');
+    }
   };
 
   return (
