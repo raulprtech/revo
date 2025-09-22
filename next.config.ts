@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  output: 'standalone',
+  outputFileTracingRoot: __dirname,
   images: {
     remotePatterns: [
       {
@@ -16,11 +18,14 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
-  turbopack: {
-    root: '/home/raulprtech/projects/web/revo'
-  }
 };
 
 export default nextConfig;
