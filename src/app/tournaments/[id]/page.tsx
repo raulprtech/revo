@@ -367,21 +367,35 @@ export default function TournamentPage() {
   };
 
 
-  const handleDelete = () => {
-    const allTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
-    const updatedTournaments = allTournaments.filter(t => t?.id !== id);
-    localStorage.setItem("tournaments", JSON.stringify(updatedTournaments));
+  const handleDelete = async () => {
+    if (!tournament) return;
 
-    const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}") as Record<string, LocalParticipant[]>;
-    delete participantsData[id];
-    localStorage.setItem("participantsData", JSON.stringify(participantsData));
+    try {
+      // Eliminar de Supabase
+      await db.deleteTournament(id);
 
-    toast({
-      title: "Torneo eliminado",
-      description: `El torneo "${tournament?.name}" ha sido eliminado.`,
-      variant: "destructive"
-    });
-    router.push("/dashboard");
+      // Eliminar del localStorage como respaldo
+      const allTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
+      const updatedTournaments = allTournaments.filter(t => t?.id !== id);
+      localStorage.setItem("tournaments", JSON.stringify(updatedTournaments));
+
+      const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}") as Record<string, LocalParticipant[]>;
+      delete participantsData[id];
+      localStorage.setItem("participantsData", JSON.stringify(participantsData));
+
+      toast({
+        title: "Torneo eliminado",
+        description: `El torneo "${tournament?.name}" ha sido eliminado.`,
+      });
+      router.push("/dashboard");
+    } catch (error) {
+      console.error('Error deleting tournament:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el torneo. Inténtalo de nuevo.",
+        variant: "destructive"
+      });
+    }
   }
 
   const handleScoreReported = (matchId: number, scores: {top: number, bottom: number}) => {

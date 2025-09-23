@@ -58,6 +58,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           data: {
             location: values.location,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

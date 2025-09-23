@@ -213,25 +213,36 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported }
         </div>
       </CardHeader>
       <CardContent className="p-4 print:p-0">
-        <div ref={bracketRef} className="flex space-x-4 md:space-x-8 lg:space-x-12 overflow-x-auto pb-4">
-          {rounds.map((round) => (
-            <div key={round.name} className="flex flex-col space-y-4 min-w-[250px]">
-              <h3 className="text-xl font-bold text-center font-headline">{round.name}</h3>
-              <div className="flex flex-col justify-around flex-grow space-y-8">
-                {round.matches.map((match) => (
-                  <MatchCard key={match.id} match={match} onScoreReported={onScoreReported} isOwner={isOwner} />
-                ))}
+        {rounds.length > 0 ? (
+          <div ref={bracketRef} className="flex space-x-4 md:space-x-8 lg:space-x-12 overflow-x-auto pb-4">
+            {rounds.map((round) => (
+              <div key={round.name} className="flex flex-col space-y-4 min-w-[250px]">
+                <h3 className="text-xl font-bold text-center font-headline">{round.name}</h3>
+                <div className="flex flex-col justify-around flex-grow space-y-8">
+                  {round.matches.map((match) => (
+                    <MatchCard key={match.id} match={match} onScoreReported={onScoreReported} isOwner={isOwner} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-          {rounds.length > 0 && (
+            ))}
             <div className="flex flex-col space-y-4 min-w-[250px] items-center justify-center">
                 <h3 className="text-xl font-bold text-center font-headline">Ganador</h3>
                 <Trophy className="w-24 h-24 text-yellow-400" />
                 <p className="font-bold text-lg">{tournamentWinner || 'TBD'}</p>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Trophy className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Bracket no disponible</h3>
+            <p className="text-muted-foreground mb-4">
+              El bracket se generará automáticamente cuando haya participantes aceptados.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Para generar el bracket, ve a la pestaña "Gestionar" y acepta participantes, luego asigna seeds.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

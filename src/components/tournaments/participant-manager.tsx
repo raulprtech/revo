@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Shuffle, Play, X } from "lucide-react";
+import { Check, Shuffle, Play, X, Flag, RotateCcw } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -167,6 +167,25 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
         if (!tournament) return;
 
         try {
+            const acceptedParticipants = participants.filter(p => p.status === 'Aceptado');
+            if (acceptedParticipants.length < 2) {
+                toast({
+                    title: "No hay suficientes participantes",
+                    description: "Se necesitan al menos 2 participantes aceptados para iniciar el torneo.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            // Auto-asignar seeds si no se han asignado
+            const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
+            if (!seededParticipantsData[tournamentId] || seededParticipantsData[tournamentId].length === 0) {
+                const shuffled = [...acceptedParticipants].sort(() => Math.random() - 0.5);
+                seededParticipantsData[tournamentId] = shuffled.map(p => p.name);
+                localStorage.setItem("seededParticipantsData", JSON.stringify(seededParticipantsData));
+                window.dispatchEvent(new CustomEvent('seedsAssigned'));
+            }
+
             const updated = await db.updateTournament(tournamentId, { status: 'En curso' });
             setTournament(updated);
             onTournamentStart('En curso');
@@ -185,6 +204,67 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
         }
     };
 
+    const handleFinishTournament = async () => {
+        if (!tournament) return;
+
+        try {
+            const updated = await db.updateTournament(tournamentId, { status: 'Finalizado' });
+            setTournament(updated);
+            onTournamentStart('Finalizado');
+            toast({
+                title: "¡Torneo Finalizado!",
+                description: "El torneo ha sido marcado como finalizado. ¡Felicidades a todos los participantes!",
+            });
+            window.dispatchEvent(new CustomEvent('participantsUpdated'));
+        } catch (error) {
+            console.error('Error finishing tournament:', error);
+            toast({
+                title: "Error",
+                description: "No se pudo finalizar el torneo.",
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleRepeatTournament = async () => {
+        if (!tournament) return;
+
+        try {
+            // Resetear el estado del torneo
+            const updated = await db.updateTournament(tournamentId, { status: 'Próximo' });
+            setTournament(updated);
+            onTournamentStart('Próximo');
+
+            // Limpiar seeds y resultados del localStorage
+            const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
+            delete seededParticipantsData[tournamentId];
+            localStorage.setItem("seededParticipantsData", JSON.stringify(seededParticipantsData));
+
+            // Resetear todos los participantes a estado "Aceptado" (mantener los ya aceptados)
+            const acceptedParticipants = participants.filter(p => p.status === 'Aceptado');
+            for (const participant of acceptedParticipants) {
+                if (participant.id) {
+                    await db.updateParticipant(participant.id, { status: 'Aceptado' });
+                }
+            }
+
+            toast({
+                title: "Torneo Reiniciado",
+                description: "El torneo ha sido reiniciado. Los participantes aceptados se mantienen.",
+            });
+
+            window.dispatchEvent(new CustomEvent('participantsUpdated'));
+            window.dispatchEvent(new CustomEvent('seedsAssigned'));
+        } catch (error) {
+            console.error('Error repeating tournament:', error);
+            toast({
+                title: "Error",
+                description: "No se pudo reiniciar el torneo.",
+                variant: "destructive"
+            });
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -193,9 +273,19 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                         <CardTitle>Gestionar Participantes</CardTitle>
                         <CardDescription>Acepta o rechaza solicitantes, asigna seeds e inicia el torneo.</CardDescription>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleSeed} disabled={tournament?.status === 'En curso'}><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
-                        <Button onClick={handleStartTournament} disabled={tournament?.status === 'En curso'}><Play className="mr-2 h-4 w-4" /> Iniciar Torneo</Button>
+                    <div className="flex gap-2 flex-wrap">
+                        {tournament?.status === 'Próximo' && (
+                            <>
+                                <Button variant="outline" onClick={handleSeed}><Shuffle className="mr-2 h-4 w-4" /> Asignar Seeds</Button>
+                                <Button onClick={handleStartTournament}><Play className="mr-2 h-4 w-4" /> Iniciar Torneo</Button>
+                            </>
+                        )}
+                        {tournament?.status === 'En curso' && (
+                            <Button variant="destructive" onClick={handleFinishTournament}><Flag className="mr-2 h-4 w-4" /> Finalizar Torneo</Button>
+                        )}
+                        {tournament?.status === 'Finalizado' && (
+                            <Button variant="outline" onClick={handleRepeatTournament}><RotateCcw className="mr-2 h-4 w-4" /> Repetir Torneo</Button>
+                        )}
                     </div>
                 </div>
             </CardHeader>
