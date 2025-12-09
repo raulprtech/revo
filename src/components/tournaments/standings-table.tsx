@@ -3,8 +3,12 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { useMemo, useEffect } from "react";
+import { useParticipants } from "@/hooks/use-tournaments";
+import { Loader2, Trophy, Medal, Crown, Award } from "lucide-react";
 import type { Round } from "./bracket";
+import { cn } from "@/lib/utils";
 
 type StandingsEntry = {
     id: string;
@@ -12,23 +16,55 @@ type StandingsEntry = {
     name: string;
     wins: number;
     losses: number;
+    draws: number;
+    points: number; // For Swiss: 3 for win, 1 for draw, 0 for loss
+    buchholz: number; // Swiss tiebreaker: sum of opponents' scores
+    gameWins: number; // Total games/rounds won
     avatar: string;
 }
 
-const calculateStandings = (rounds: Round[]): StandingsEntry[] => {
+interface StandingsTableProps {
+    rounds: Round[];
+    tournamentId: string;
+    format?: string;
+    gameMode?: string;
+}
+
+const calculateStandings = (rounds: Round[], format?: string): StandingsEntry[] => {
     if (!rounds || rounds.length === 0) return [];
     
-    const playerStats: { [name: string]: { wins: number, losses: number } } = {};
+    const playerStats: { [name: string]: { 
+        wins: number; 
+        losses: number; 
+        draws: number;
+        gameWins: number;
+        opponents: string[];
+    } } = {};
 
     rounds.forEach(round => {
         round.matches.forEach(match => {
             const { top, bottom, winner } = match;
 
-            if (top.name !== 'BYE' && top.name !== 'TBD' && !playerStats[top.name]) {
-                playerStats[top.name] = { wins: 0, losses: 0 };
+            // Initialize player stats
+            if (top.name !== 'BYE' && top.name !== 'TBD' && !top.name.includes('(') && !playerStats[top.name]) {
+                playerStats[top.name] = { wins: 0, losses: 0, draws: 0, gameWins: 0, opponents: [] };
             }
-            if (bottom.name !== 'BYE' && bottom.name !== 'TBD' && !playerStats[bottom.name]) {
-                playerStats[bottom.name] = { wins: 0, losses: 0 };
+            if (bottom.name !== 'BYE' && bottom.name !== 'TBD' && !bottom.name.includes('(') && !playerStats[bottom.name]) {
+                playerStats[bottom.name] = { wins: 0, losses: 0, draws: 0, gameWins: 0, opponents: [] };
+            }
+
+            // Track opponents for Buchholz calculation
+            if (playerStats[top.name] && playerStats[bottom.name]) {
+                playerStats[top.name].opponents.push(bottom.name);
+                playerStats[bottom.name].opponents.push(top.name);
+            }
+
+            // Count game wins from scores
+            if (top.score !== null && playerStats[top.name]) {
+                playerStats[top.name].gameWins += top.score;
+            }
+            if (bottom.score !== null && playerStats[bottom.name]) {
+                playerStats[bottom.name].gameWins += bottom.score;
             }
 
             if (winner) {
@@ -43,23 +79,54 @@ const calculateStandings = (rounds: Round[]): StandingsEntry[] => {
         });
     });
 
+    // Calculate Buchholz score (sum of opponents' wins)
+    const calculateBuchholz = (playerName: string): number => {
+        const player = playerStats[playerName];
+        if (!player) return 0;
+        return player.opponents.reduce((sum, opponent) => {
+            return sum + (playerStats[opponent]?.wins || 0);
+        }, 0);
+    };
+
+    // Calculate points based on format
+    const calculatePoints = (wins: number, draws: number): number => {
+        if (format === 'swiss') {
+            return wins * 3 + draws * 1; // Swiss scoring: 3-1-0
+        }
+        return wins; // Elimination: just count wins
+    };
+
     const sortedStandings = Object.entries(playerStats)
         .map(([name, stats]) => ({
             id: name,
             name,
-            ...stats
+            wins: stats.wins,
+            losses: stats.losses,
+            draws: stats.draws,
+            gameWins: stats.gameWins,
+            points: calculatePoints(stats.wins, stats.draws),
+            buchholz: calculateBuchholz(name),
         }))
-        .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+        .sort((a, b) => {
+            // Primary: wins/points
+            if (b.points !== a.points) return b.points - a.points;
+            // Secondary: Buchholz (for Swiss)
+            if (format === 'swiss' && b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+            // Tertiary: game wins
+            if (b.gameWins !== a.gameWins) return b.gameWins - a.gameWins;
+            // Quaternary: fewer losses
+            return a.losses - b.losses;
+        });
         
     let rank = 0;
-    let lastWins = -1;
-    let lastLosses = -1;
+    let lastPoints = -1;
+    let lastBuchholz = -1;
     return sortedStandings.map((player, index) => {
-        if (player.wins !== lastWins || player.losses !== lastLosses) {
+        if (player.points !== lastPoints || player.buchholz !== lastBuchholz) {
             rank = index + 1;
         }
-        lastWins = player.wins;
-        lastLosses = player.losses;
+        lastPoints = player.points;
+        lastBuchholz = player.buchholz;
         return {
             ...player,
             rank,
@@ -68,45 +135,130 @@ const calculateStandings = (rounds: Round[]): StandingsEntry[] => {
     });
 };
 
-export default function StandingsTable({ rounds }: { rounds: Round[] }) {
-    const standings = useMemo(() => calculateStandings(rounds), [rounds]);
+const getRankIcon = (rank: number) => {
+    switch (rank) {
+        case 1: return <Crown className="h-5 w-5 text-yellow-500" />;
+        case 2: return <Medal className="h-5 w-5 text-gray-400" />;
+        case 3: return <Award className="h-5 w-5 text-amber-600" />;
+        default: return <span className="font-bold text-muted-foreground">{rank}</span>;
+    }
+};
+
+export default function StandingsTable({ rounds, tournamentId, format, gameMode }: StandingsTableProps) {
+    const standings = useMemo(() => calculateStandings(rounds, format), [rounds, format]);
+    const { participants, isLoading, refresh } = useParticipants(tournamentId);
+    const isSwiss = format === 'swiss';
+
+    // Listen for participant updates
+    useEffect(() => {
+        const handleUpdate = () => refresh();
+        window.addEventListener('participantsUpdated', handleUpdate);
+        return () => window.removeEventListener('participantsUpdated', handleUpdate);
+    }, [refresh]);
+
+    // Get accepted participants for display when no rounds/matches yet
+    const acceptedParticipants = useMemo(() => {
+        return participants
+            .filter(p => p.status === 'Aceptado')
+            .map((p, index) => ({
+                id: p.id || p.email,
+                rank: index + 1,
+                name: p.name,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                points: 0,
+                buchholz: 0,
+                gameWins: 0,
+                avatar: p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`
+            }));
+    }, [participants]);
+
+    // Use standings from rounds if available, otherwise show accepted participants
+    const displayStandings = standings.length > 0 ? standings : acceptedParticipants;
+    const hasMatchResults = standings.length > 0 && standings.some(s => s.wins > 0 || s.losses > 0);
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Trophy className="h-5 w-5" />
+                        Posiciones
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Posiciones</CardTitle>
-                <CardDescription>Clasificación actual de los jugadores en el torneo.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5" />
+                    Posiciones
+                    {isSwiss && (
+                        <Badge variant="secondary" className="ml-2">Sistema Suizo</Badge>
+                    )}
+                </CardTitle>
+                <CardDescription>
+                    {hasMatchResults 
+                        ? isSwiss 
+                            ? "Clasificación basada en puntos (3-1-0) con desempate Buchholz."
+                            : "Clasificación actual de los jugadores en el torneo."
+                        : "Participantes aceptados. Las posiciones se actualizarán cuando inicien las partidas."}
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[80px] text-center">Rango</TableHead>
+                            <TableHead className="w-[60px] text-center">#</TableHead>
                             <TableHead>Jugador</TableHead>
-                            <TableHead className="text-center">Victorias</TableHead>
-                            <TableHead className="text-center">Derrotas</TableHead>
+                            {isSwiss && <TableHead className="text-center">Pts</TableHead>}
+                            <TableHead className="text-center">V</TableHead>
+                            <TableHead className="text-center">D</TableHead>
+                            {isSwiss && <TableHead className="text-center" title="Buchholz (desempate)">BH</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {standings.length > 0 ? standings.map((p) => (
-                            <TableRow key={p.id}>
-                                <TableCell className="font-medium text-center">{p.rank}</TableCell>
+                        {displayStandings.length > 0 ? displayStandings.map((p) => (
+                            <TableRow 
+                                key={p.id}
+                                className={cn(
+                                    p.rank === 1 && hasMatchResults && "bg-yellow-500/10",
+                                    p.rank === 2 && hasMatchResults && "bg-gray-400/10",
+                                    p.rank === 3 && hasMatchResults && "bg-amber-600/10"
+                                )}
+                            >
+                                <TableCell className="text-center">
+                                    {getRankIcon(p.rank)}
+                                </TableCell>
                                 <TableCell>
                                     <div className="flex items-center space-x-3">
-                                        <Avatar>
-                                            <AvatarImage src={p.avatar} />
-                                            <AvatarFallback>{p.name.substring(0,2)}</AvatarFallback>
+                                        <Avatar className="h-8 w-8">
+                                            {p.avatar && <AvatarImage src={p.avatar} />}
+                                            <AvatarFallback className="text-xs">{p.name.substring(0,2)}</AvatarFallback>
                                         </Avatar>
                                         <span className="font-medium">{p.name}</span>
                                     </div>
                                 </TableCell>
+                                {isSwiss && (
+                                    <TableCell className="text-center font-bold text-primary">{p.points}</TableCell>
+                                )}
                                 <TableCell className="text-center font-mono text-green-400">{p.wins}</TableCell>
                                 <TableCell className="text-center font-mono text-red-400">{p.losses}</TableCell>
+                                {isSwiss && (
+                                    <TableCell className="text-center font-mono text-muted-foreground">{p.buchholz}</TableCell>
+                                )}
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                                    No hay participantes registrados aún
+                                <TableCell colSpan={isSwiss ? 6 : 4} className="text-center text-muted-foreground py-8">
+                                    No hay participantes aceptados aún
                                 </TableCell>
                             </TableRow>
                         )}

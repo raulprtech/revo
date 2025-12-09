@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/header";
 import { Toaster } from "@/components/ui/toaster";
+import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "TournaVerse",
@@ -24,9 +25,11 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased min-h-screen bg-background flex flex-col">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Toaster />
+        <Providers>
+          <Header />
+          <main className="flex-1">{children}</main>
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );

@@ -1,11 +1,19 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Gamepad2, MapPin, Loader2, CheckCircle2 } from "lucide-react";
+import { Search, Users, Gamepad2, MapPin, Loader2, CheckCircle2, Calendar } from "lucide-react";
+import Link from 'next/link';
+import Image from 'next/image';
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/supabase/auth-context";
+import { usePublicTournaments, joinTournamentOptimistic, invalidateCache } from "@/hooks/use-tournaments";
+import { db } from "@/lib/database";
+import useSWR from "swr";
 
 const getDefaultTournamentImage = (gameName: string) => {
   const colors = [
@@ -20,108 +28,85 @@ const getDefaultTournamentImage = (gameName: string) => {
   const colorIndex = gameName.length % colors.length;
   return colors[colorIndex];
 };
-import Link from 'next/link';
-import Image from 'next/image';
-import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
-import { db, type Tournament, type Participant } from "@/lib/database";
-import { createClient } from "@/lib/supabase/client";
-
-// Interfaces are now imported from database
-
-interface User {
-    displayName: string;
-    email: string;
-    photoURL: string;
-}
 
 export default function TournamentsPage() {
-    const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { user, loading: authLoading } = useAuth();
+    const { tournaments, isLoading: tournamentsLoading, refresh } = usePublicTournaments();
     const [searchTerm, setSearchTerm] = useState("");
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [participatingTournamentIds, setParticipatingTournamentIds] = useState<Set<string>>(new Set());
+    const [joiningTournamentId, setJoiningTournamentId] = useState<string | null>(null);
     const { toast } = useToast();
     const router = useRouter();
 
+    // Fetch events to display event names on tournament cards
+    const { data: eventsMap = new Map<string, string>() } = useSWR(
+        tournaments.length > 0 ? 'events-map' : null,
+        async () => {
+            const events = await db.getEvents();
+            const map = new Map<string, string>();
+            events.forEach(e => map.set(e.id, e.name));
+            return map;
+        },
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 30000,
+        }
+    );
 
-    useEffect(() => {
-        const loadTournaments = async () => {
-            try {
-                const publicTournaments = await db.getPublicTournaments();
-                setAllTournaments(publicTournaments);
+    // Fetch participating tournament IDs for current user (cached)
+    const { data: participatingIds = new Set<string>(), mutate: mutateParticipating } = useSWR(
+        user?.email ? `user-participating:${user.email}` : null,
+        async () => {
+            if (!user?.email || tournaments.length === 0) return new Set<string>();
+            
+            // Batch check participation for all tournaments
+            const checks = await Promise.all(
+                tournaments.map(async (t) => {
+                    const isParticipating = await db.isUserParticipating(t.id, user.email);
+                    return { id: t.id, isParticipating };
+                })
+            );
+            
+            return new Set(checks.filter(c => c.isParticipating).map(c => c.id));
+        },
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 10000,
+        }
+    );
 
-                // Check current user
-                const supabase = createClient();
-                const { data: { user } } = await supabase.auth.getUser();
-
-                if (user && user.email) {
-                    // Create user object from Supabase auth data
-                    const userData = {
-                        displayName: user.user_metadata?.full_name || user.email.split('@')[0],
-                        email: user.email,
-                        photoURL: user.user_metadata?.avatar_url || ''
-                    };
-                    setCurrentUser(userData);
-
-                    // Also store in localStorage for consistency
-                    localStorage.setItem("user", JSON.stringify(userData));
-
-                    // Check which tournaments user is participating in
-                    const ids = new Set<string>();
-                    for (const tournament of publicTournaments) {
-                        const isParticipating = await db.isUserParticipating(tournament.id, user.email);
-                        if (isParticipating) {
-                            ids.add(tournament.id);
-                        }
-                    }
-                    setParticipatingTournamentIds(ids);
-                } else {
-                    // No authenticated user, clear localStorage
-                    localStorage.removeItem("user");
-                    setCurrentUser(null);
-                }
-            } catch (error) {
-                console.error('Error loading tournaments:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadTournaments();
-    }, []);
+    const loading = authLoading || tournamentsLoading;
 
     const handleJoinTournament = async (tournamentId: string) => {
-        if (!currentUser) {
+        if (!user) {
             toast({ title: "Debes iniciar sesión", description: "Inicia sesión para unirte a un torneo.", variant: "destructive" });
             router.push('/login');
             return;
         }
 
+        const tournament = tournaments.find(t => t.id === tournamentId);
+        if (!tournament) return;
+
+        if (tournament.participants >= tournament.max_participants) {
+            toast({ title: "Torneo Lleno", description: "Este torneo ya ha alcanzado el máximo de participantes.", variant: "destructive" });
+            return;
+        }
+
+        setJoiningTournamentId(tournamentId);
+
         try {
-            const tournamentIndex = allTournaments.findIndex(t => t.id === tournamentId);
-            if (tournamentIndex === -1) return;
-
-            const tournament = allTournaments[tournamentIndex];
-
-            if (tournament.participants >= tournament.max_participants) {
-                toast({ title: "Torneo Lleno", description: "Este torneo ya ha alcanzado el máximo de participantes.", variant: "destructive" });
-                return;
-            }
-
-            // Add participant to database
-            await db.addParticipant({
+            await joinTournamentOptimistic(tournamentId, {
                 tournament_id: tournamentId,
-                email: currentUser.email,
-                name: currentUser.displayName,
-                avatar: currentUser.photoURL,
+                email: user.email,
+                name: user.displayName,
+                avatar: user.photoURL,
                 status: 'Pendiente'
             });
 
-            // Reload tournaments to get updated participant count from database
-            const updatedTournaments = await db.getPublicTournaments();
-            setAllTournaments(updatedTournaments);
-            setParticipatingTournamentIds(prev => new Set(prev).add(tournamentId));
+            // Update local participating set
+            mutateParticipating(new Set([...participatingIds, tournamentId]), false);
+            
+            // Refresh tournaments to get updated count
+            refresh();
 
             toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
         } catch (error) {
@@ -131,10 +116,12 @@ export default function TournamentsPage() {
                 description: "No se pudo procesar tu inscripción. Inténtalo de nuevo.",
                 variant: "destructive"
             });
+        } finally {
+            setJoiningTournamentId(null);
         }
     }
 
-    const filteredTournaments = allTournaments.filter(t => 
+    const filteredTournaments = tournaments.filter(t => 
         t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.game.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -170,7 +157,8 @@ export default function TournamentsPage() {
                 {filteredTournaments.length > 0 ? (
                     <div className="mx-auto grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {filteredTournaments.map((tournament) => {
-                            const isParticipant = participatingTournamentIds.has(tournament.id);
+                            const isParticipant = participatingIds.has(tournament.id);
+                            const isJoining = joiningTournamentId === tournament.id;
                             return (
                                 <Card key={tournament.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 bg-card flex flex-col">
                                     <Link href={`/tournaments/${tournament.id}`} className="block">
@@ -197,6 +185,12 @@ export default function TournamentsPage() {
                                         <Gamepad2 className="mr-2 h-4 w-4" />
                                         {tournament.game}
                                         </CardDescription>
+                                        {tournament.event_id && eventsMap.get(tournament.event_id) && (
+                                            <Badge variant="outline" className="mt-2 w-fit text-xs bg-accent/10">
+                                                <Calendar className="h-3 w-3 mr-1" />
+                                                {eventsMap.get(tournament.event_id)}
+                                            </Badge>
+                                        )}
                                     </CardHeader>
                                     <CardContent className="flex-grow">
                                         <div className="flex items-center text-sm text-muted-foreground">
@@ -220,10 +214,14 @@ export default function TournamentsPage() {
                                             variant="secondary" 
                                             className="w-full"
                                             onClick={() => handleJoinTournament(tournament.id)}
-                                            disabled={isParticipant}
+                                            disabled={isParticipant || isJoining}
                                         >
-                                            {isParticipant ? <CheckCircle2 className="mr-2 h-4 w-4" /> : null}
-                                            {isParticipant ? 'Inscrito' : 'Inscribirse'}
+                                            {isJoining ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : isParticipant ? (
+                                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            ) : null}
+                                            {isJoining ? 'Inscribiendo...' : isParticipant ? 'Inscrito' : 'Inscribirse'}
                                          </Button>
                                     </CardFooter>
                                 </Card>

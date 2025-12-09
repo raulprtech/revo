@@ -1,0 +1,47 @@
+# Supabase Configuration
+# Documentación: https://supabase.com/docs/guides/cli/config
+
+[api]
+# Puerto para el API local
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+# Puerto para la base de datos local
+port = 54322
+major_version = 15
+
+[studio]
+# Puerto para Supabase Studio local
+port = 54323
+
+[inbucket]
+# Puerto para email testing
+port = 54324
+
+[storage]
+# Puerto para storage local
+port = 54325
+
+[auth]
+# Configuración de autenticación
+site_url = "http://localhost:9002"
+additional_redirect_urls = ["http://localhost:9002/auth/callback"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+[functions]
+# Configuración de Edge Functions
+verify_jwt = false
+
+# Función para eliminar cuentas expiradas
+[functions.delete-expired-accounts]
+verify_jwt = false

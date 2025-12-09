@@ -5,24 +5,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { db, type Tournament, type Prize } from "@/lib/database";
+import { useAuth } from "@/lib/supabase/auth-context";
 
-interface Tournament {
+// Form data type for the CreateTournamentForm
+interface TournamentFormData {
     id: string;
     name: string;
     description: string;
     game: string;
-    participants: number;
+    gameMode: string;
     maxParticipants: number;
-    startDate: string;
-    startTime?: string;
+    startDate: Date;
+    startTime: string;
     format: 'single-elimination' | 'double-elimination' | 'swiss';
-    status: string;
-    owner_email: string;
-    image?: string;
-    dataAiHint: string;
     prizePool?: string;
+    prizes?: Prize[];
     registrationType: 'public' | 'private';
     location?: string;
+    image?: string;
 }
 
 export default function EditTournamentPage() {
@@ -30,33 +31,61 @@ export default function EditTournamentPage() {
     const params = useParams();
     const id = params.id as string;
     const [loading, setLoading] = useState(true);
-    const [tournament, setTournament] = useState<Tournament | null>(null);
+    const [tournamentData, setTournamentData] = useState<TournamentFormData | null>(null);
+    const { user, loading: authLoading } = useAuth();
 
     useEffect(() => {
-        const userStr = localStorage.getItem('user');
-        if (!userStr) {
+        if (authLoading) return;
+        
+        if (!user) {
             router.push('/login');
             return;
         }
 
-        const user = JSON.parse(userStr);
-        const allTournaments: Tournament[] = JSON.parse(localStorage.getItem("tournaments") || "[]");
-        const currentTournament = allTournaments.find(t => t.id === id);
-
-        if (currentTournament) {
-            if (currentTournament.owner_email !== user.email) {
-                router.push(`/tournaments/${id}`);
-                return;
+        const loadTournament = async () => {
+            try {
+                const result = await db.getTournament(id);
+                const tournament = result.tournament;
+                
+                if (!tournament) {
+                    router.push('/dashboard');
+                    return;
+                }
+                
+                if (tournament.owner_email !== user.email) {
+                    router.push(`/tournaments/${id}`);
+                    return;
+                }
+                
+                // Map to form data format
+                setTournamentData({
+                    id: tournament.id,
+                    name: tournament.name,
+                    description: tournament.description || '',
+                    game: tournament.game,
+                    gameMode: tournament.game_mode || '',
+                    maxParticipants: tournament.max_participants,
+                    startDate: new Date(tournament.start_date),
+                    startTime: tournament.start_time || '10:00',
+                    format: tournament.format,
+                    prizePool: tournament.prize_pool,
+                    prizes: tournament.prizes || [],
+                    registrationType: tournament.registration_type,
+                    location: tournament.location,
+                    image: tournament.image || '',
+                });
+            } catch (error) {
+                console.error('Error loading tournament:', error);
+                router.push('/dashboard');
+            } finally {
+                setLoading(false);
             }
-            setTournament(currentTournament);
-        } else {
-             router.push('/dashboard');
-        }
+        };
         
-        setLoading(false);
-    }, [id, router]);
+        loadTournament();
+    }, [id, router, user, authLoading]);
 
-    if (loading || !tournament) {
+    if (loading || authLoading || !tournamentData) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
                 <Loader2 className="h-16 w-16 animate-spin" />
@@ -73,12 +102,7 @@ export default function EditTournamentPage() {
                 </div>
                 <Card>
                     <CardContent className="p-8">
-                        <CreateTournamentForm mode="edit" tournamentData={{
-                            ...tournament,
-                            startDate: new Date(tournament.startDate),
-                            startTime: tournament.startTime || '10:00',
-                            image: tournament.image || ''
-                        }} />
+                        <CreateTournamentForm mode="edit" tournamentData={tournamentData} />
                     </CardContent>
                 </Card>
             </div>

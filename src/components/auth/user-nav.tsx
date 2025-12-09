@@ -14,17 +14,11 @@ import {
 import Link from "next/link";
 import { LogOut, User, Wrench, LayoutDashboard } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth, type AppUser } from "@/lib/supabase/auth-context";
 
-type User = {
-  displayName?: string | null;
-  email?: string | null;
-  photoURL?: string | null;
-};
-
-export function UserNav({ user }: { user: User }) {
+export function UserNav({ user }: { user: AppUser }) {
   const router = useRouter();
-  const supabase = createClient();
+  const { signOut } = useAuth();
 
   const getInitials = (name?: string | null) => {
     if (!name) return "U";
@@ -35,25 +29,8 @@ export function UserNav({ user }: { user: User }) {
   };
 
   const handleLogout = async () => {
-    try {
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-
-      // Clear localStorage
-      localStorage.removeItem("user");
-
-      // Trigger storage event for header to update
-      window.dispatchEvent(new Event("storage"));
-
-      // Redirect to home page
-      router.push('/');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      // Even if Supabase signout fails, clear local storage
-      localStorage.removeItem("user");
-      window.dispatchEvent(new Event("storage"));
-      router.push('/');
-    }
+    await signOut();
+    router.push('/');
   };
 
   return (

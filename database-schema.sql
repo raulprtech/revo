@@ -1,13 +1,80 @@
 -- Database schema for TournaVerse
 -- Run this in Supabase SQL Editor
 
--- Enable Row Level Security (RLS)
--- Create tournaments table
-CREATE TABLE IF NOT EXISTS public.tournaments (
+-- =============================================
+-- EVENTS TABLE (Meta-Events that group tournaments)
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.events (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
+  slug VARCHAR(100) UNIQUE NOT NULL, -- URL-friendly identifier (e.g., 'jaguar-games-2025')
+  banner_image TEXT, -- Large banner for the event landing page
+  logo_image TEXT, -- Event logo
+  primary_color VARCHAR(7) DEFAULT '#6366f1', -- Hex color for branding
+  secondary_color VARCHAR(7) DEFAULT '#8b5cf6', -- Hex color for branding
+  start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  location VARCHAR(255),
+  organizer_name VARCHAR(255), -- e.g., "Gobierno del Estado de Campeche"
+  organizer_logo TEXT,
+  owner_email VARCHAR(255) NOT NULL,
+  organizers JSONB DEFAULT '[]'::jsonb, -- Array of co-organizer emails
+  status VARCHAR(50) DEFAULT 'Próximo' CHECK (status IN ('Próximo', 'En curso', 'Finalizado')),
+  is_public BOOLEAN DEFAULT true,
+  sponsors JSONB DEFAULT '[]'::jsonb, -- Array of {name, logo, url}
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Migration: Add organizers column to existing events table
+-- ALTER TABLE public.events ADD COLUMN IF NOT EXISTS organizers JSONB DEFAULT '[]'::jsonb;
+
+-- Create indexes for events
+CREATE INDEX IF NOT EXISTS events_owner_email_idx ON public.events(owner_email);
+CREATE INDEX IF NOT EXISTS events_slug_idx ON public.events(slug);
+CREATE INDEX IF NOT EXISTS events_start_date_idx ON public.events(start_date);
+CREATE INDEX IF NOT EXISTS events_is_public_idx ON public.events(is_public);
+
+-- Enable RLS for events
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for events
+CREATE POLICY "Public events are viewable by everyone" ON public.events
+FOR SELECT USING (is_public = true);
+
+CREATE POLICY "Private events viewable by owner" ON public.events
+FOR SELECT USING (owner_email = auth.jwt() ->> 'email');
+
+CREATE POLICY "Event owners can update their events" ON public.events
+FOR UPDATE USING (owner_email = auth.jwt() ->> 'email');
+
+CREATE POLICY "Event owners can delete their events" ON public.events
+FOR DELETE USING (owner_email = auth.jwt() ->> 'email');
+
+CREATE POLICY "Authenticated users can create events" ON public.events
+FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IS NOT NULL);
+
+-- Trigger for events updated_at
+CREATE TRIGGER handle_events_updated_at
+  BEFORE UPDATE ON public.events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_updated_at();
+
+-- Grant permissions for events
+GRANT ALL ON public.events TO authenticated;
+GRANT SELECT ON public.events TO anon;
+
+-- =============================================
+-- TOURNAMENTS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.tournaments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID REFERENCES public.events(id) ON DELETE SET NULL, -- Optional link to parent event
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
   game VARCHAR(255) NOT NULL,
+  game_mode VARCHAR(100),
   participants INTEGER DEFAULT 0,
   max_participants INTEGER NOT NULL,
   start_date TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -15,15 +82,29 @@ CREATE TABLE IF NOT EXISTS public.tournaments (
   format VARCHAR(50) NOT NULL CHECK (format IN ('single-elimination', 'double-elimination', 'swiss')),
   status VARCHAR(50) DEFAULT 'Próximo',
   owner_email VARCHAR(255) NOT NULL,
+  organizers JSONB DEFAULT '[]'::jsonb,
   image TEXT,
   data_ai_hint VARCHAR(255),
   registration_type VARCHAR(20) NOT NULL CHECK (registration_type IN ('public', 'private')),
   prize_pool VARCHAR(100),
+  prizes JSONB DEFAULT '[]'::jsonb,
   location VARCHAR(255),
   invited_users JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Migration: Add event_id column to existing tournaments table
+-- ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS event_id UUID REFERENCES public.events(id) ON DELETE SET NULL;
+
+-- Migration: Add game_mode column to existing tournaments table
+-- ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS game_mode VARCHAR(100);
+
+-- Migration: Add prizes column to existing tournaments table
+-- ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS prizes JSONB DEFAULT '[]'::jsonb;
+
+-- Migration: Add organizers column to existing tournaments table
+-- ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS organizers JSONB DEFAULT '[]'::jsonb;
 
 -- Create participants table
 CREATE TABLE IF NOT EXISTS public.participants (
@@ -33,9 +114,13 @@ CREATE TABLE IF NOT EXISTS public.participants (
   name VARCHAR(255) NOT NULL,
   avatar TEXT,
   status VARCHAR(20) DEFAULT 'Pendiente' CHECK (status IN ('Aceptado', 'Pendiente', 'Rechazado')),
+  checked_in_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   UNIQUE(tournament_id, email)
 );
+
+-- Migration: Add checked_in_at column to existing participants table
+-- ALTER TABLE public.participants ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS tournaments_owner_email_idx ON public.tournaments(owner_email);

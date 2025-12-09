@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -13,7 +12,10 @@ import Bracket, { generateRounds, type Round } from "@/components/tournaments/br
 import StandingsTable from "@/components/tournaments/standings-table";
 import ParticipantManager from "@/components/tournaments/participant-manager";
 import { InvitationManager } from "@/components/tournaments/invitation-manager";
-import ParticipantsList from "@/components/tournaments/participants-list";
+import { EventLinkManager } from "@/components/tournaments/event-link-manager";
+import TournamentStats from "@/components/tournaments/tournament-stats";
+import { PrizeDisplay } from "@/components/tournaments/prize-manager";
+import { OrganizerManager } from "@/components/shared/organizer-manager";
 import Image from "next/image";
 import {
   AlertDialog,
@@ -27,9 +29,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast";
-import { db, type Tournament, type Participant } from "@/lib/database";
-import { createClient } from "@/lib/supabase/client";
-import type { Session } from "@supabase/supabase-js";
+import { db, type Tournament, type Participant, type Event } from "@/lib/database";
+import { useAuth } from "@/lib/supabase/auth-context";
+import { useTournament, useIsParticipating, invalidateCache } from "@/hooks/use-tournaments";
 
 const getDefaultTournamentImage = (gameName: string) => {
   const colors = [
@@ -45,284 +47,121 @@ const getDefaultTournamentImage = (gameName: string) => {
   return colors[colorIndex];
 };
 
-
-// Interfaces are now imported from database
-
-interface User {
-    displayName: string;
-    email: string;
-    photoURL: string;
-}
-
 const formatMapping = {
     'single-elimination': 'Eliminación Simple',
     'double-elimination': 'Doble Eliminación',
     'swiss': 'Suizo'
 };
 
-const SUPABASE_SESSION_KEY = (() => {
-  if (typeof process === 'undefined') return null;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl) return null;
-  const match = supabaseUrl.match(/^https?:\/\/([^.]+)\.supabase\.co/);
-  return match ? `sb-${match[1]}-auth-token` : null;
-})();
-
-const readStoredSession = (): Session | null => {
-  if (typeof window === 'undefined' || !SUPABASE_SESSION_KEY) {
-    return null;
-  }
-
-  try {
-    const raw = localStorage.getItem(SUPABASE_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const session = parsed?.currentSession;
-    if (session && typeof session === 'object') {
-      return session as Session;
-    }
-  } catch (error) {
-    console.warn('Unable to parse stored Supabase session.', error);
-  }
-
-  return null;
-};
-
-type StoredTournamentShape = Partial<Tournament> & {
-  id?: string;
-  name?: string;
-  game?: string;
-  maxParticipants?: number;
-  startDate?: string;
-  startTime?: string;
-  ownerEmail?: string;
-  prizePool?: string;
-  registrationType?: 'public' | 'private';
-  invitedUsers?: string[];
-  dataAiHint?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
 type LocalParticipant = Omit<Participant, 'id' | 'created_at' | 'tournament_id'> & { tournament_id?: string };
 
-const normalizeTournament = (raw: StoredTournamentShape | null | undefined): Tournament | null => {
-  if (!raw?.id || !raw.name || !raw.game) {
-    return null;
-  }
-
-  const format = (raw.format ?? 'single-elimination') as Tournament['format'];
-  const registrationType = (raw.registration_type ?? raw.registrationType ?? 'public') as Tournament['registration_type'];
-
-  return {
-    id: raw.id,
-    name: raw.name,
-    description: raw.description,
-    game: raw.game,
-    participants: raw.participants ?? 0,
-    max_participants: raw.max_participants ?? raw.maxParticipants ?? 0,
-    start_date: raw.start_date ?? raw.startDate ?? '',
-    start_time: raw.start_time ?? raw.startTime,
-    format,
-    status: raw.status ?? 'Próximo',
-    owner_email: raw.owner_email ?? raw.ownerEmail ?? '',
-    image: raw.image,
-    data_ai_hint: raw.data_ai_hint ?? raw.dataAiHint,
-    registration_type: registrationType,
-    prize_pool: raw.prize_pool ?? raw.prizePool,
-    location: raw.location,
-    invited_users: raw.invited_users ?? raw.invitedUsers ?? [],
-    created_at: raw.created_at ?? raw.createdAt,
-    updated_at: raw.updated_at ?? raw.updatedAt,
-  };
-};
-
-
 export default function TournamentPage() {
-  const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
-  const [loading, setLoading] = useState(true);
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const { toast } = useToast();
+  
+  // Use auth context for user
+  const { user, loading: authLoading } = useAuth();
+  
+  // Use SWR hooks for tournament data
+  const { tournament: fetchedTournament, isLoading: tournamentLoading, refresh: refreshTournament } = useTournament(id);
+  const { isParticipating: isParticipantFromHook, isLoading: participantLoading } = useIsParticipating(id);
+  
+  // Local state for tournament (allows updates)
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [linkedEvent, setLinkedEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isParticipant, setIsParticipant] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  // Sync fetched tournament to local state
+  useEffect(() => {
+    if (fetchedTournament) {
+      setTournament(fetchedTournament);
+    }
+  }, [fetchedTournament]);
+
+  // Load linked event when tournament has event_id
+  useEffect(() => {
+    const loadLinkedEvent = async () => {
+      if (tournament?.event_id) {
+        const event = await db.getEventById(tournament.event_id);
+        setLinkedEvent(event);
+      } else {
+        setLinkedEvent(null);
+      }
+    };
+    loadLinkedEvent();
+  }, [tournament?.event_id]);
+
+  // Sync participant status
+  useEffect(() => {
+    setIsParticipant(isParticipantFromHook);
+  }, [isParticipantFromHook]);
+
+  // Check if user is owner or co-organizer
+  const isOwner = user?.email === tournament?.owner_email || 
+    (tournament?.organizers?.includes(user?.email ?? '') ?? false);
+  const isMainOwner = user?.email === tournament?.owner_email;
 
   const loadBracketData = useCallback(() => {
-    if (!id) return;
+    if (!id || !tournament) return;
     const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
-    const seededPlayerNames = seededParticipantsData[id] || [];
+    const seededPlayers = seededParticipantsData[id] || [];
 
-    const allTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
-    const currentTournament = allTournaments.find(t => t?.id === id);
-
-    if (currentTournament) {
-        const normalizedTournament = normalizeTournament(currentTournament);
-        // Solo generar bracket si hay participantes reales registrados
-        if (seededPlayerNames.length > 0) {
-            setRounds(generateRounds(seededPlayerNames.length, seededPlayerNames));
-        } else {
-            setRounds([]);
-        }
+    if (seededPlayers.length > 0) {
+      setRounds(generateRounds(seededPlayers.length, seededPlayers, tournament.format));
+    } else {
+      setRounds([]);
     }
-  }, [id]);
+  }, [id, tournament]);
 
-
+  // Access control and initial setup
   useEffect(() => {
-    const loadTournament = async () => {
-      if (!id) return;
+    if (tournamentLoading || authLoading) return;
+    
+    // Tournament not found
+    if (!fetchedTournament && !tournamentLoading) {
+      toast({
+        title: "Torneo no encontrado",
+        description: "El torneo que buscas no existe o no tienes acceso.",
+        variant: "destructive"
+      });
+      router.push("/tournaments");
+      return;
+    }
 
-      try {
-        const supabase = createClient();
-        let session: Session | null = readStoredSession();
-        const hasStoredSession =
-          !!session ||
-          (typeof window !== 'undefined' && SUPABASE_SESSION_KEY
-            ? !!localStorage.getItem(SUPABASE_SESSION_KEY)
-            : false);
-        let authenticatedUser: Session['user'] | null = session?.user ?? null;
-
-        if (!authenticatedUser && hasStoredSession) {
-          try {
-            const { data } = await supabase.auth.getSession();
-            session = data.session ?? session;
-            authenticatedUser = session?.user ?? null;
-          } catch (sessionError) {
-            console.warn('Unable to load Supabase session from client.', sessionError);
-          }
-        }
-
-        const tournamentResult = await db.getTournament(id);
-
-        if (!tournamentResult.tournament) {
-          if (tournamentResult.status === 401 || tournamentResult.status === 403) {
-            if (!session) {
-              toast({
-                title: "Acceso restringido",
-                description: "Inicia sesión con una cuenta autorizada para ver este torneo.",
-                variant: "destructive"
-              });
-              router.push('/login');
-              return;
-            }
-
-            toast({
-              title: "Acceso restringido",
-              description: "No tienes permisos para ver este torneo.",
-              variant: "destructive"
-            });
-            router.push('/tournaments');
-            return;
-          }
-
-          if (tournamentResult.status === 404) {
-            toast({
-              title: "Torneo no encontrado",
-              description: "El torneo que buscas no existe.",
-              variant: "destructive"
-            });
-            router.push("/tournaments");
-            return;
-          }
-
-          console.error('No se pudo obtener el torneo', tournamentResult.error);
+    if (fetchedTournament) {
+      // Check access for private tournaments
+      if (fetchedTournament.registration_type === 'private') {
+        const canAccess = 
+          user?.email === fetchedTournament.owner_email ||
+          (fetchedTournament.invited_users?.includes(user?.email ?? '') ?? false);
+        
+        if (!canAccess) {
           toast({
-            title: "Error",
-            description: "Error al cargar el torneo.",
+            title: "Acceso restringido",
+            description: "Este torneo es privado y requiere invitación.",
             variant: "destructive"
           });
           router.push("/tournaments");
           return;
         }
-
-        const currentTournament = tournamentResult.tournament;
-
-        if (!authenticatedUser) {
-          session = readStoredSession();
-          authenticatedUser = session?.user ?? null;
-        }
-
-        if (currentTournament) {
-          // Check access permissions
-          let canAccessTournament = false;
-
-          if (currentTournament.registration_type === 'public') {
-            // Public tournaments are accessible to everyone
-            canAccessTournament = true;
-          } else if (currentTournament.registration_type === 'private') {
-            if (authenticatedUser) {
-              // Private tournament: allow access only to owner and invited users
-              canAccessTournament =
-                authenticatedUser.email === currentTournament.owner_email ||
-                (currentTournament.invited_users?.includes(authenticatedUser.email!) ?? false);
-            } else {
-              // No user logged in and it's a private tournament
-              canAccessTournament = false;
-            }
-          }
-
-          if (!canAccessTournament) {
-            toast({
-              title: "Acceso restringido",
-              description: "Este torneo es privado y requiere invitación.",
-              variant: "destructive"
-            });
-            router.push("/tournaments");
-            return;
-          }
-
-          setTournament(currentTournament);
-
-          if (authenticatedUser) {
-            // Get user data from localStorage as fallback
-            const storedUser = localStorage.getItem("user");
-            if (storedUser) {
-              const userData = JSON.parse(storedUser);
-              setCurrentUser(userData);
-            } else {
-              const userData = {
-                displayName: authenticatedUser.user_metadata?.full_name || authenticatedUser.email?.split('@')[0] || '',
-                email: authenticatedUser.email ?? '',
-                photoURL: authenticatedUser.user_metadata?.avatar_url || ''
-              } satisfies User;
-              setCurrentUser(userData);
-              localStorage.setItem("user", JSON.stringify(userData));
-            }
-
-            setIsOwner(authenticatedUser.email === currentTournament.owner_email);
-
-            // Check if user is participant
-            const isParticipating = await db.isUserParticipating(id, authenticatedUser.email!);
-            setIsParticipant(isParticipating);
-          } else {
-            localStorage.removeItem("user");
-            setCurrentUser(null);
-          }
-
-          loadBracketData();
-        }
-      } catch (error) {
-        console.error('Error loading tournament:', error);
-        toast({
-          title: "Error",
-          description: "Error al cargar el torneo.",
-          variant: "destructive"
-        });
-        router.push("/tournaments");
-      } finally {
-        setLoading(false);
       }
-    };
+      
+      setAccessChecked(true);
+      loadBracketData();
+    }
+  }, [fetchedTournament, tournamentLoading, authLoading, user, router, toast, loadBracketData]);
 
-    loadTournament();
-
+  // Listen for bracket updates
+  useEffect(() => {
     window.addEventListener('seedsAssigned', loadBracketData);
     return () => {
-        window.removeEventListener('seedsAssigned', loadBracketData);
-    }
-  }, [id, loadBracketData, router, toast]);
+      window.removeEventListener('seedsAssigned', loadBracketData);
+    };
+  }, [loadBracketData]);
 
   const handleShare = async () => {
     const shareData = {
@@ -368,20 +207,15 @@ export default function TournamentPage() {
 
 
   const handleDelete = async () => {
-    if (!tournament) return;
+    if (!tournament || !user) return;
 
     try {
-      // Eliminar de Supabase
       await db.deleteTournament(id);
 
-      // Eliminar del localStorage como respaldo
-      const allTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
-      const updatedTournaments = allTournaments.filter(t => t?.id !== id);
-      localStorage.setItem("tournaments", JSON.stringify(updatedTournaments));
-
-      const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}") as Record<string, LocalParticipant[]>;
-      delete participantsData[id];
-      localStorage.setItem("participantsData", JSON.stringify(participantsData));
+      // Invalidate caches
+      invalidateCache.tournament(id);
+      invalidateCache.publicTournaments();
+      invalidateCache.userTournaments(user.email);
 
       toast({
         title: "Torneo eliminado",
@@ -479,8 +313,68 @@ export default function TournamentPage() {
       });
   };
 
+  // Handle station assignment for matches
+  const handleStationAssigned = (matchId: number, stationId: string | null) => {
+    if (!tournament?.stations) return;
+
+    const station = stationId 
+      ? tournament.stations.find(s => s.id === stationId)
+      : null;
+
+    setRounds(prevRounds => {
+      const newRounds: Round[] = JSON.parse(JSON.stringify(prevRounds));
+      
+      for (const round of newRounds) {
+        const match = round.matches.find(m => m.id === matchId);
+        if (match) {
+          match.station = station ? {
+            id: station.id,
+            name: station.name,
+            location: station.location,
+          } : null;
+          break;
+        }
+      }
+      
+      return newRounds;
+    });
+
+    // Update station availability in tournament
+    if (tournament) {
+      const updatedStations = tournament.stations.map(s => ({
+        ...s,
+        isAvailable: s.id === stationId ? false : (s.currentMatchId === matchId ? true : s.isAvailable),
+        currentMatchId: s.id === stationId ? matchId : (s.currentMatchId === matchId ? null : s.currentMatchId),
+      }));
+
+      setTournament(prev => prev ? { ...prev, stations: updatedStations } : null);
+
+      // Optionally save to database
+      db.updateTournament(tournament.id, { 
+        stations: updatedStations,
+        station_assignments: [
+          ...(tournament.station_assignments || []).filter(a => a.matchId !== matchId),
+          ...(stationId ? [{
+            matchId,
+            stationId,
+            roundName: '', // Could be enhanced to include round name
+            assignedAt: new Date().toISOString(),
+            status: 'pending' as const,
+          }] : []),
+        ],
+      }).catch(err => console.error('Error saving station assignment:', err));
+    }
+
+    toast({
+      title: stationId ? "Estación asignada" : "Estación removida",
+      description: stationId 
+        ? `La partida ha sido asignada a ${station?.name}`
+        : "La asignación de estación ha sido removida",
+    });
+  };
+
   const handleJoinTournament = async () => {
-    if (!currentUser) {
+    if (!user) {
         toast({ title: "Debes iniciar sesión", description: "Inicia sesión para unirte a un torneo.", variant: "destructive" });
         router.push('/login');
         return;
@@ -496,60 +390,18 @@ export default function TournamentPage() {
     try {
       await db.addParticipant({
         tournament_id: tournament.id,
-        email: currentUser.email,
-        name: currentUser.displayName,
-        avatar: currentUser.photoURL,
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
         status: 'Pendiente'
       });
 
-      const refreshed = await db.getTournament(id);
-      if (refreshed.tournament) {
-        setTournament(refreshed.tournament);
-
-        const storedTournaments = JSON.parse(localStorage.getItem("tournaments") || "[]") as StoredTournamentShape[];
-        const storedIndex = storedTournaments.findIndex(t => t?.id === id);
-        const updatedStoredTournament: StoredTournamentShape = {
-          ...(storedTournaments[storedIndex] ?? {}),
-          ...refreshed.tournament,
-          maxParticipants: refreshed.tournament.max_participants,
-          startDate: refreshed.tournament.start_date,
-          startTime: refreshed.tournament.start_time,
-          ownerEmail: refreshed.tournament.owner_email,
-          prizePool: refreshed.tournament.prize_pool,
-          registrationType: refreshed.tournament.registration_type,
-          invitedUsers: refreshed.tournament.invited_users,
-          dataAiHint: refreshed.tournament.data_ai_hint,
-          createdAt: refreshed.tournament.created_at,
-          updatedAt: refreshed.tournament.updated_at,
-        };
-
-        if (storedIndex !== -1) {
-          storedTournaments[storedIndex] = updatedStoredTournament;
-        } else {
-          storedTournaments.push(updatedStoredTournament);
-        }
-
-        localStorage.setItem("tournaments", JSON.stringify(storedTournaments));
-      }
-
-      const participantsData = JSON.parse(localStorage.getItem("participantsData") || "{}") as Record<string, LocalParticipant[]>;
-      const currentList = participantsData[id] ?? [];
-      const participantIndex = currentList.findIndex(participant => participant.email === currentUser.email);
-      const participantPayload: LocalParticipant = {
-        email: currentUser.email,
-        name: currentUser.displayName,
-        avatar: currentUser.photoURL,
-        status: 'Pendiente'
-      };
-
-      if (participantIndex !== -1) {
-        currentList[participantIndex] = participantPayload;
-      } else {
-        currentList.push(participantPayload);
-      }
-
-      participantsData[id] = currentList;
-      localStorage.setItem("participantsData", JSON.stringify(participantsData));
+      // Refresh tournament data
+      refreshTournament();
+      
+      // Invalidate caches
+      invalidateCache.participants(tournament.id);
+      invalidateCache.publicTournaments();
 
       setIsParticipant(true);
       toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
@@ -579,6 +431,20 @@ export default function TournamentPage() {
         });
     }
   }
+
+  const handleOrganizersUpdate = async (updatedOrganizers: string[]) => {
+    if (!tournament) return;
+    
+    await db.updateTournament(tournament.id, { organizers: updatedOrganizers });
+    setTournament({
+      ...tournament,
+      organizers: updatedOrganizers
+    });
+    invalidateCache.tournament(tournament.id);
+  }
+
+  // Combined loading state
+  const loading = tournamentLoading || authLoading || (!accessChecked && !!fetchedTournament);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]"><Loader2 className="h-16 w-16 animate-spin" /></div>;
@@ -590,8 +456,60 @@ export default function TournamentPage() {
   
   const canJoin = !isOwner && !isParticipant && tournament.status !== 'En curso';
 
+  // Find if current participant has a pending match with station assigned
+  const getParticipantNextMatch = () => {
+    if (!user || !isParticipant) return null;
+    
+    for (const round of rounds) {
+      for (const match of round.matches) {
+        if (!match.winner && match.station) {
+          const userName = user.displayName;
+          if (match.top.name === userName || match.bottom.name === userName) {
+            return { match, roundName: round.name };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const participantNextMatch = getParticipantNextMatch();
+
   return (
     <div className="container mx-auto py-10 px-4">
+      {/* Station Alert for Participants */}
+      {participantNextMatch && (
+        <div className="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-lg animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-primary/20 rounded-full">
+              <Gamepad2 className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg">¡Tu partida está lista!</h3>
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">{participantNextMatch.roundName}</span>
+                {' vs '}
+                <span className="font-medium text-foreground">
+                  {participantNextMatch.match.top.name === user?.displayName 
+                    ? participantNextMatch.match.bottom.name 
+                    : participantNextMatch.match.top.name}
+                </span>
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Dirígete a</p>
+              <p className="text-xl font-bold text-primary">{participantNextMatch.match.station?.name}</p>
+              {participantNextMatch.match.station?.location && (
+                <p className="text-sm text-muted-foreground flex items-center justify-end gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {participantNextMatch.match.station.location}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative w-full h-48 md:h-64 lg:h-80 rounded-lg overflow-hidden mb-8 shadow-lg">
         {tournament.image && tournament.image.trim() !== '' ? (
           <Image src={tournament.image} layout="fill" objectFit="cover" alt={tournament.name} data-ai-hint={tournament.data_ai_hint} />
@@ -606,16 +524,24 @@ export default function TournamentPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">{tournament.name}</h1>
-          <Badge className="mt-2 text-sm" variant={tournament.status === 'En curso' ? 'default' : 'secondary'}>{tournament.status}</Badge>
+          <div className="flex items-center gap-2 mt-2">
+            <Badge className="text-sm" variant={tournament.status === 'En curso' ? 'default' : 'secondary'}>{tournament.status}</Badge>
+            {linkedEvent && (
+              <Badge variant="outline" className="bg-accent/20 text-accent-foreground border-accent">
+                <Calendar className="h-3 w-3 mr-1" />
+                {linkedEvent.name}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="participants">Participantes</TabsTrigger>
           <TabsTrigger value="bracket">Bracket</TabsTrigger>
           <TabsTrigger value="standings">Posiciones</TabsTrigger>
+          {isOwner && <TabsTrigger value="stats">Estadísticas</TabsTrigger>}
           {isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
           {isOwner && tournament.registration_type === 'private' && <TabsTrigger value="invitations">Invitaciones</TabsTrigger>}
         </TabsList>
@@ -667,6 +593,9 @@ export default function TournamentPage() {
                   <div>
                     <p className="text-sm font-medium">Juego</p>
                     <p className="text-lg text-foreground">{tournament.game}</p>
+                    {tournament.game_mode && (
+                      <p className="text-sm text-muted-foreground">{tournament.game_mode}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -690,11 +619,15 @@ export default function TournamentPage() {
                     <p className="text-lg text-foreground">{tournament.participants} / {tournament.max_participants}</p>
                   </div>
                 </div>
-                 <div className="flex items-center space-x-3">
-                  <Trophy className="h-8 w-8 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Bolsa de Premios</p>
-                    <p className="text-lg text-foreground">{tournament.prize_pool || 'Por anunciar'}</p>
+                 <div className="flex items-start space-x-3">
+                  <Trophy className="h-8 w-8 text-primary mt-1" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-2">Bolsa de Premios</p>
+                    {tournament.prizes && tournament.prizes.length > 0 ? (
+                      <PrizeDisplay prizes={tournament.prizes} />
+                    ) : (
+                      <p className="text-lg text-foreground">{tournament.prize_pool || 'Por anunciar'}</p>
+                    )}
                   </div>
                 </div>
                  <div className="flex items-center space-x-3">
@@ -713,6 +646,29 @@ export default function TournamentPage() {
                         </div>
                     </div>
                 )}
+                {tournament.stations && tournament.stations.length > 0 && (
+                    <div className="flex items-start space-x-3">
+                        <Gamepad2 className="h-8 w-8 text-primary mt-1" />
+                        <div>
+                        <p className="text-sm font-medium">Estaciones de juego</p>
+                        <p className="text-lg text-foreground">{tournament.stations.length} estación{tournament.stations.length !== 1 ? 'es' : ''}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {tournament.stations.filter(s => s.isAvailable).length} disponible{tournament.stations.filter(s => s.isAvailable).length !== 1 ? 's' : ''}
+                        </p>
+                        </div>
+                    </div>
+                )}
+                {linkedEvent && (
+                    <div className="flex items-center space-x-3">
+                        <Calendar className="h-8 w-8 text-accent" />
+                        <div>
+                        <p className="text-sm font-medium">Parte del evento</p>
+                        <Link href={`/events/${linkedEvent.slug}`} className="text-lg text-primary hover:underline">
+                          {linkedEvent.name}
+                        </Link>
+                        </div>
+                    </div>
+                )}
               </div>
               <div className="pt-6 border-t">
                   {canJoin && <Button size="lg" onClick={handleJoinTournament}>Unirse al Torneo</Button>}
@@ -721,18 +677,44 @@ export default function TournamentPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="participants" className="mt-6">
-          <ParticipantsList tournamentId={id} />
-        </TabsContent>
         <TabsContent value="bracket" className="mt-6">
-          <Bracket tournament={tournament} isOwner={isOwner} rounds={rounds} onScoreReported={handleScoreReported} />
+          <Bracket 
+            tournament={tournament} 
+            isOwner={isOwner} 
+            rounds={rounds} 
+            onScoreReported={handleScoreReported}
+            onStationAssigned={handleStationAssigned}
+          />
         </TabsContent>
         <TabsContent value="standings" className="mt-6">
-          <StandingsTable rounds={rounds} />
+          <StandingsTable 
+            rounds={rounds} 
+            tournamentId={id} 
+            format={tournament.format}
+            gameMode={tournament.game_mode}
+          />
         </TabsContent>
         {isOwner && (
-          <TabsContent value="manage" className="mt-6">
+          <TabsContent value="stats" className="mt-6">
+            <TournamentStats tournament={tournament} rounds={rounds} />
+          </TabsContent>
+        )}
+        {isOwner && (
+          <TabsContent value="manage" className="mt-6 space-y-6">
+            <EventLinkManager 
+              tournamentId={id} 
+              currentEventId={tournament.event_id}
+              onEventChanged={() => refreshTournament()}
+            />
             <ParticipantManager tournamentId={id} onTournamentStart={handleTournamentStatusChange}/>
+            {isMainOwner && (
+              <OrganizerManager
+                ownerEmail={tournament.owner_email}
+                organizers={tournament.organizers || []}
+                onOrganizersChange={handleOrganizersUpdate}
+                entityType="torneo"
+              />
+            )}
           </TabsContent>
         )}
         {isOwner && tournament.registration_type === 'private' && (

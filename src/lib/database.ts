@@ -1,10 +1,75 @@
 import { createClient } from '@/lib/supabase/client';
 
-export type Tournament = {
+// =============================================
+// TYPES
+// =============================================
+
+export type Sponsor = {
+  name: string;
+  logo: string;
+  url?: string;
+};
+
+export type Event = {
   id: string;
   name: string;
   description?: string;
+  slug: string;
+  banner_image?: string;
+  logo_image?: string;
+  primary_color: string;
+  secondary_color: string;
+  start_date: string;
+  end_date: string;
+  location?: string;
+  organizer_name?: string;
+  organizer_logo?: string;
+  owner_email: string;
+  organizers?: string[]; // Array of co-organizer emails
+  status: 'Próximo' | 'En curso' | 'Finalizado';
+  is_public: boolean;
+  sponsors: Sponsor[];
+  created_at?: string;
+  updated_at?: string;
+  // Computed fields (not in DB)
+  tournaments_count?: number;
+};
+
+export type CreateEventData = Omit<Event, 'id' | 'created_at' | 'updated_at' | 'tournaments_count'>;
+export type UpdateEventData = Partial<CreateEventData>;
+
+export type Prize = {
+  position: string; // '1', '2', '3', '4', 'top8', 'top16', etc.
+  label: string; // '1er Lugar', '2do Lugar', 'Top 8', etc.
+  reward: string; // '$500', 'Medalla de Oro', 'Pase VIP', etc.
+  type?: 'cash' | 'item' | 'other';
+};
+
+export type GameStation = {
+  id: string;
+  name: string; // 'Consola 1', 'PC Gaming 2', 'Mesa 3', etc.
+  type: 'console' | 'pc' | 'arcade' | 'table' | 'other';
+  description?: string; // 'PS5 con monitor LG', 'PC RTX 4080', etc.
+  location?: string; // 'Área A', 'Zona VIP', 'Sala 2'
+  isAvailable: boolean;
+  currentMatchId?: number | null;
+};
+
+export type MatchStationAssignment = {
+  matchId: number;
+  stationId: string;
+  roundName: string;
+  assignedAt: string;
+  status: 'pending' | 'in-progress' | 'completed';
+};
+
+export type Tournament = {
+  id: string;
+  event_id?: string | null;
+  name: string;
+  description?: string;
   game: string;
+  game_mode?: string;
   participants: number;
   max_participants: number;
   start_date: string;
@@ -12,14 +77,22 @@ export type Tournament = {
   format: 'single-elimination' | 'double-elimination' | 'swiss';
   status: string;
   owner_email: string;
+  organizers?: string[]; // Array of co-organizer emails
   image?: string;
   data_ai_hint?: string;
   registration_type: 'public' | 'private';
   prize_pool?: string;
+  prizes?: Prize[];
   location?: string;
   invited_users?: string[];
+  // Gaming stations for in-person tournaments
+  stations?: GameStation[];
+  station_assignments?: MatchStationAssignment[];
+  auto_assign_stations?: boolean;
   created_at?: string;
   updated_at?: string;
+  // Computed fields (not in DB)
+  event?: Event;
 };
 
 export type Participant = {
@@ -29,6 +102,7 @@ export type Participant = {
   name: string;
   avatar?: string;
   status: 'Aceptado' | 'Pendiente' | 'Rechazado';
+  checked_in_at?: string | null;
   created_at?: string;
 };
 
@@ -45,24 +119,59 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 class DatabaseService {
-  private supabase = createClient();
+  private get supabase() {
+    return createClient();
+  }
 
   // Tournament operations
   async createTournament(tournament: CreateTournamentData): Promise<Tournament> {
+    // Log the data being sent for debugging
+    console.log('Creating tournament with data:', JSON.stringify(tournament, null, 2));
+    
+    // Build insert object with only the fields that exist in the database
+    // Note: 'organizers' column may not exist in older schemas
+    const insertData: Record<string, unknown> = {
+      name: tournament.name,
+      description: tournament.description || null,
+      game: tournament.game,
+      max_participants: tournament.max_participants,
+      start_date: tournament.start_date,
+      format: tournament.format,
+      status: tournament.status || 'Próximo',
+      owner_email: tournament.owner_email,
+      registration_type: tournament.registration_type,
+    };
+
+    // Add optional fields only if they have values
+    if (tournament.game_mode) insertData.game_mode = tournament.game_mode;
+    if (tournament.start_time) insertData.start_time = tournament.start_time;
+    if (tournament.image) insertData.image = tournament.image;
+    if (tournament.data_ai_hint) insertData.data_ai_hint = tournament.data_ai_hint;
+    if (tournament.prize_pool) insertData.prize_pool = tournament.prize_pool;
+    if (tournament.prizes && tournament.prizes.length > 0) insertData.prizes = tournament.prizes;
+    if (tournament.location) insertData.location = tournament.location;
+    if (tournament.invited_users) insertData.invited_users = tournament.invited_users;
+    if (tournament.event_id) insertData.event_id = tournament.event_id;
+    // Gaming stations for in-person tournaments
+    if (tournament.stations && tournament.stations.length > 0) insertData.stations = tournament.stations;
+    if (tournament.auto_assign_stations !== undefined) insertData.auto_assign_stations = tournament.auto_assign_stations;
+    // Note: 'organizers' is intentionally not included - add column to DB first if needed
+
     const { data, error } = await this.supabase
       .from('tournaments')
-      .insert({
-        ...tournament,
-        start_date: tournament.start_date,
-        max_participants: tournament.max_participants,
-        invited_users: tournament.invited_users || []
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
       console.error('Error creating tournament:', error);
-      throw new Error('Failed to create tournament');
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw new Error(`Failed to create tournament: ${error.message || 'Unknown error'}`);
     }
 
     return this.mapTournamentFromDB(data);
@@ -89,7 +198,7 @@ class DatabaseService {
       return [];
     }
 
-    return data.map(this.mapTournamentFromDB);
+    return data.map((t) => this.mapTournamentFromDB(t));
   }
 
   async getPublicTournaments(): Promise<Tournament[]> {
@@ -123,11 +232,89 @@ class DatabaseService {
         return [];
       }
 
-      return data.map(this.mapTournamentFromDB);
+      return data.map((t) => this.mapTournamentFromDB(t));
     } catch (err) {
       console.error('Unexpected error in getPublicTournaments:', this.serializeError(err));
       return [];
     }
+  }
+
+  // Get tournaments owned by a specific user
+  async getTournamentsByOwner(ownerEmail: string): Promise<Tournament[]> {
+    const { data, error } = await this.supabase
+      .from('tournaments')
+      .select('*')
+      .eq('owner_email', ownerEmail)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (typeof error === 'object' && Object.keys(error).length === 0) {
+        console.log('Empty error object received in getTournamentsByOwner, continuing...');
+      } else if (error.message) {
+        console.error('Error fetching tournaments by owner:', error);
+        return [];
+      }
+    }
+
+    if (!data) {
+      return [];
+    }
+
+    return data.map((t) => this.mapTournamentFromDB(t));
+  }
+
+  // Get tournaments where user is participating
+  async getTournamentsWhereParticipating(userEmail: string): Promise<Tournament[]> {
+    // First get all tournament IDs where user is a participant
+    const { data: participations, error: partError } = await this.supabase
+      .from('participants')
+      .select('tournament_id')
+      .eq('email', userEmail)
+      .in('status', ['Aceptado', 'Pendiente']);
+
+    if (partError || !participations || participations.length === 0) {
+      return [];
+    }
+
+    const tournamentIds = participations.map(p => p.tournament_id);
+
+    // Then fetch those tournaments
+    const { data, error } = await this.supabase
+      .from('tournaments')
+      .select('*')
+      .in('id', tournamentIds)
+      .order('start_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching participating tournaments:', error);
+      return [];
+    }
+
+    if (!data) {
+      return [];
+    }
+
+    return data.map((t) => this.mapTournamentFromDB(t));
+  }
+
+  // Get all tournaments accessible to user (owned + participating + public)
+  async getUserAccessibleTournaments(userEmail: string): Promise<{
+    owned: Tournament[];
+    participating: Tournament[];
+  }> {
+    const [owned, participating] = await Promise.all([
+      this.getTournamentsByOwner(userEmail),
+      this.getTournamentsWhereParticipating(userEmail),
+    ]);
+
+    // Filter out owned tournaments from participating list to avoid duplicates
+    const ownedIds = new Set(owned.map(t => t.id));
+    const participatingFiltered = participating.filter(t => !ownedIds.has(t.id));
+
+    return {
+      owned,
+      participating: participatingFiltered,
+    };
   }
 
   async getTournament(id: string): Promise<TournamentFetchResult> {
@@ -165,16 +352,27 @@ class DatabaseService {
   }
 
   async updateTournament(id: string, updates: UpdateTournamentData): Promise<Tournament> {
+    // Filter out undefined values to avoid Supabase errors
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+
+    console.log('Updating tournament:', id, 'with data:', cleanUpdates);
+
     const { data, error } = await this.supabase
       .from('tournaments')
-      .update(updates)
+      .update(cleanUpdates)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
-      console.error('Error updating tournament:', error);
-      throw new Error('Failed to update tournament');
+      console.error('Error updating tournament:', error, 'Code:', error.code, 'Message:', error.message, 'Details:', error.details);
+      throw new Error(error.message || 'Failed to update tournament');
+    }
+
+    if (!data) {
+      throw new Error('No data returned after update - you may not have permission to update this tournament');
     }
 
     return this.mapTournamentFromDB(data);
@@ -233,24 +431,77 @@ class DatabaseService {
       return [];
     }
 
-    return data.map(this.mapParticipantFromDB);
+    return data.map((p) => this.mapParticipantFromDB(p));
   }
 
   async updateParticipant(id: string, updates: Partial<Participant>): Promise<Participant> {
-    const { data, error } = await this.supabase
+    // First verify we have an authenticated session
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) {
+      console.error('No authenticated session for update participant');
+      throw new Error('Debes iniciar sesión para realizar esta acción');
+    }
+
+    const { data, error, status, statusText } = await this.supabase
       .from('participants')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      console.error('Error updating participant:', error);
-      throw new Error('Failed to update participant');
+    if (error || !data) {
+      console.error('Error updating participant:', { error, status, statusText, id, updates });
+      throw new Error(error?.message || 'Failed to update participant');
     }
 
     // Update tournament participant count
     await this.updateParticipantCount(data.tournament_id);
+
+    return this.mapParticipantFromDB(data);
+  }
+
+  async checkInParticipant(id: string): Promise<Participant> {
+    // First verify we have an authenticated session
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) {
+      console.error('No authenticated session for check-in');
+      throw new Error('Debes iniciar sesión para realizar esta acción');
+    }
+
+    const { data, error, status, statusText } = await this.supabase
+      .from('participants')
+      .update({ checked_in_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error checking in participant:', { error, status, statusText, id });
+      throw new Error(error?.message || 'Failed to check in participant');
+    }
+
+    return this.mapParticipantFromDB(data);
+  }
+
+  async undoCheckIn(id: string): Promise<Participant> {
+    // First verify we have an authenticated session
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) {
+      console.error('No authenticated session for undo check-in');
+      throw new Error('Debes iniciar sesión para realizar esta acción');
+    }
+
+    const { data, error, status, statusText } = await this.supabase
+      .from('participants')
+      .update({ checked_in_at: null })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error undoing check-in:', { error, status, statusText, id });
+      throw new Error('Failed to undo check-in');
+    }
 
     return this.mapParticipantFromDB(data);
   }
@@ -306,13 +557,200 @@ class DatabaseService {
       .eq('id', tournamentId);
   }
 
+  // =============================================
+  // EVENT OPERATIONS
+  // =============================================
+
+  async createEvent(event: CreateEventData): Promise<Event> {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Debes iniciar sesión para crear un evento');
+    }
+
+    const { data, error } = await this.supabase
+      .from('events')
+      .insert({
+        ...event,
+        owner_email: session.user.email,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating event:', error);
+      throw new Error(error.message || 'Failed to create event');
+    }
+
+    return this.mapEventFromDB(data);
+  }
+
+  async getEvents(): Promise<Event[]> {
+    const { data, error } = await this.supabase
+      .from('events')
+      .select('*, tournaments:tournaments(count)')
+      .order('start_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching events:', error);
+      return [];
+    }
+
+    return (data || []).map((e: any) => ({
+      ...this.mapEventFromDB(e),
+      tournaments_count: e.tournaments?.[0]?.count || 0,
+    }));
+  }
+
+  async getPublicEvents(): Promise<Event[]> {
+    const { data, error } = await this.supabase
+      .from('events')
+      .select('*, tournaments:tournaments(count)')
+      .eq('is_public', true)
+      .order('start_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching public events:', error);
+      return [];
+    }
+
+    return (data || []).map((e: any) => ({
+      ...this.mapEventFromDB(e),
+      tournaments_count: e.tournaments?.[0]?.count || 0,
+    }));
+  }
+
+  async getEventBySlug(slug: string): Promise<Event | null> {
+    const { data, error } = await this.supabase
+      .from('events')
+      .select('*, tournaments:tournaments(count)')
+      .eq('slug', slug)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching event by slug:', error);
+      return null;
+    }
+
+    return {
+      ...this.mapEventFromDB(data),
+      tournaments_count: data.tournaments?.[0]?.count || 0,
+    };
+  }
+
+  async getEventById(id: string): Promise<Event | null> {
+    const { data, error } = await this.supabase
+      .from('events')
+      .select('*, tournaments:tournaments(count)')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching event by id:', error);
+      return null;
+    }
+
+    return {
+      ...this.mapEventFromDB(data),
+      tournaments_count: data.tournaments?.[0]?.count || 0,
+    };
+  }
+
+  async updateEvent(id: string, updates: UpdateEventData): Promise<Event> {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Debes iniciar sesión para actualizar un evento');
+    }
+
+    const { data, error } = await this.supabase
+      .from('events')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error updating event:', error);
+      throw new Error(error?.message || 'Failed to update event');
+    }
+
+    return this.mapEventFromDB(data);
+  }
+
+  async deleteEvent(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('events')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      throw new Error('Failed to delete event');
+    }
+  }
+
+  async getEventTournaments(eventId: string): Promise<Tournament[]> {
+    const { data, error } = await this.supabase
+      .from('tournaments')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('start_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching event tournaments:', error);
+      return [];
+    }
+
+    return (data || []).map((t) => this.mapTournamentFromDB(t));
+  }
+
+  async assignTournamentToEvent(tournamentId: string, eventId: string | null): Promise<Tournament> {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Debes iniciar sesión para asignar un torneo a un evento');
+    }
+
+    const { data, error } = await this.supabase
+      .from('tournaments')
+      .update({ event_id: eventId })
+      .eq('id', tournamentId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('Error assigning tournament to event:', error);
+      throw new Error(error?.message || 'Failed to assign tournament to event');
+    }
+
+    return this.mapTournamentFromDB(data);
+  }
+
+  async getUserEvents(userEmail: string): Promise<Event[]> {
+    const { data, error } = await this.supabase
+      .from('events')
+      .select('*, tournaments:tournaments(count)')
+      .eq('owner_email', userEmail)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user events:', error);
+      return [];
+    }
+
+    return (data || []).map((e: any) => ({
+      ...this.mapEventFromDB(e),
+      tournaments_count: e.tournaments?.[0]?.count || 0,
+    }));
+  }
+
   // Mapping functions to convert between DB format and app format
   private mapTournamentFromDB(dbTournament: any): Tournament {
     return {
       id: dbTournament.id,
+      event_id: dbTournament.event_id,
       name: dbTournament.name,
       description: dbTournament.description,
       game: dbTournament.game,
+      game_mode: dbTournament.game_mode,
       participants: dbTournament.participants || 0,
       max_participants: dbTournament.max_participants,
       start_date: dbTournament.start_date,
@@ -320,14 +758,42 @@ class DatabaseService {
       format: dbTournament.format,
       status: dbTournament.status,
       owner_email: dbTournament.owner_email,
+      organizers: dbTournament.organizers || [],
       image: dbTournament.image,
       data_ai_hint: dbTournament.data_ai_hint,
       registration_type: dbTournament.registration_type,
       prize_pool: dbTournament.prize_pool,
+      prizes: dbTournament.prizes || [],
       location: dbTournament.location,
       invited_users: dbTournament.invited_users || [],
       created_at: dbTournament.created_at,
       updated_at: dbTournament.updated_at,
+    };
+  }
+
+  private mapEventFromDB(dbEvent: any): Event {
+    return {
+      id: dbEvent.id,
+      name: dbEvent.name,
+      description: dbEvent.description,
+      slug: dbEvent.slug,
+      banner_image: dbEvent.banner_image,
+      logo_image: dbEvent.logo_image,
+      primary_color: dbEvent.primary_color || '#6366f1',
+      secondary_color: dbEvent.secondary_color || '#8b5cf6',
+      start_date: dbEvent.start_date,
+      end_date: dbEvent.end_date,
+      location: dbEvent.location,
+      organizer_name: dbEvent.organizer_name,
+      organizer_logo: dbEvent.organizer_logo,
+      owner_email: dbEvent.owner_email,
+      organizers: dbEvent.organizers || [],
+      status: dbEvent.status,
+      is_public: dbEvent.is_public ?? true,
+      sponsors: dbEvent.sponsors || [],
+      created_at: dbEvent.created_at,
+      updated_at: dbEvent.updated_at,
+      tournaments_count: dbEvent.tournaments_count,
     };
   }
 
@@ -339,6 +805,7 @@ class DatabaseService {
       name: dbParticipant.name,
       avatar: dbParticipant.avatar,
       status: dbParticipant.status,
+      checked_in_at: dbParticipant.checked_in_at,
       created_at: dbParticipant.created_at,
     };
   }

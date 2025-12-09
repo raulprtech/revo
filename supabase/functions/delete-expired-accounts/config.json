@@ -1,0 +1,5 @@
+{
+  "version": "1.0.0",
+  "name": "delete-expired-accounts",
+  "entrypoint": "index.ts"
+}

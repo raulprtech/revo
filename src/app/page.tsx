@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Gamepad2, Users, Calendar, PlayCircle } from "lucide-react";
 import Image from 'next/image';
 import Link from 'next/link';
-import { db, type Tournament } from "@/lib/database";
-
-// Tournament interface is now imported from database
-
-
+import { usePublicTournaments } from "@/hooks/use-tournaments";
 
 const getDefaultTournamentImage = (gameName: string) => {
   // Generate a consistent color based on game name
@@ -28,48 +24,22 @@ const getDefaultTournamentImage = (gameName: string) => {
 };
 
 export default function Home() {
-  const [featuredTournaments, setFeaturedTournaments] = useState<Tournament[]>([]);
-  const [communityTournaments, setCommunityTournaments] = useState<Tournament[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { tournaments, isLoading: loading } = usePublicTournaments();
 
-  useEffect(() => {
-    const loadTournaments = async () => {
-      try {
-        const allTournaments = await db.getPublicTournaments();
+  // Derive featured and community tournaments from cached data
+  const featuredTournaments = useMemo(() => {
+    return tournaments
+      .filter(t => t.status !== 'Completado')
+      .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+      .slice(0, 3);
+  }, [tournaments]);
 
-        // Get featured tournaments (limit to 3 most recent)
-        const featured = allTournaments
-          .filter(t => t.status !== 'Completado')
-          .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-          .slice(0, 3);
-
-        // Get community tournaments (limit to 3 most popular by participants)
-        const community = allTournaments
-          .filter(t => t.status !== 'Completado')
-          .sort((a, b) => b.participants - a.participants)
-          .slice(0, 3);
-
-        setFeaturedTournaments(featured);
-        setCommunityTournaments(community);
-      } catch (error) {
-        console.error('Error loading tournaments:', error);
-        setFeaturedTournaments([]);
-        setCommunityTournaments([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadTournaments();
-
-    // Listen for tournament changes
-    const handleStorageChange = () => {
-      loadTournaments();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  const communityTournaments = useMemo(() => {
+    return tournaments
+      .filter(t => t.status !== 'Completado')
+      .sort((a, b) => b.participants - a.participants)
+      .slice(0, 3);
+  }, [tournaments]);
   return (
     <div className="flex flex-col bg-background text-foreground">
         {/* Hero Section */}
