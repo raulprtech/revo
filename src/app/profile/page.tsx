@@ -30,7 +30,7 @@ import { EditProfileForm } from "@/components/profile/edit-profile-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useUserTournaments } from "@/hooks/use-tournaments";
-import { db, type Tournament, type Participant } from "@/lib/database";
+import { db, type Tournament, type Participant, type AwardedBadge } from "@/lib/database";
 import useSWR from "swr";
 
 interface ParticipatingTournament extends Tournament {
@@ -114,6 +114,16 @@ export default function ProfilePage() {
     const { ownedTournaments, participatingTournaments: participatingIds, isLoading: tournamentsLoading } = useUserTournaments();
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const router = useRouter();
+
+    // Fetch user's earned badges
+    const { data: userBadges = [] } = useSWR<AwardedBadge[]>(
+        user?.email ? `user-badges:${user.email}` : null,
+        async () => {
+            if (!user?.email) return [];
+            return await db.getUserBadges(user.email);
+        },
+        { revalidateOnFocus: false }
+    );
 
     // Fetch participant statuses for tournaments user is participating in
     const { data: participatingWithStatus = [] } = useSWR(
@@ -459,6 +469,66 @@ export default function ProfilePage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* User Badges Section */}
+            {userBadges.length > 0 && (
+                <Card className="mb-8">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <span className="text-xl">🏆</span>
+                            Mis Logros
+                        </CardTitle>
+                        <CardDescription>
+                            Badges obtenidos en torneos y eventos
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {userBadges.map((awardedBadge) => (
+                                <div
+                                    key={awardedBadge.id}
+                                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                                >
+                                    {awardedBadge.badge.image ? (
+                                        <img
+                                            src={awardedBadge.badge.image}
+                                            alt={awardedBadge.badge.name}
+                                            className="h-12 w-12 rounded-full object-cover ring-2 ring-background shadow-lg"
+                                        />
+                                    ) : (
+                                        <div
+                                            className="h-12 w-12 rounded-full flex items-center justify-center text-2xl ring-2 ring-background shadow-lg"
+                                            style={{
+                                                backgroundColor: awardedBadge.badge.color,
+                                                boxShadow: `0 4px 14px ${awardedBadge.badge.color}40`,
+                                            }}
+                                        >
+                                            {awardedBadge.badge.icon}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">{awardedBadge.badge.name}</p>
+                                        <p className="text-sm text-muted-foreground truncate">
+                                            {awardedBadge.tournament_name || awardedBadge.event_name}
+                                        </p>
+                                        {awardedBadge.game && (
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                <Gamepad2 className="h-3 w-3" />
+                                                {awardedBadge.game}
+                                            </p>
+                                        )}
+                                    </div>
+                                    {awardedBadge.position && (
+                                        <Badge variant="outline" className="shrink-0">
+                                            #{awardedBadge.position}
+                                        </Badge>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Tabs defaultValue="created" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">

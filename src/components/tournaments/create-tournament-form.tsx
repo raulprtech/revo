@@ -33,10 +33,11 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { db, type CreateTournamentData, type Event, type Prize, type GameStation } from "@/lib/database";
+import { db, type CreateTournamentData, type Event, type Prize, type GameStation, type BadgeTemplate } from "@/lib/database";
 import { createClient } from "@/lib/supabase/client";
 import { PrizeManager } from "./prize-manager";
 import { StationManager } from "./station-manager";
+import { BadgeManager } from "./badge-manager";
 
 // Game configurations with recommended formats and game modes
 const GAMES_CONFIG = {
@@ -175,6 +176,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
   const [selectedEventId, setSelectedEventId] = useState<string | null>(eventId || null);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [prizes, setPrizes] = useState<Prize[]>(tournamentData?.prizes || []);
+  const [badges, setBadges] = useState<BadgeTemplate[]>((tournamentData as { badges?: BadgeTemplate[] })?.badges || []);
   const [stations, setStations] = useState<GameStation[]>([]);
   const [autoAssignStations, setAutoAssignStations] = useState(true);
   const [selectedGame, setSelectedGame] = useState<GameKey | "">(
@@ -375,6 +377,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           registration_type: values.registrationType,
           prize_pool: prizePoolSummary || undefined,
           prizes: prizes.length > 0 ? prizes : undefined,
+          badges: badges.length > 0 ? badges : undefined,
           location: values.tournamentMode === 'presencial' ? values.location : undefined,
           invited_users: values.registrationType === 'private' ? [] : undefined,
           event_id: finalEventId || undefined,
@@ -418,6 +421,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           registration_type: values.registrationType,
           prize_pool: prizePoolSummary || null,
           prizes: prizes.length > 0 ? prizes : null,
+          badges: badges.length > 0 ? badges : null,
           location: values.tournamentMode === 'presencial' ? (values.location || null) : null,
         };
 
@@ -801,6 +805,13 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
               prizes={prizes}
               onChange={setPrizes}
               maxParticipants={form.watch("maxParticipants")}
+            />
+
+            {/* Badge Manager */}
+            <BadgeManager
+              badges={badges}
+              onChange={setBadges}
+              type="tournament"
             />
 
             <FormField

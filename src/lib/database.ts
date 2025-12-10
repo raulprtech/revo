@@ -10,6 +10,50 @@ export type Sponsor = {
   url?: string;
 };
 
+// Badge/Medal types for tournaments and events
+export type BadgeType = 
+  | 'champion'      // 1st place
+  | 'runner-up'     // 2nd place  
+  | 'third-place'   // 3rd place
+  | 'top-4'         // Top 4
+  | 'top-8'         // Top 8
+  | 'top-16'        // Top 16
+  | 'participant'   // Participated
+  | 'mvp'           // Most Valuable Player
+  | 'custom';       // Custom badge
+
+export type Badge = {
+  id: string;
+  type: BadgeType;
+  name: string;           // 'Campeón', 'Subcampeón', 'Participante', etc.
+  description?: string;   // 'Ganador del torneo X'
+  icon: string;           // Emoji or icon name: '🥇', '🥈', 'trophy', etc.
+  color: string;          // Hex color for the badge: '#FFD700', '#C0C0C0', etc.
+  image?: string;         // Optional custom image URL
+  position?: string;      // Position achieved: '1', '2', '3', 'top-8', etc.
+  isCustom?: boolean;     // If true, uses custom image/design
+};
+
+export type BadgeTemplate = {
+  id: string;
+  badge: Badge;
+  awardTo: 'position' | 'all-participants' | 'custom'; // Who receives this badge
+  position?: string;      // If awardTo is 'position', which position: '1', '2', '3', etc.
+  customEmails?: string[]; // If awardTo is 'custom', list of emails
+};
+
+export type AwardedBadge = {
+  id: string;
+  badge: Badge;
+  tournament_id?: string;
+  tournament_name?: string;
+  event_id?: string;
+  event_name?: string;
+  game?: string;
+  awarded_at: string;
+  position?: string;
+};
+
 export type Event = {
   id: string;
   name: string;
@@ -29,6 +73,7 @@ export type Event = {
   status: 'Próximo' | 'En curso' | 'Finalizado';
   is_public: boolean;
   sponsors: Sponsor[];
+  badges?: BadgeTemplate[]; // Badges to award to participants
   created_at?: string;
   updated_at?: string;
   // Computed fields (not in DB)
@@ -83,6 +128,7 @@ export type Tournament = {
   registration_type: 'public' | 'private';
   prize_pool?: string;
   prizes?: Prize[];
+  badges?: BadgeTemplate[]; // Badges to award to participants
   location?: string;
   invited_users?: string[];
   // Gaming stations for in-person tournaments
@@ -918,6 +964,142 @@ class DatabaseService {
     }
 
     return { message: String(error) };
+  }
+
+  // =============================================
+  // USER BADGES OPERATIONS
+  // =============================================
+
+  async getUserBadges(userEmail: string): Promise<AwardedBadge[]> {
+    const { data, error } = await this.supabase
+      .from('user_badges')
+      .select('*')
+      .eq('user_email', userEmail)
+      .order('awarded_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user badges:', error);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      badge: row.badge as Badge,
+      tournament_id: row.tournament_id,
+      tournament_name: row.tournament_name,
+      event_id: row.event_id,
+      event_name: row.event_name,
+      game: row.game,
+      awarded_at: row.awarded_at,
+      position: row.position,
+    }));
+  }
+
+  async awardBadge(
+    userEmail: string,
+    badge: Badge,
+    options: {
+      tournament_id?: string;
+      tournament_name?: string;
+      event_id?: string;
+      event_name?: string;
+      game?: string;
+      position?: string;
+    }
+  ): Promise<AwardedBadge | null> {
+    const { data, error } = await this.supabase
+      .from('user_badges')
+      .insert({
+        user_email: userEmail,
+        badge,
+        tournament_id: options.tournament_id || null,
+        tournament_name: options.tournament_name || null,
+        event_id: options.event_id || null,
+        event_name: options.event_name || null,
+        game: options.game || null,
+        position: options.position || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error awarding badge:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      badge: data.badge as Badge,
+      tournament_id: data.tournament_id,
+      tournament_name: data.tournament_name,
+      event_id: data.event_id,
+      event_name: data.event_name,
+      game: data.game,
+      awarded_at: data.awarded_at,
+      position: data.position,
+    };
+  }
+
+  async awardBadgesToParticipants(
+    tournament: Tournament,
+    finalStandings: { email: string; position: string }[]
+  ): Promise<void> {
+    if (!tournament.badges || tournament.badges.length === 0) return;
+
+    for (const template of tournament.badges) {
+      const recipients: string[] = [];
+
+      if (template.awardTo === 'all-participants') {
+        // Award to all participants
+        recipients.push(...finalStandings.map(p => p.email));
+      } else if (template.awardTo === 'position' && template.position) {
+        // Award to specific position
+        const position = template.position;
+        
+        if (position.startsWith('top-')) {
+          // Top N (e.g., top-8)
+          const topN = parseInt(position.replace('top-', ''));
+          const topParticipants = finalStandings
+            .filter(p => parseInt(p.position) <= topN)
+            .map(p => p.email);
+          recipients.push(...topParticipants);
+        } else {
+          // Specific position (1, 2, 3)
+          const positionParticipant = finalStandings.find(p => p.position === position);
+          if (positionParticipant) {
+            recipients.push(positionParticipant.email);
+          }
+        }
+      } else if (template.awardTo === 'custom' && template.customEmails) {
+        // Award to custom list
+        recipients.push(...template.customEmails);
+      }
+
+      // Award badge to all recipients
+      for (const email of recipients) {
+        const participant = finalStandings.find(p => p.email === email);
+        await this.awardBadge(email, template.badge, {
+          tournament_id: tournament.id,
+          tournament_name: tournament.name,
+          game: tournament.game,
+          position: participant?.position,
+        });
+      }
+    }
+  }
+
+  async removeBadge(badgeId: string): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('user_badges')
+      .delete()
+      .eq('id', badgeId);
+
+    if (error) {
+      console.error('Error removing badge:', error);
+      return false;
+    }
+
+    return true;
   }
 }
 

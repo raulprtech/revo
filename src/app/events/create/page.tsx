@@ -19,8 +19,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { db, type CreateEventData, type Sponsor } from "@/lib/database";
+import { db, type CreateEventData, type Sponsor, type BadgeTemplate } from "@/lib/database";
 import { cn } from "@/lib/utils";
+import { BadgeManager } from "@/components/tournaments/badge-manager";
 
 const sponsorSchema = z.object({
     name: z.string().min(1, "Nombre requerido"),
@@ -65,6 +66,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function CreateEventPage() {
     const [loading, setLoading] = useState(false);
     const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+    const [badges, setBadges] = useState<BadgeTemplate[]>([]);
     const router = useRouter();
     const { toast } = useToast();
 
@@ -135,6 +137,7 @@ export default function CreateEventPage() {
                 status: "Próximo",
                 is_public: values.isPublic,
                 sponsors: sponsors.filter(s => s.name && s.logo),
+                badges: badges.length > 0 ? badges : undefined,
             };
 
             const newEvent = await db.createEvent(eventData);
@@ -563,6 +566,13 @@ export default function CreateEventPage() {
                                     </Card>
                                 ))}
                             </div>
+
+                            {/* Badges */}
+                            <BadgeManager
+                                badges={badges}
+                                onChange={setBadges}
+                                type="event"
+                            />
 
                             {/* Visibility */}
                             <div className="space-y-4">
