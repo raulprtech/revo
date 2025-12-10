@@ -135,6 +135,10 @@ const calculateStandings = (rounds: Round[], format?: string): StandingsEntry[] 
     });
 };
 
+// Export for use in badge awarding
+export { calculateStandings };
+export type { StandingsEntry };
+
 const getRankIcon = (rank: number) => {
     switch (rank) {
         case 1: return <Crown className="h-5 w-5 text-yellow-500" />;

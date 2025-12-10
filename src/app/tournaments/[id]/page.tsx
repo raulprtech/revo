@@ -31,7 +31,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { db, type Tournament, type Participant, type Event } from "@/lib/database";
 import { useAuth } from "@/lib/supabase/auth-context";
-import { useTournament, useIsParticipating, invalidateCache } from "@/hooks/use-tournaments";
+import { useTournament, useIsParticipating, useParticipants, invalidateCache } from "@/hooks/use-tournaments";
+import { calculateStandings } from "@/components/tournaments/standings-table";
 
 const getDefaultTournamentImage = (gameName: string) => {
   const colors = [
@@ -162,6 +163,73 @@ export default function TournamentPage() {
       window.removeEventListener('seedsAssigned', loadBracketData);
     };
   }, [loadBracketData]);
+
+  // Get participants for badge awarding
+  const { participants } = useParticipants(id);
+
+  // Function to award badges when tournament finishes
+  const awardBadgesToParticipants = async () => {
+    if (!tournament || !tournament.badges || tournament.badges.length === 0) return;
+    if (rounds.length === 0) {
+      console.log('No rounds data available for badge awarding');
+      return;
+    }
+
+    try {
+      // Calculate standings from the rounds
+      const standings = calculateStandings(rounds, tournament.format);
+      
+      if (standings.length === 0) {
+        console.log('No standings calculated');
+        return;
+      }
+
+      // Map standings to participant emails
+      const finalStandings: { email: string; position: string }[] = [];
+      
+      for (const standing of standings) {
+        // Find participant by name
+        const participant = participants.find(p => 
+          p.name === standing.name || 
+          p.email.split('@')[0] === standing.name ||
+          (p.name && standing.name.includes(p.name))
+        );
+        
+        if (participant) {
+          finalStandings.push({
+            email: participant.email,
+            position: standing.rank.toString(),
+          });
+        }
+      }
+
+      // Also add all accepted participants who may not have standings (for participation badges)
+      const acceptedParticipants = participants.filter(p => p.status === 'Aceptado');
+      for (const p of acceptedParticipants) {
+        if (!finalStandings.find(fs => fs.email === p.email)) {
+          finalStandings.push({
+            email: p.email,
+            position: 'participant',
+          });
+        }
+      }
+
+      // Award badges using the database function
+      await db.awardBadgesToParticipants(tournament, finalStandings);
+
+      toast({
+        title: "🏆 Badges otorgados",
+        description: `Se han otorgado ${tournament.badges.length} tipos de badges a los participantes.`,
+      });
+    } catch (error) {
+      console.error('Error awarding badges:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron otorgar los badges automáticamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleShare = async () => {
     const shareData = {
@@ -416,10 +484,15 @@ export default function TournamentPage() {
     }
   }
 
-  const handleTournamentStatusChange = (newStatus: string) => {
+  const handleTournamentStatusChange = async (newStatus: string) => {
     if(tournament){
         const updatedTournament = { ...tournament, status: newStatus };
         setTournament(updatedTournament);
+
+        // Award badges when tournament is finalized
+        if (newStatus === 'Finalizado' && tournament.badges && tournament.badges.length > 0) {
+          await awardBadgesToParticipants();
+        }
     }
   }
 

@@ -1,5 +1,5 @@
 -- Migration: Add badges column to tournaments and events tables
--- This migration adds support for custom badges/medals that can be awarded to participants
+-- This migration adds support for custom badges/medals for participants
 
 -- Add badges column to tournaments table
 ALTER TABLE tournaments 
