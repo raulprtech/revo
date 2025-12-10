@@ -1,11 +1,12 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { AuthForm } from "@/components/auth/auth-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Mail, CheckCircle } from "lucide-react";
+import { Mail, CheckCircle, Loader2 } from "lucide-react";
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "true";
   const emailConfirmed = searchParams.get("confirmed") === "true";
@@ -49,5 +50,21 @@ export default function LoginPage() {
 
       <AuthForm mode="login" />
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <LoginContent />
+    </Suspense>
   );
 }

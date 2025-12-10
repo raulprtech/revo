@@ -1,16 +1,14 @@
 // Auth callback handler for email confirmation and OAuth
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const supabase = createClient();
   const { toast } = useToast();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("Verificando tu cuenta...");
@@ -18,6 +16,9 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        // Create client inside useEffect to avoid SSR issues
+        const supabase = createClient();
+        
         // Supabase maneja automáticamente el token de la URL
         const { data, error } = await supabase.auth.getSession();
 
@@ -81,7 +82,7 @@ export default function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [router, supabase.auth, toast]);
+  }, [router, toast]);
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
@@ -113,80 +114,23 @@ export default function AuthCallback() {
   );
 }
 
-// Original OAuth callback code (temporarily commented out)
-/*
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-export default function AuthCallback() {
-  const router = useRouter();
-  const supabase = createClient();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const handleAuthCallback = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error('Error getting session:', error);
-          toast({
-            title: "Error de Autenticación",
-            description: "Hubo un problema al iniciar sesión. Inténtalo de nuevo.",
-            variant: "destructive",
-          });
-          router.push("/login");
-          return;
-        }
-
-        if (data.session?.user) {
-          const user = data.session.user;
-          const userData = {
-            displayName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario',
-            email: user.email || '',
-            photoURL: user.user_metadata?.avatar_url || user.user_metadata?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`
-          };
-
-          localStorage.setItem('user', JSON.stringify(userData));
-
-          // Trigger storage event for header to update
-          window.dispatchEvent(new Event('storage'));
-
-          toast({
-            title: "Inicio de Sesión Exitoso",
-            description: "Bienvenido a TournaVerse!",
-          });
-
-          router.push("/profile");
-        } else {
-          router.push("/login");
-        }
-      } catch (error) {
-        console.error('Auth callback error:', error);
-        toast({
-          title: "Error de Autenticación",
-          description: "Hubo un problema al procesar tu inicio de sesión.",
-          variant: "destructive",
-        });
-        router.push("/login");
-      }
-    };
-
-    handleAuthCallback();
-  }, [router, supabase, toast]);
-
+// Loading fallback component
+function LoadingFallback() {
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-      <div className="text-center space-y-4">
-        <Loader2 className="h-16 w-16 animate-spin mx-auto" />
-        <p className="text-muted-foreground">Completando tu inicio de sesión...</p>
+      <div className="text-center space-y-4 p-8">
+        <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+        <p className="text-muted-foreground text-lg">Cargando...</p>
       </div>
     </div>
   );
 }
-*/
+
+// Main export wrapped in Suspense to handle client-side rendering properly
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <AuthCallbackContent />
+    </Suspense>
+  );
+}
