@@ -13,8 +13,10 @@ import { Trash2, Plus, Trophy, Medal, Award, Star, Crown, Shield, Sparkles } fro
 import { Badge as BadgeType, BadgeTemplate, BadgeType as BadgeTypeEnum } from '@/lib/database';
 import { CompactImageUpload } from '@/components/ui/image-upload';
 
-// Simple ID generator
-const generateId = () => crypto.randomUUID();
+// Simple ID generator (compatible with all browsers)
+const generateId = () => {
+  return 'badge_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
 
 // Predefined badge templates
 const BADGE_PRESETS: Record<string, Omit<BadgeType, 'id'>> = {
