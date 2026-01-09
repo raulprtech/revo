@@ -424,7 +424,9 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
     setLoading(true);
 
     try {
-      let finalPhotoURL = values.photoURL || user.photoURL;
+      // Use imagePreview as the source of truth for the avatar
+      // This handles both uploaded files preview and selected gallery avatars
+      let finalPhotoURL = imagePreview || values.photoURL || user.photoURL;
 
       // If there's a pending image file, upload it to storage
       if (pendingImageFile) {
