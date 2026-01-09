@@ -505,6 +505,31 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
               avatar_url: finalPhotoURL,
             },
           });
+
+          // Also sync to profiles table for participant lookups
+          await supabase
+            .from('profiles')
+            .upsert({
+              id: supabaseUser.id,
+              email: supabaseUser.email,
+              first_name: values.firstName || null,
+              last_name: values.lastName || null,
+              nickname: values.nickname || null,
+              bio: values.bio || null,
+              birth_date: values.birthDate || null,
+              gender: values.gender || null,
+              location: values.location || null,
+              country: values.country || null,
+              avatar_url: finalPhotoURL,
+              favorite_games: values.favoriteGames || null,
+              gaming_platforms: values.gamingPlatforms || null,
+              discord_username: values.discordUsername || null,
+              twitch_username: values.twitchUsername || null,
+              twitter_username: values.twitterUsername || null,
+              instagram_username: values.instagramUsername || null,
+              youtube_channel: values.youtubeChannel || null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'id' });
         }
       } catch (error) {
         console.log("Supabase update failed, but localStorage updated:", error);

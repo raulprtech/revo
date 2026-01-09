@@ -456,10 +456,30 @@ export default function TournamentPage() {
     }
 
     try {
+      // Build full name from user profile - concatenate firstName and lastName
+      let fullName: string | undefined = undefined;
+      if (user.firstName || user.lastName) {
+        fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || undefined;
+      }
+
+      console.log('User data for registration:', {
+        email: user.email,
+        displayName: user.displayName,
+        nickname: user.nickname,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        birthDate: user.birthDate,
+        gender: user.gender,
+        fullName: fullName
+      });
+
       await db.addParticipant({
         tournament_id: tournament.id,
         email: user.email,
-        name: user.displayName,
+        name: user.nickname || user.displayName, // Nickname or displayName
+        full_name: fullName,
+        birth_date: user.birthDate || undefined,
+        gender: user.gender || undefined,
         avatar: user.photoURL,
         status: 'Pendiente'
       });

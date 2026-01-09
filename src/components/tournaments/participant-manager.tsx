@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Check, Shuffle, Play, X, Flag, RotateCcw, UserCheck, UserX, MapPin, Search, Filter, Settings } from "lucide-react";
+import { Check, Shuffle, Play, X, Flag, RotateCcw, UserCheck, UserX, MapPin, Search, Filter, Settings, Download } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,32 @@ import { useParticipants, useTournament, invalidateCache } from "@/hooks/use-tou
 type Participant = DbParticipant;
 type FilterStatus = 'all' | 'pending-checkin' | 'checked-in' | 'pending' | 'accepted' | 'rejected';
 type TournamentStatus = 'Próximo' | 'En curso' | 'Finalizado';
+
+// Helper function to calculate age from birth date
+const calculateAge = (birthDate?: string): number | null => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
+};
+
+// Helper function to format gender for display
+const formatGender = (gender?: string): string => {
+    if (!gender) return '-';
+    const genderMap: Record<string, string> = {
+        'male': 'Masculino',
+        'female': 'Femenino',
+        'non-binary': 'No binario',
+        'prefer-not-to-say': 'Prefiere no decir',
+        'other': 'Otro'
+    };
+    return genderMap[gender] || gender;
+};
 
 interface ParticipantManagerProps {
     tournamentId: string;
@@ -46,7 +72,8 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
             const query = searchQuery.toLowerCase().trim();
             result = result.filter(p => 
                 p.name.toLowerCase().includes(query) ||
-                p.email.toLowerCase().includes(query)
+                p.email.toLowerCase().includes(query) ||
+                (p.full_name && p.full_name.toLowerCase().includes(query))
             );
         }
         
@@ -419,6 +446,66 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
         );
     };
 
+    // Export participants to Excel/CSV
+    const handleExportToExcel = () => {
+        if (participants.length === 0) {
+            toast({
+                title: "Sin datos",
+                description: "No hay participantes para exportar.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        // Prepare CSV data
+        const headers = [
+            'Nickname',
+            'Nombre Completo',
+            'Email',
+            'Edad',
+            'Género',
+            'Estado',
+            'Check-in',
+            'Fecha de Inscripción'
+        ];
+
+        const rows = participants.map(p => [
+            p.name,
+            p.full_name || 'No disponible',
+            p.email,
+            calculateAge(p.birth_date)?.toString() || 'No disponible',
+            p.gender ? formatGender(p.gender) : 'No disponible',
+            p.status,
+            p.checked_in_at ? new Date(p.checked_in_at).toLocaleString('es-ES') : 'No',
+            p.created_at ? new Date(p.created_at).toLocaleString('es-ES') : ''
+        ]);
+
+        // Create CSV content
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // Add BOM for Excel UTF-8 compatibility
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `participantes_${tournament?.name?.replace(/[^a-zA-Z0-9]/g, '_') || tournamentId}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+            title: "Exportación completada",
+            description: `Se han exportado ${participants.length} participantes.`
+        });
+    };
+
     // Count stats for in-person tournaments
     const acceptedCount = participants.filter(p => p.status === 'Aceptado').length;
     const pendingCount = participants.filter(p => p.status === 'Pendiente').length;
@@ -533,6 +620,10 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                                     <RotateCcw className="mr-2 h-4 w-4" /> Reiniciar
                                 </Button>
                             )}
+                            {/* Export Button */}
+                            <Button variant="outline" size="sm" onClick={handleExportToExcel}>
+                                <Download className="mr-2 h-4 w-4" /> Exportar
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -583,8 +674,10 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Jugador</TableHead>
-                            <TableHead>Inscripción</TableHead>
+                            <TableHead>Nickname / Email</TableHead>
+                            <TableHead>Nombre Completo</TableHead>
+                            <TableHead>Edad</TableHead>
+                            <TableHead>Género</TableHead>
                             <TableHead>Estado</TableHead>
                             {isInPersonTournament && <TableHead>Check-in</TableHead>}
                             <TableHead className="text-right">Acciones</TableHead>
@@ -593,7 +686,7 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={isInPersonTournament ? 5 : 4} className="text-center h-24">Cargando participantes...</TableCell>
+                                <TableCell colSpan={isInPersonTournament ? 7 : 6} className="text-center h-24">Cargando participantes...</TableCell>
                             </TableRow>
                         ) : filteredParticipants.length > 0 ? (
                             filteredParticipants.map((p) => (
@@ -611,17 +704,25 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <span className="text-xs text-muted-foreground">
-                                            {p.created_at 
-                                                ? new Date(p.created_at).toLocaleDateString('es-ES', { 
-                                                    day: '2-digit', 
-                                                    month: 'short',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                  })
-                                                : '-'
-                                            }
-                                        </span>
+                                        {p.full_name ? (
+                                            <span className="font-medium text-sm">{p.full_name}</span>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">No disponible</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {calculateAge(p.birth_date) !== null ? (
+                                            <span className="text-sm">{calculateAge(p.birth_date)} años</span>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">-</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {p.gender ? (
+                                            <span className="text-sm">{formatGender(p.gender)}</span>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">-</span>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         {getParticipantStatusBadge(p)}

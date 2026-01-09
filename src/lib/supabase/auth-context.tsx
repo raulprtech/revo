@@ -97,7 +97,7 @@ function mapSupabaseUser(user: User | null): AppUser | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(false); // Start with false to not block rendering
+  const [loading, setLoading] = useState(true); // Start with true to wait for session check
 
   const refreshUser = useCallback(async () => {
     const supabase = createClient();

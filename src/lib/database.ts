@@ -146,6 +146,9 @@ export type Participant = {
   tournament_id: string;
   email: string;
   name: string;
+  full_name?: string; // Complete name (first_name + last_name) for organizer verification
+  birth_date?: string; // Birth date for age calculation
+  gender?: string; // Gender of the participant
   avatar?: string;
   status: 'Aceptado' | 'Pendiente' | 'Rechazado';
   checked_in_at?: string | null;
@@ -438,6 +441,8 @@ class DatabaseService {
 
   // Participant operations
   async addParticipant(participant: Omit<Participant, 'id' | 'created_at'>): Promise<Participant> {
+    console.log('Adding participant with data:', JSON.stringify(participant, null, 2));
+    
     const { data, error } = await this.supabase
       .from('participants')
       .insert(participant)
@@ -449,6 +454,8 @@ class DatabaseService {
       throw new Error('Failed to add participant');
     }
 
+    console.log('Participant added, received data:', JSON.stringify(data, null, 2));
+
     // Update tournament participant count
     await this.updateParticipantCount(participant.tournament_id);
 
@@ -456,28 +463,59 @@ class DatabaseService {
   }
 
   async getParticipants(tournamentId: string): Promise<Participant[]> {
-    const { data, error } = await this.supabase
+    // First get participants
+    const { data: participantsData, error: participantsError } = await this.supabase
       .from('participants')
       .select('*')
       .eq('tournament_id', tournamentId)
       .order('created_at', { ascending: true });
 
     // Handle empty error objects from Supabase
-    if (error) {
-      if (typeof error === 'object' && Object.keys(error).length === 0) {
+    if (participantsError) {
+      if (typeof participantsError === 'object' && Object.keys(participantsError).length === 0) {
         console.log('Empty error object received in getParticipants, continuing...');
-      } else if (error.message) {
-        console.error('Error fetching participants:', error);
+      } else if (participantsError.message) {
+        console.error('Error fetching participants:', participantsError);
         return [];
       }
     }
 
-    if (!data) {
+    if (!participantsData || participantsData.length === 0) {
       console.log('No participants data returned from Supabase.');
       return [];
     }
 
-    return data.map((p) => this.mapParticipantFromDB(p));
+    // Get emails to fetch profiles
+    const emails = participantsData.map(p => p.email);
+    
+    // Fetch profiles for these participants
+    const { data: profilesData } = await this.supabase
+      .from('profiles')
+      .select('email, first_name, last_name, birth_date, gender')
+      .in('email', emails);
+
+    // Create a map of email -> profile for quick lookup
+    const profilesMap = new Map<string, { first_name?: string; last_name?: string; birth_date?: string; gender?: string }>();
+    if (profilesData) {
+      for (const profile of profilesData) {
+        profilesMap.set(profile.email, profile);
+      }
+    }
+
+    // Map participants with enriched profile data
+    return participantsData.map((p) => {
+      const profile = profilesMap.get(p.email);
+      const enrichedParticipant = {
+        ...p,
+        // Use profile data if available, otherwise fall back to participant data
+        full_name: profile?.first_name || profile?.last_name 
+          ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim()
+          : p.full_name,
+        birth_date: profile?.birth_date || p.birth_date,
+        gender: profile?.gender || p.gender,
+      };
+      return this.mapParticipantFromDB(enrichedParticipant);
+    });
   }
 
   async updateParticipant(id: string, updates: Partial<Participant>): Promise<Participant> {
@@ -849,6 +887,9 @@ class DatabaseService {
       tournament_id: dbParticipant.tournament_id,
       email: dbParticipant.email,
       name: dbParticipant.name,
+      full_name: dbParticipant.full_name,
+      birth_date: dbParticipant.birth_date,
+      gender: dbParticipant.gender,
       avatar: dbParticipant.avatar,
       status: dbParticipant.status,
       checked_in_at: dbParticipant.checked_in_at,
