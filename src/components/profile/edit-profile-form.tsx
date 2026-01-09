@@ -31,10 +31,34 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Camera, Loader2, X, User, Gamepad2, Globe, Shield, AlertTriangle, Trash2 } from "lucide-react";
+import { Camera, Loader2, X, User, Gamepad2, Globe, Shield, AlertTriangle, Trash2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+
+// Predefined avatar options using DiceBear styles
+const AVATAR_STYLES = [
+  { id: 'avataaars', name: 'Avataaars' },
+  { id: 'bottts', name: 'Robots' },
+  { id: 'pixel-art', name: 'Pixel Art' },
+  { id: 'lorelei', name: 'Lorelei' },
+  { id: 'adventurer', name: 'Adventurer' },
+  { id: 'big-ears', name: 'Big Ears' },
+  { id: 'thumbs', name: 'Thumbs' },
+  { id: 'fun-emoji', name: 'Emoji' },
+];
+
+// Seed variations for each style
+const AVATAR_SEEDS = [
+  'gamer1', 'player2', 'champion3', 'legend4', 'pro5', 
+  'ninja6', 'dragon7', 'phoenix8', 'warrior9', 'hero10',
+  'star11', 'fire12', 'ice13', 'thunder14', 'shadow15',
+  'wolf16', 'tiger17', 'eagle18', 'shark19', 'panther20'
+];
+
+// Generate avatar URL
+const getAvatarUrl = (style: string, seed: string) => 
+  `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
 
 const profileSchema = z.object({
   // Información básica
@@ -104,6 +128,8 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [selectedAvatarStyle, setSelectedAvatarStyle] = useState('avataaars');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const supabase = createClient();
@@ -530,15 +556,26 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
             )}
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            Cambiar Foto
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+            >
+              <User className="h-4 w-4 mr-2" />
+              Elegir Avatar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Subir Foto
+            </Button>
+          </div>
 
           <input
             ref={fileInputRef}
@@ -547,6 +584,79 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
             onChange={handleImageUpload}
             className="hidden"
           />
+
+          {/* Avatar Picker */}
+          {showAvatarPicker && (
+            <div className="w-full border rounded-lg p-4 space-y-4 bg-muted/30">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Estilo de Avatar</label>
+                <div className="flex flex-wrap gap-2">
+                  {AVATAR_STYLES.map((style) => (
+                    <Button
+                      key={style.id}
+                      type="button"
+                      variant={selectedAvatarStyle === style.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedAvatarStyle(style.id)}
+                    >
+                      {style.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Elige tu avatar</label>
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                  {AVATAR_SEEDS.map((seed) => {
+                    const avatarUrl = getAvatarUrl(selectedAvatarStyle, seed);
+                    const isSelected = imagePreview === avatarUrl;
+                    return (
+                      <button
+                        key={seed}
+                        type="button"
+                        onClick={() => {
+                          setImagePreview(avatarUrl);
+                          setPendingImageFile(null);
+                          toast({
+                            title: "Avatar seleccionado",
+                            description: "Guarda los cambios para aplicar tu nuevo avatar.",
+                          });
+                        }}
+                        className={`relative rounded-full overflow-hidden border-2 transition-all hover:scale-110 ${
+                          isSelected 
+                            ? 'border-primary ring-2 ring-primary ring-offset-2' 
+                            : 'border-transparent hover:border-muted-foreground'
+                        }`}
+                      >
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={avatarUrl} alt={seed} />
+                        </Avatar>
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                            <Check className="h-4 w-4 text-primary" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="text-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAvatarPicker(false)}
+                >
+                  Cerrar galería
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tabbed Form Sections */}
