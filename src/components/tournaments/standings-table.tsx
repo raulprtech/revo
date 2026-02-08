@@ -130,7 +130,7 @@ const calculateStandings = (rounds: Round[], format?: string): StandingsEntry[] 
         return {
             ...player,
             rank,
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${player.name}`
+            avatar: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(player.name)}&backgroundColor=6366f1,8b5cf6,ec4899,f43f5e,f97316,eab308,22c55e,06b6d4&fontFamily=Arial&fontSize=40`
         };
     });
 };
@@ -174,7 +174,7 @@ export default function StandingsTable({ rounds, tournamentId, format, gameMode 
                 points: 0,
                 buchholz: 0,
                 gameWins: 0,
-                avatar: p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`
+                avatar: p.avatar || `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(p.name)}&backgroundColor=6366f1,8b5cf6,ec4899,f43f5e,f97316,eab308,22c55e,06b6d4&fontFamily=Arial&fontSize=40`
             }));
     }, [participants]);
 

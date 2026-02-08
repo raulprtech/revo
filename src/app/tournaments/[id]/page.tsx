@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2 } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2, Radio, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
@@ -32,21 +32,9 @@ import { useToast } from "@/hooks/use-toast";
 import { db, type Tournament, type Participant, type Event } from "@/lib/database";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useTournament, useIsParticipating, useParticipants, invalidateCache } from "@/hooks/use-tournaments";
+import { useTournamentRealtime, type TournamentRealtimeEvent } from "@/hooks/use-realtime";
 import { calculateStandings } from "@/components/tournaments/standings-table";
-
-const getDefaultTournamentImage = (gameName: string) => {
-  const colors = [
-    'from-blue-500 to-purple-600',
-    'from-green-500 to-teal-600',
-    'from-red-500 to-pink-600',
-    'from-yellow-500 to-orange-600',
-    'from-indigo-500 to-blue-600',
-    'from-purple-500 to-indigo-600'
-  ];
-
-  const colorIndex = gameName.length % colors.length;
-  return colors[colorIndex];
-};
+import { getDefaultTournamentImage } from "@/lib/utils";
 
 const formatMapping = {
     'single-elimination': 'Eliminación Simple',
@@ -112,11 +100,62 @@ export default function TournamentPage() {
     const seededPlayers = seededParticipantsData[id] || [];
 
     if (seededPlayers.length > 0) {
-      setRounds(generateRounds(seededPlayers.length, seededPlayers, tournament.format));
+      const newRounds = generateRounds(seededPlayers.length, seededPlayers, tournament.format);
+      setRounds(newRounds);
+      // Persist bracket data to DB for spectator mode
+      db.saveBracketData(id, { seededPlayers, rounds: newRounds });
     } else {
       setRounds([]);
     }
   }, [id, tournament]);
+
+  // Real-time updates for this tournament
+  useTournamentRealtime(
+    id,
+    useCallback((event: TournamentRealtimeEvent) => {
+      // Refresh SWR cache on any realtime event
+      refreshTournament();
+      invalidateCache.participants(id);
+
+      // Show toast notifications for relevant events
+      switch (event.type) {
+        case 'participant_joined':
+          toast({
+            title: '🎮 Nuevo participante',
+            description: `${event.participantName} se ha inscrito al torneo.`,
+          });
+          break;
+        case 'participant_removed':
+          toast({
+            title: 'Participante eliminado',
+            description: `${event.participantName} ha salido del torneo.`,
+          });
+          break;
+        case 'participant_updated':
+          if (event.status === 'Aceptado') {
+            toast({
+              title: '✅ Participante aceptado',
+              description: `${event.participantName} ha sido aceptado.`,
+            });
+          }
+          break;
+        case 'status_changed':
+          toast({
+            title: '🏆 Estado del torneo actualizado',
+            description: `El torneo cambió de "${event.oldStatus}" a "${event.newStatus}".`,
+          });
+          break;
+        case 'bracket_updated':
+          toast({
+            title: '📊 Bracket actualizado',
+            description: 'Los resultados del torneo han sido actualizados.',
+          });
+          loadBracketData();
+          break;
+      }
+    }, [id, refreshTournament, toast, loadBracketData]),
+    !tournamentLoading
+  );
 
   // Access control and initial setup
   useEffect(() => {
@@ -376,6 +415,11 @@ export default function TournamentPage() {
                     }
                 }
             }
+
+          // Persist bracket data to Supabase for spectator mode
+          const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
+          const seededPlayers = seededParticipantsData[id] || [];
+          db.saveBracketData(id, { seededPlayers, rounds: newRounds });
           
           return newRounds;
       });
@@ -644,6 +688,12 @@ export default function TournamentPage() {
               <CardTitle>Detalles del Torneo</CardTitle>
                {isOwner && (
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/tournaments/${tournament.id}/spectate`}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      Espectador
+                    </Link>
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleShare}>
                     <Share2 className="mr-2 h-4 w-4" />
                     Compartir
@@ -771,6 +821,18 @@ export default function TournamentPage() {
           </Card>
         </TabsContent>
         <TabsContent value="bracket" className="mt-6">
+          <div className="flex items-center justify-end mb-4">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/tournaments/${tournament.id}/spectate`}>
+                {tournament.status === 'En curso' ? (
+                  <Radio className="mr-2 h-4 w-4 text-red-500" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {tournament.status === 'En curso' ? 'Ver en vivo' : 'Modo espectador'}
+              </Link>
+            </Button>
+          </div>
           <Bracket 
             tournament={tournament} 
             isOwner={isOwner} 

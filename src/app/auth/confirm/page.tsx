@@ -40,19 +40,7 @@ function AuthCallbackContent() {
 
         if (data.session?.user) {
           // Usuario verificado y con sesión activa
-          const user = data.session.user;
-          
-          // Guardar datos del usuario en localStorage
-          const userData = {
-            displayName: user.user_metadata?.nickname || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
-            email: user.email || '',
-            photoURL: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`,
-            firstName: user.user_metadata?.first_name,
-            lastName: user.user_metadata?.last_name,
-            nickname: user.user_metadata?.nickname,
-          };
-          localStorage.setItem('user', JSON.stringify(userData));
-          window.dispatchEvent(new Event('storage'));
+          // AuthProvider detectará la sesión automáticamente via onAuthStateChange
 
           setStatus("success");
           setMessage("¡Tu correo ha sido verificado exitosamente!");

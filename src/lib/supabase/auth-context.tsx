@@ -30,6 +30,12 @@ export type AppUser = {
   // Account deletion status
   pendingDeletion?: boolean;
   deletionRequestedAt?: string;
+  // COPPA compliance fields
+  isMinor?: boolean;
+  parentEmail?: string;
+  parentFullName?: string;
+  parentalConsentAt?: string;
+  dataSharingConsent?: boolean;
 };
 
 type AuthContextType = {
@@ -42,13 +48,19 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to build initials avatar URL from user's name
+function getInitialsAvatarUrl(seed: string): string {
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&backgroundColor=6366f1,8b5cf6,ec4899,f43f5e,f97316,eab308,22c55e,06b6d4&fontFamily=Arial&fontSize=40`;
+}
+
 // Helper to get a safe avatar URL (no base64)
 function getSafeAvatarUrl(user: User): string {
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
   
   // If avatar_url is base64 data, use generated avatar instead
   if (avatarUrl && avatarUrl.startsWith('data:')) {
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`;
+    const name = `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || user.email || 'User';
+    return getInitialsAvatarUrl(name);
   }
   
   // If it's a valid URL, use it
@@ -56,8 +68,9 @@ function getSafeAvatarUrl(user: User): string {
     return avatarUrl;
   }
   
-  // Default to generated avatar
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`;
+  // Default to initials avatar based on first name + last name
+  const name = `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || user.email || 'User';
+  return getInitialsAvatarUrl(name);
 }
 
 function mapSupabaseUser(user: User | null): AppUser | null {
@@ -91,7 +104,46 @@ function mapSupabaseUser(user: User | null): AppUser | null {
     // Account deletion status
     pendingDeletion: meta.pending_deletion,
     deletionRequestedAt: meta.deletion_requested_at,
+    // COPPA compliance fields
+    isMinor: meta.is_minor,
+    parentEmail: meta.parent_email,
+    parentFullName: meta.parent_full_name,
+    parentalConsentAt: meta.parental_consent_at,
+    dataSharingConsent: meta.data_sharing_consent,
   };
+}
+
+/**
+ * Ensure a profiles row exists for the user.
+ * Creates one from auth metadata if missing.
+ * This runs silently in the background on sign-in.
+ */
+async function ensureProfileExists(supabase: ReturnType<typeof createClient>, user: User) {
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!data) {
+      const meta = user.user_metadata || {};
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        nickname: meta.nickname || null,
+        first_name: meta.first_name || null,
+        last_name: meta.last_name || null,
+        full_name: meta.full_name || meta.name || null,
+        birth_date: meta.birth_date || null,
+        gender: meta.gender || null,
+        location: meta.location || null,
+      }, { onConflict: 'id' });
+    }
+  } catch (error) {
+    // Non-critical: log but don't block the user
+    console.warn('Could not auto-create profile row:', error);
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -106,7 +158,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (!currentSession) {
         setUser(null);
-        localStorage.removeItem("user");
         return;
       }
 
@@ -114,21 +165,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error("Error refreshing user:", error);
         setUser(null);
-        localStorage.removeItem("user");
         return;
       }
       const appUser = mapSupabaseUser(supabaseUser);
       setUser(appUser);
-      
-      if (appUser) {
-        localStorage.setItem("user", JSON.stringify(appUser));
-      } else {
-        localStorage.removeItem("user");
-      }
     } catch (error) {
       console.error("Unexpected error refreshing user:", error);
       setUser(null);
-      localStorage.removeItem("user");
     }
   }, []);
 
@@ -141,8 +184,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setSession(null);
-      localStorage.removeItem("user");
-      window.dispatchEvent(new Event("storage"));
     }
   }, []);
 
@@ -167,12 +208,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (initialSession?.user) {
           const appUser = mapSupabaseUser(initialSession.user);
           setUser(appUser);
-          if (appUser) {
-            localStorage.setItem("user", JSON.stringify(appUser));
-          }
-        } else {
-          // Clear any stale localStorage
-          localStorage.removeItem("user");
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
@@ -202,15 +237,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           const appUser = mapSupabaseUser(newSession?.user ?? null);
           setUser(appUser);
-          if (appUser) {
-            localStorage.setItem("user", JSON.stringify(appUser));
+
+          // Auto-create profile row on first sign-in (if missing)
+          if (event === "SIGNED_IN" && newSession?.user) {
+            ensureProfileExists(supabase, newSession.user);
           }
         } else if (event === "SIGNED_OUT") {
           setUser(null);
-          localStorage.removeItem("user");
         }
-        
-        window.dispatchEvent(new Event("storage"));
       }
     );
 

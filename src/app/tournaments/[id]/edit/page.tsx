@@ -19,6 +19,7 @@ interface TournamentFormData {
     startDate: Date;
     startTime: string;
     format: 'single-elimination' | 'double-elimination' | 'swiss';
+    tournamentMode: 'online' | 'presencial';
     prizePool?: string;
     prizes?: Prize[];
     registrationType: 'public' | 'private';
@@ -37,10 +38,9 @@ export default function EditTournamentPage() {
     useEffect(() => {
         if (authLoading) return;
         
-        if (!user) {
-            router.push('/login');
-            return;
-        }
+        // Middleware handles redirect to login if not authenticated.
+        // If user is still null after auth resolves, don't load.
+        if (!user) return;
 
         const loadTournament = async () => {
             try {
@@ -68,6 +68,7 @@ export default function EditTournamentPage() {
                     startDate: new Date(tournament.start_date),
                     startTime: tournament.start_time || '10:00',
                     format: tournament.format,
+                    tournamentMode: tournament.location ? 'presencial' : 'online',
                     prizePool: tournament.prize_pool,
                     prizes: tournament.prizes || [],
                     registrationType: tournament.registration_type,

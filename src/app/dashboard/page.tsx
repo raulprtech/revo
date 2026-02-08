@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,23 +11,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Users, Search, Loader2, Plus, Trophy, CalendarDays } from "lucide-react";
 import Link from 'next/link';
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useUserTournaments } from "@/hooks/use-tournaments";
+import { Pagination, paginateArray } from "@/components/ui/pagination";
+
+const DASHBOARD_PER_PAGE = 10;
 
 export default function DashboardPage() {
     const { user, loading: authLoading } = useAuth();
     const { ownedTournaments, participatingTournaments, isLoading: tournamentsLoading } = useUserTournaments();
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
-    const router = useRouter();
-
-    useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/login');
-        }
-    }, [user, authLoading, router]);
+    const [ownedPage, setOwnedPage] = useState(1);
+    const [participatingPage, setParticipatingPage] = useState(1);
+    // Note: Route protection is handled by middleware.
+    // The useAuth() hook is used here only for user data display.
 
     const loading = authLoading || tournamentsLoading;
 
@@ -54,6 +52,22 @@ export default function DashboardPage() {
     const filteredOwned = filterTournaments(ownedTournaments);
     const filteredParticipating = filterTournaments(participatingTournaments);
     const allFiltered = [...filteredOwned, ...filteredParticipating];
+
+    const paginatedOwned = paginateArray(filteredOwned, ownedPage, DASHBOARD_PER_PAGE);
+    const paginatedParticipating = paginateArray(filteredParticipating, participatingPage, DASHBOARD_PER_PAGE);
+
+    // Reset pages when filters/search change
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        setOwnedPage(1);
+        setParticipatingPage(1);
+    };
+
+    const handleTabChange = (tab: typeof activeTab) => {
+        setActiveTab(tab);
+        setOwnedPage(1);
+        setParticipatingPage(1);
+    };
 
     // Count by status for tabs
     const allTournaments = [...ownedTournaments, ...participatingTournaments];
@@ -111,25 +125,25 @@ export default function DashboardPage() {
 
                 <div className="flex border-b border-border mb-6 overflow-x-auto">
                     <button 
-                        onClick={() => setActiveTab('all')}
+                        onClick={() => handleTabChange('all')}
                         className={`py-2 px-4 text-sm font-semibold whitespace-nowrap ${activeTab === 'all' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         TODOS {allTournaments.length}
                     </button>
                     <button 
-                        onClick={() => setActiveTab('pending')}
+                        onClick={() => handleTabChange('pending')}
                         className={`py-2 px-4 text-sm font-semibold whitespace-nowrap ${activeTab === 'pending' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         PENDIENTE {pendingCount}
                     </button>
                     <button 
-                        onClick={() => setActiveTab('active')}
+                        onClick={() => handleTabChange('active')}
                         className={`py-2 px-4 text-sm font-semibold whitespace-nowrap ${activeTab === 'active' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         EN CURSO {activeCount}
                     </button>
                     <button 
-                        onClick={() => setActiveTab('completed')}
+                        onClick={() => handleTabChange('completed')}
                         className={`py-2 px-4 text-sm font-semibold whitespace-nowrap ${activeTab === 'completed' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         COMPLETO {completedCount}
@@ -142,31 +156,49 @@ export default function DashboardPage() {
                         placeholder="Buscar tus torneos" 
                         className="pl-10 bg-card border-border h-12" 
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => handleSearchChange(e.target.value)}
                     />
                 </div>
 
                 {/* Owned Tournaments Section */}
                 {filteredOwned.length > 0 && (
                     <div className="mb-8">
-                        <h2 className="text-lg font-semibold mb-4 text-muted-foreground">Torneos que organizas</h2>
+                        <h2 className="text-lg font-semibold mb-4 text-muted-foreground">
+                            Torneos que organizas
+                            <span className="text-sm font-normal ml-2">({filteredOwned.length})</span>
+                        </h2>
                         <div className="space-y-4">
-                            {filteredOwned.map((tournament) => (
+                            {paginatedOwned.data.map((tournament) => (
                                 <TournamentCard key={tournament.id} tournament={tournament} isOwner />
                             ))}
                         </div>
+                        <Pagination
+                            currentPage={ownedPage}
+                            totalPages={paginatedOwned.totalPages}
+                            onPageChange={setOwnedPage}
+                            className="mt-4"
+                        />
                     </div>
                 )}
 
                 {/* Participating Tournaments Section */}
                 {filteredParticipating.length > 0 && (
                     <div className="mb-8">
-                        <h2 className="text-lg font-semibold mb-4 text-muted-foreground">Torneos en los que participas</h2>
+                        <h2 className="text-lg font-semibold mb-4 text-muted-foreground">
+                            Torneos en los que participas
+                            <span className="text-sm font-normal ml-2">({filteredParticipating.length})</span>
+                        </h2>
                         <div className="space-y-4">
-                            {filteredParticipating.map((tournament) => (
+                            {paginatedParticipating.data.map((tournament) => (
                                 <TournamentCard key={tournament.id} tournament={tournament} />
                             ))}
                         </div>
+                        <Pagination
+                            currentPage={participatingPage}
+                            totalPages={paginatedParticipating.totalPages}
+                            onPageChange={setParticipatingPage}
+                            className="mt-4"
+                        />
                     </div>
                 )}
 

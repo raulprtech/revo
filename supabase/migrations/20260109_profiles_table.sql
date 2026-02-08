@@ -1,5 +1,6 @@
 -- Migration: Add profiles table and participant profile fields
 -- Run this in Supabase SQL Editor
+-- IDEMPOTENT: Safe to run multiple times
 
 -- =============================================
 -- STEP 1: ADD COLUMNS TO PARTICIPANTS TABLE
@@ -15,31 +16,46 @@ ALTER TABLE public.participants
 ADD COLUMN IF NOT EXISTS gender VARCHAR(50);
 
 -- =============================================
--- STEP 2: CREATE PROFILES TABLE
+-- STEP 2: CREATE PROFILES TABLE (if not exists)
 -- =============================================
 
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY,
-  email VARCHAR(255) UNIQUE,
-  nickname VARCHAR(100),
-  first_name VARCHAR(100),
-  last_name VARCHAR(100),
-  birth_date DATE,
-  gender VARCHAR(50),
-  avatar_url TEXT,
-  location VARCHAR(255),
-  country VARCHAR(100),
-  bio TEXT,
-  favorite_games TEXT,
-  gaming_platforms TEXT,
-  discord_username VARCHAR(100),
-  twitch_username VARCHAR(100),
-  twitter_username VARCHAR(100),
-  instagram_username VARCHAR(100),
-  youtube_channel VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Add all columns individually (safe if table already exists with partial columns)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS nickname VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS birth_date DATE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gender VARCHAR(50);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS country VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS favorite_games TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gaming_platforms TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS discord_username VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS twitch_username VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS twitter_username VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS instagram_username VARCHAR(100);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS youtube_channel VARCHAR(255);
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL;
+
+-- Add unique constraint on email if not already present
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'profiles_email_key' AND conrelid = 'public.profiles'::regclass
+  ) THEN
+    ALTER TABLE public.profiles ADD CONSTRAINT profiles_email_key UNIQUE (email);
+  END IF;
+END $$;
 
 -- =============================================
 -- STEP 3: ENABLE RLS AND CREATE POLICIES

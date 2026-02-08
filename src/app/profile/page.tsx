@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,30 +26,20 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { EditProfileForm } from "@/components/profile/edit-profile-form";
+import { CompetitiveProfile } from "@/components/profile/competitive-profile";
+import { MatchHistory, type TournamentHistoryEntry } from "@/components/profile/match-history";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useUserTournaments } from "@/hooks/use-tournaments";
 import { db, type Tournament, type Participant, type AwardedBadge } from "@/lib/database";
 import useSWR from "swr";
+import { getDefaultTournamentImage } from "@/lib/utils";
 
 interface ParticipatingTournament extends Tournament {
     participantStatus: ParticipantStatus;
 }
 
 type ParticipantStatus = 'Aceptado' | 'Pendiente' | 'Rechazado';
-
-const getDefaultTournamentImage = (gameName: string) => {
-  const colors = [
-    'from-blue-500 to-purple-600',
-    'from-green-500 to-teal-600',
-    'from-red-500 to-pink-600',
-    'from-yellow-500 to-orange-600',
-    'from-indigo-500 to-blue-600',
-    'from-purple-500 to-indigo-600'
-  ];
-  const colorIndex = gameName.length % colors.length;
-  return colors[colorIndex];
-};
 
 const TournamentListItem = ({ tournament, isParticipating = false, participantStatus }: { 
     tournament: Tournament; 
@@ -113,7 +102,6 @@ export default function ProfilePage() {
     const { user, loading: authLoading, refreshUser } = useAuth();
     const { ownedTournaments, participatingTournaments: participatingIds, isLoading: tournamentsLoading } = useUserTournaments();
     const [isEditingProfile, setIsEditingProfile] = useState(false);
-    const router = useRouter();
 
     // Fetch user's earned badges
     const { data: userBadges = [] } = useSWR<AwardedBadge[]>(
@@ -151,11 +139,8 @@ export default function ProfilePage() {
         { revalidateOnFocus: false }
     );
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            router.push("/login");
-        }
-    }, [user, authLoading, router]);
+    // Note: Route protection is handled by middleware.
+    // The useAuth() hook is used here only for user data display.
 
     const handleProfileSave = async (updatedUser: { displayName: string; email: string; photoURL: string; location?: string }) => {
         await refreshUser();
@@ -251,6 +236,21 @@ export default function ProfilePage() {
     };
 
     const pendingDeletionInfo = getPendingDeletionInfo();
+
+    // Build match history entries: merge participating tournaments with their badges
+    const matchHistoryEntries: TournamentHistoryEntry[] = [
+        ...participatingWithStatus.map(({ tournament, status }) => {
+            const badge = userBadges.find(b => b.tournament_id === tournament.id);
+            return { tournament, status, badge } as TournamentHistoryEntry;
+        }),
+        // Also include owned tournaments that aren't already in participating
+        ...ownedTournaments
+            .filter(t => !participatingWithStatus.some(p => p.tournament.id === t.id))
+            .map(t => {
+                const badge = userBadges.find(b => b.tournament_id === t.id);
+                return { tournament: t, status: 'Aceptado' as const, badge } as TournamentHistoryEntry;
+            }),
+    ];
 
     return (
         <div className="container mx-auto py-10 px-4">
@@ -529,6 +529,16 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Competitive Profile & Match History */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <CompetitiveProfile
+                    ownedTournaments={ownedTournaments}
+                    participatingTournaments={participatingWithStatus.map(p => p.tournament)}
+                    badges={userBadges}
+                />
+                <MatchHistory entries={matchHistoryEntries} />
+            </div>
 
             <Tabs defaultValue="created" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">

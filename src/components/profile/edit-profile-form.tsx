@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -31,34 +31,33 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Camera, Loader2, X, User, Gamepad2, Globe, Shield, AlertTriangle, Trash2, Check } from "lucide-react";
+import { Camera, Loader2, X, User, Gamepad2, Globe, Shield, AlertTriangle, Trash2, Check, CheckCircle2, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
+import { db } from "@/lib/database";
 import { useRouter } from "next/navigation";
 
-// Predefined avatar options using DiceBear styles
+// Generate default initials avatar URL from first name + last name
+const getInitialsAvatarUrl = (firstName: string, lastName: string) => {
+  const seed = `${firstName} ${lastName}`.trim() || 'User';
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&backgroundColor=6366f1,8b5cf6,ec4899,f43f5e,f97316,eab308,22c55e,06b6d4&fontFamily=Arial&fontSize=40`;
+};
+
+// Extra avatar style collections
 const AVATAR_STYLES = [
-  { id: 'avataaars', name: 'Avataaars' },
-  { id: 'bottts', name: 'Robots' },
-  { id: 'pixel-art', name: 'Pixel Art' },
-  { id: 'lorelei', name: 'Lorelei' },
-  { id: 'adventurer', name: 'Adventurer' },
-  { id: 'big-ears', name: 'Big Ears' },
   { id: 'thumbs', name: 'Thumbs' },
   { id: 'fun-emoji', name: 'Emoji' },
+  { id: 'glass', name: 'Glass' },
 ];
 
-// Seed variations for each style
 const AVATAR_SEEDS = [
-  'gamer1', 'player2', 'champion3', 'legend4', 'pro5', 
+  'gamer1', 'player2', 'champion3', 'legend4', 'pro5',
   'ninja6', 'dragon7', 'phoenix8', 'warrior9', 'hero10',
-  'star11', 'fire12', 'ice13', 'thunder14', 'shadow15',
-  'wolf16', 'tiger17', 'eagle18', 'shark19', 'panther20'
+  'star11', 'fire12',
 ];
 
-// Generate avatar URL
-const getAvatarUrl = (style: string, seed: string) => 
-  `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
+const getAvatarUrl = (style: string, seed: string) =>
+  `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}`;
 
 const profileSchema = z.object({
   // Información básica
@@ -86,6 +85,22 @@ const profileSchema = z.object({
   
   // Avatar
   photoURL: z.string().optional(),
+}).refine((data) => {
+  // Validate that birthDate cannot be changed to make someone under 13 without existing parental consent
+  if (data.birthDate) {
+    const birthDate = new Date(data.birthDate);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
+    // Don't allow changing birth date to make someone younger than what was registered
+    // This field is informational and should not be easily modified
+    if (actualAge < 0) return false;
+  }
+  return true;
+}, {
+  message: "La fecha de nacimiento no es válida.",
+  path: ["birthDate"],
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -112,6 +127,11 @@ interface User {
   // Deletion status
   pendingDeletion?: boolean;
   deletionRequestedAt?: string;
+  // COPPA fields
+  isMinor?: boolean;
+  parentEmail?: string;
+  parentFullName?: string;
+  parentalConsentAt?: string;
 }
 
 interface EditProfileFormProps {
@@ -129,11 +149,31 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const [selectedAvatarStyle, setSelectedAvatarStyle] = useState('avataaars');
+  const [selectedAvatarStyle, setSelectedAvatarStyle] = useState('thumbs');
+  const [nicknameStatus, setNicknameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const nicknameTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const supabase = createClient();
   const router = useRouter();
+
+  const checkNickname = useCallback((value: string) => {
+    if (nicknameTimerRef.current) clearTimeout(nicknameTimerRef.current);
+    // If nickname hasn't changed from the current one, it's fine
+    if (value.trim().toLowerCase() === (user.nickname || '').trim().toLowerCase()) {
+      setNicknameStatus('idle');
+      return;
+    }
+    if (!value || value.trim().length < 2) {
+      setNicknameStatus('idle');
+      return;
+    }
+    setNicknameStatus('checking');
+    nicknameTimerRef.current = setTimeout(async () => {
+      const taken = await db.isNicknameTaken(value.trim(), user.email);
+      setNicknameStatus(taken ? 'taken' : 'available');
+    }, 500);
+  }, [user.nickname, user.email]);
 
   // Parse displayName to get firstName and lastName if not available
   const parseDisplayName = (displayName: string) => {
@@ -262,7 +302,9 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
   };
 
   const removeImage = () => {
-    const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`;
+    const firstName = form.getValues('firstName') || user.firstName || '';
+    const lastName = form.getValues('lastName') || user.lastName || '';
+    const defaultAvatar = getInitialsAvatarUrl(firstName, lastName);
     setImagePreview(defaultAvatar);
     form.setValue("photoURL", defaultAvatar);
     setPendingImageFile(null);
@@ -319,22 +361,12 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
         },
       });
 
-      // Update localStorage
-      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const updatedUser = {
-        ...currentUser,
-        pendingDeletion: false,
-        deletionRequestedAt: null,
-      };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      window.dispatchEvent(new Event("storage"));
-
       toast({
         title: "¡Eliminación cancelada!",
         description: "Tu cuenta ya no está programada para eliminación. Nos alegra que te quedes.",
       });
 
-      // Force refresh to update UI
+      // Force refresh to update UI and auth state
       window.location.reload();
 
     } catch (error) {
@@ -381,15 +413,7 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
         },
       });
 
-      // Update localStorage to reflect pending deletion
-      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const updatedUser = {
-        ...currentUser,
-        pendingDeletion: true,
-        deletionRequestedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      window.dispatchEvent(new Event("storage"));
+      // Auth state will be refreshed after page reload
 
       toast({
         title: "Cuenta programada para eliminación",
@@ -424,6 +448,21 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
     setLoading(true);
 
     try {
+      // Check nickname uniqueness if it changed
+      if (values.nickname && values.nickname.trim() !== '' &&
+          values.nickname.trim().toLowerCase() !== (user.nickname || '').trim().toLowerCase()) {
+        const taken = await db.isNicknameTaken(values.nickname.trim(), user.email);
+        if (taken) {
+          form.setError('nickname', {
+            type: 'manual',
+            message: 'Este nickname ya está en uso. Elige otro.',
+          });
+          setNicknameStatus('taken');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Use imagePreview as the source of truth for the avatar
       // This handles both uploaded files preview and selected gallery avatars
       let finalPhotoURL = imagePreview || values.photoURL || user.photoURL;
@@ -439,7 +478,7 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
             finalPhotoURL = uploadedUrl;
           } else {
             // Fallback to dicebear if upload fails
-            finalPhotoURL = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`;
+            finalPhotoURL = getInitialsAvatarUrl(values.firstName, values.lastName);
             toast({
               title: "Aviso",
               description: "No se pudo subir la imagen. Se usará un avatar generado.",
@@ -451,10 +490,75 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
 
       // Make sure we're not saving base64 data
       if (finalPhotoURL && finalPhotoURL.startsWith('data:')) {
-        finalPhotoURL = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`;
+        finalPhotoURL = getInitialsAvatarUrl(values.firstName, values.lastName);
       }
 
       const fullName = `${values.firstName} ${values.lastName}`.trim();
+
+      // Update Supabase user metadata (source of truth)
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+      if (!supabaseUser) {
+        throw new Error("No se encontró la sesión de usuario");
+      }
+
+      await supabase.auth.updateUser({
+        data: {
+          full_name: fullName,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          nickname: values.nickname,
+          bio: values.bio,
+          birth_date: values.birthDate,
+          gender: values.gender,
+          location: values.location,
+          country: values.country,
+          favorite_games: values.favoriteGames,
+          gaming_platforms: values.gamingPlatforms,
+          discord_username: values.discordUsername,
+          twitch_username: values.twitchUsername,
+          twitter_username: values.twitterUsername,
+          instagram_username: values.instagramUsername,
+          youtube_channel: values.youtubeChannel,
+          avatar_url: finalPhotoURL,
+        },
+      });
+
+      // Also sync to profiles table for participant lookups
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: supabaseUser.id,
+          email: supabaseUser.email,
+          first_name: values.firstName || null,
+          last_name: values.lastName || null,
+          nickname: values.nickname || null,
+          bio: values.bio || null,
+          birth_date: values.birthDate || null,
+          gender: values.gender || null,
+          location: values.location || null,
+          country: values.country || null,
+          avatar_url: finalPhotoURL,
+          favorite_games: values.favoriteGames || null,
+          gaming_platforms: values.gamingPlatforms || null,
+          discord_username: values.discordUsername || null,
+          twitch_username: values.twitchUsername || null,
+          twitter_username: values.twitterUsername || null,
+          instagram_username: values.instagramUsername || null,
+          youtube_channel: values.youtubeChannel || null,
+          // COPPA fields - preserve from user metadata
+          is_minor: user.isMinor || false,
+          parent_email: user.parentEmail || null,
+          parent_full_name: user.parentFullName || null,
+          parental_consent_at: user.parentalConsentAt || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+      toast({
+        title: "Perfil actualizado",
+        description: "Tu información ha sido guardada exitosamente.",
+      });
+
+      setPendingImageFile(null);
 
       const updatedUser: User = {
         ...user,
@@ -476,74 +580,6 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
         youtubeChannel: values.youtubeChannel || "",
         photoURL: finalPhotoURL,
       };
-
-      // Update localStorage
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-
-      // Try to update Supabase user metadata if connected
-      try {
-        const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-        if (supabaseUser) {
-          await supabase.auth.updateUser({
-            data: {
-              full_name: fullName,
-              first_name: values.firstName,
-              last_name: values.lastName,
-              nickname: values.nickname,
-              bio: values.bio,
-              birth_date: values.birthDate,
-              gender: values.gender,
-              location: values.location,
-              country: values.country,
-              favorite_games: values.favoriteGames,
-              gaming_platforms: values.gamingPlatforms,
-              discord_username: values.discordUsername,
-              twitch_username: values.twitchUsername,
-              twitter_username: values.twitterUsername,
-              instagram_username: values.instagramUsername,
-              youtube_channel: values.youtubeChannel,
-              avatar_url: finalPhotoURL,
-            },
-          });
-
-          // Also sync to profiles table for participant lookups
-          await supabase
-            .from('profiles')
-            .upsert({
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              first_name: values.firstName || null,
-              last_name: values.lastName || null,
-              nickname: values.nickname || null,
-              bio: values.bio || null,
-              birth_date: values.birthDate || null,
-              gender: values.gender || null,
-              location: values.location || null,
-              country: values.country || null,
-              avatar_url: finalPhotoURL,
-              favorite_games: values.favoriteGames || null,
-              gaming_platforms: values.gamingPlatforms || null,
-              discord_username: values.discordUsername || null,
-              twitch_username: values.twitchUsername || null,
-              twitter_username: values.twitterUsername || null,
-              instagram_username: values.instagramUsername || null,
-              youtube_channel: values.youtubeChannel || null,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'id' });
-        }
-      } catch (error) {
-        console.log("Supabase update failed, but localStorage updated:", error);
-      }
-
-      // Trigger storage event for header to update
-      window.dispatchEvent(new Event("storage"));
-
-      toast({
-        title: "Perfil actualizado",
-        description: "Tu información ha sido guardada exitosamente.",
-      });
-
-      setPendingImageFile(null);
       onSave(updatedUser);
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -570,7 +606,7 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
               </AvatarFallback>
             </Avatar>
 
-            {imagePreview && imagePreview !== `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}` && (
+            {imagePreview && !imagePreview.includes('api.dicebear.com') && (
               <Button
                 type="button"
                 variant="destructive"
@@ -616,7 +652,7 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
           {showAvatarPicker && (
             <div className="w-full border rounded-lg p-4 space-y-4 bg-muted/30">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Estilo de Avatar</label>
+                <label className="text-sm font-medium">Estilo</label>
                 <div className="flex flex-wrap gap-2">
                   {AVATAR_STYLES.map((style) => (
                     <Button
@@ -631,12 +667,12 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
                   ))}
                 </div>
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Elige tu avatar</label>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
                   {AVATAR_SEEDS.map((seed) => {
                     const avatarUrl = getAvatarUrl(selectedAvatarStyle, seed);
                     const isSelected = imagePreview === avatarUrl;
@@ -653,8 +689,8 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
                           });
                         }}
                         className={`relative rounded-full overflow-hidden border-2 transition-all hover:scale-110 ${
-                          isSelected 
-                            ? 'border-primary ring-2 ring-primary ring-offset-2' 
+                          isSelected
+                            ? 'border-primary ring-2 ring-primary ring-offset-2'
                             : 'border-transparent hover:border-muted-foreground'
                         }`}
                       >
@@ -746,11 +782,35 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
                 <FormItem>
                   <FormLabel>Nickname / Gamertag</FormLabel>
                   <FormControl>
-                    <Input placeholder="Tu nombre de jugador" {...field} />
+                    <div className="relative">
+                      <Input
+                        placeholder="Tu nombre de jugador"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          checkNickname(e.target.value);
+                        }}
+                      />
+                      {nicknameStatus === 'checking' && (
+                        <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      {nicknameStatus === 'available' && (
+                        <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />
+                      )}
+                      {nicknameStatus === 'taken' && (
+                        <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />
+                      )}
+                    </div>
                   </FormControl>
-                  <FormDescription>
-                    Este nombre se mostrará públicamente en torneos
-                  </FormDescription>
+                  {nicknameStatus === 'taken' ? (
+                    <p className="text-sm text-destructive">
+                      Este nickname ya está en uso. Elige otro.
+                    </p>
+                  ) : (
+                    <FormDescription>
+                      Este nombre se mostrará públicamente en torneos
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -786,8 +846,17 @@ export function EditProfileForm({ user, onSave, onCancel }: EditProfileFormProps
                   <FormItem>
                     <FormLabel>Fecha de Nacimiento</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input 
+                        type="date" 
+                        {...field} 
+                        disabled={!!user.isMinor}
+                      />
                     </FormControl>
+                    {user.isMinor && (
+                      <FormDescription className="text-amber-600 dark:text-amber-400">
+                        Cuenta de menor - la fecha de nacimiento no puede modificarse
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

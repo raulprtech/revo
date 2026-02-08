@@ -4,15 +4,34 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AuthForm } from "@/components/auth/auth-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Mail, CheckCircle, Loader2 } from "lucide-react";
+import { Mail, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "true";
   const emailConfirmed = searchParams.get("confirmed") === "true";
+  const authError = searchParams.get("error");
+  const redirectTo = searchParams.get("redirectTo") || "/profile";
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+      {/* Banner de error de autenticación */}
+      {authError && (
+        <div className="w-full max-w-md mx-auto mt-6 px-4">
+          <Alert className="border-red-500 bg-red-50 dark:bg-red-950">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <AlertTitle className="text-red-800 dark:text-red-200">
+              Error de autenticación
+            </AlertTitle>
+            <AlertDescription className="text-red-700 dark:text-red-300">
+              {authError === 'auth_callback_failed'
+                ? 'El enlace de verificación ha expirado o es inválido. Intenta registrarte de nuevo.'
+                : 'Ocurrió un error durante la autenticación. Intenta de nuevo.'}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {/* Banner cuando el usuario acaba de registrarse */}
       {justRegistered && (
         <div className="w-full max-w-md mx-auto mt-6 px-4">
@@ -48,7 +67,7 @@ function LoginContent() {
         </div>
       )}
 
-      <AuthForm mode="login" />
+      <AuthForm mode="login" redirectTo={redirectTo} />
     </div>
   );
 }

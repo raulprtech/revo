@@ -90,6 +90,12 @@ async function deleteUserData(
     // This updates the JSONB array to remove the user's email
     await supabase.rpc("remove_user_from_organizers", { user_email: userEmail });
 
+    // 6. Delete user's profile from profiles table (COPPA compliance)
+    await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
+
     console.log(`Deleted user data for ${userEmail}:`, result);
   } catch (error) {
     console.error(`Error deleting user data for ${userEmail}:`, error);

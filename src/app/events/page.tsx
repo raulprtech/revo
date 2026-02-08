@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { db, type Event } from "@/lib/database";
 import { createClient } from "@/lib/supabase/client";
+import { Pagination, paginateArray } from "@/components/ui/pagination";
+
+const EVENTS_PER_PAGE = 9;
 
 const getStatusVariant = (status: Event['status']) => {
     switch (status) {
@@ -114,6 +117,9 @@ export default function EventsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [ongoingPage, setOngoingPage] = useState(1);
+    const [upcomingPage, setUpcomingPage] = useState(1);
+    const [pastPage, setPastPage] = useState(1);
     const router = useRouter();
 
     useEffect(() => {
@@ -145,6 +151,18 @@ export default function EventsPage() {
     const upcomingEvents = filteredEvents.filter(e => e.status === 'Próximo');
     const ongoingEvents = filteredEvents.filter(e => e.status === 'En curso');
     const pastEvents = filteredEvents.filter(e => e.status === 'Finalizado');
+
+    const paginatedOngoing = paginateArray(ongoingEvents, ongoingPage, EVENTS_PER_PAGE);
+    const paginatedUpcoming = paginateArray(upcomingEvents, upcomingPage, EVENTS_PER_PAGE);
+    const paginatedPast = paginateArray(pastEvents, pastPage, EVENTS_PER_PAGE);
+
+    // Reset pages when search changes
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        setOngoingPage(1);
+        setUpcomingPage(1);
+        setPastPage(1);
+    };
 
     if (loading) {
         return (
@@ -179,7 +197,7 @@ export default function EventsPage() {
                 <Input
                     placeholder="Buscar eventos..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => handleSearchChange(e.target.value)}
                     className="max-w-md"
                 />
             </div>
@@ -209,36 +227,61 @@ export default function EventsPage() {
                             <h2 className="text-2xl font-semibold mb-4 flex items-center">
                                 <span className="w-3 h-3 rounded-full bg-green-500 mr-3 animate-pulse" />
                                 En Curso
+                                <span className="text-sm font-normal text-muted-foreground ml-2">({ongoingEvents.length})</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {ongoingEvents.map(event => (
+                                {paginatedOngoing.data.map(event => (
                                     <EventCard key={event.id} event={event} />
                                 ))}
                             </div>
+                            <Pagination
+                                currentPage={ongoingPage}
+                                totalPages={paginatedOngoing.totalPages}
+                                onPageChange={setOngoingPage}
+                                className="mt-6"
+                            />
                         </section>
                     )}
 
                     {/* Próximos */}
                     {upcomingEvents.length > 0 && (
                         <section>
-                            <h2 className="text-2xl font-semibold mb-4">Próximos Eventos</h2>
+                            <h2 className="text-2xl font-semibold mb-4">
+                                Próximos Eventos
+                                <span className="text-sm font-normal text-muted-foreground ml-2">({upcomingEvents.length})</span>
+                            </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {upcomingEvents.map(event => (
+                                {paginatedUpcoming.data.map(event => (
                                     <EventCard key={event.id} event={event} />
                                 ))}
                             </div>
+                            <Pagination
+                                currentPage={upcomingPage}
+                                totalPages={paginatedUpcoming.totalPages}
+                                onPageChange={setUpcomingPage}
+                                className="mt-6"
+                            />
                         </section>
                     )}
 
                     {/* Finalizados */}
                     {pastEvents.length > 0 && (
                         <section>
-                            <h2 className="text-2xl font-semibold mb-4 text-muted-foreground">Eventos Pasados</h2>
+                            <h2 className="text-2xl font-semibold mb-4 text-muted-foreground">
+                                Eventos Pasados
+                                <span className="text-sm font-normal ml-2">({pastEvents.length})</span>
+                            </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-75">
-                                {pastEvents.map(event => (
+                                {paginatedPast.data.map(event => (
                                     <EventCard key={event.id} event={event} />
                                 ))}
                             </div>
+                            <Pagination
+                                currentPage={pastPage}
+                                totalPages={paginatedPast.totalPages}
+                                onPageChange={setPastPage}
+                                className="mt-6"
+                            />
                         </section>
                     )}
                 </div>

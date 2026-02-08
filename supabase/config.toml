@@ -45,3 +45,8 @@ verify_jwt = false
 # Función para eliminar cuentas expiradas
 [functions.delete-expired-accounts]
 verify_jwt = false
+
+# Función para procesar cola de emails via Resend (consentimiento parental COPPA)
+# Requiere secreto: RESEND_API_KEY, RESEND_FROM
+[functions.process-email-queue]
+verify_jwt = false

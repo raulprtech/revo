@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,30 +12,31 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { usePublicTournaments, joinTournamentOptimistic, invalidateCache } from "@/hooks/use-tournaments";
+import { useTournamentsListRealtime } from "@/hooks/use-realtime";
 import { db } from "@/lib/database";
 import useSWR from "swr";
+import { getDefaultTournamentImage } from "@/lib/utils";
+import { Pagination, paginateArray } from "@/components/ui/pagination";
 
-const getDefaultTournamentImage = (gameName: string) => {
-  const colors = [
-    'from-blue-500 to-purple-600',
-    'from-green-500 to-teal-600',
-    'from-red-500 to-pink-600',
-    'from-yellow-500 to-orange-600',
-    'from-indigo-500 to-blue-600',
-    'from-purple-500 to-indigo-600'
-  ];
-
-  const colorIndex = gameName.length % colors.length;
-  return colors[colorIndex];
-};
+const TOURNAMENTS_PER_PAGE = 12;
 
 export default function TournamentsPage() {
     const { user, loading: authLoading } = useAuth();
     const { tournaments, isLoading: tournamentsLoading, refresh } = usePublicTournaments();
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
     const [joiningTournamentId, setJoiningTournamentId] = useState<string | null>(null);
     const { toast } = useToast();
     const router = useRouter();
+
+    // Real-time updates for the tournaments list
+    useTournamentsListRealtime(
+        useCallback(() => {
+            // Silently refresh the list on any change
+            refresh();
+        }, [refresh]),
+        !tournamentsLoading
+    );
 
     // Fetch events to display event names on tournament cards
     const { data: eventsMap = new Map<string, string>() } = useSWR(
@@ -126,6 +127,18 @@ export default function TournamentsPage() {
         t.game.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const { data: paginatedTournaments, totalPages, totalItems } = paginateArray(
+        filteredTournaments,
+        currentPage,
+        TOURNAMENTS_PER_PAGE
+    );
+
+    // Reset to page 1 when search changes
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        setCurrentPage(1);
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
@@ -150,13 +163,19 @@ export default function TournamentsPage() {
                         placeholder="Buscar por nombre o juego..." 
                         className="pl-10 bg-card border-border h-12" 
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => handleSearchChange(e.target.value)}
                     />
                 </div>
 
-                {filteredTournaments.length > 0 ? (
+                {filteredTournaments.length > 0 && (
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Mostrando {paginatedTournaments.length} de {totalItems} torneos
+                    </p>
+                )}
+
+                {paginatedTournaments.length > 0 ? (
                     <div className="mx-auto grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredTournaments.map((tournament) => {
+                        {paginatedTournaments.map((tournament) => {
                             const isParticipant = participatingIds.has(tournament.id);
                             const isJoining = joiningTournamentId === tournament.id;
                             return (
@@ -239,6 +258,13 @@ export default function TournamentsPage() {
                         </p>
                     </div>
                 )}
+
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    className="mt-8"
+                />
             </div>
         </div>
     );

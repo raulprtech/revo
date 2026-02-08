@@ -51,7 +51,7 @@ export default function ClearDataPage() {
       }
     });
 
-    // Clear user from localStorage
+    // Clear user from localStorage (legacy cleanup)
     localStorage.removeItem('user');
 
     // Recalculate

@@ -135,6 +135,11 @@ export type Tournament = {
   stations?: GameStation[];
   station_assignments?: MatchStationAssignment[];
   auto_assign_stations?: boolean;
+  // Persisted bracket state for spectator mode
+  bracket_data?: {
+    seededPlayers: { name: string; avatar?: string | null }[];
+    rounds: any[];
+  } | null;
   created_at?: string;
   updated_at?: string;
   // Computed fields (not in DB)
@@ -153,6 +158,10 @@ export type Participant = {
   status: 'Aceptado' | 'Pendiente' | 'Rechazado';
   checked_in_at?: string | null;
   created_at?: string;
+  // COPPA compliance fields
+  is_minor?: boolean;
+  parent_email?: string;
+  data_sharing_consent?: boolean;
 };
 
 export type CreateTournamentData = Omit<Tournament, 'id' | 'participants' | 'created_at' | 'updated_at'>;
@@ -437,6 +446,43 @@ class DatabaseService {
       console.error('Error deleting tournament:', error);
       throw new Error('Failed to delete tournament');
     }
+  }
+
+  // Bracket data persistence for spectator mode
+  async saveBracketData(
+    tournamentId: string,
+    bracketData: {
+      seededPlayers: { name: string; avatar?: string | null }[];
+      rounds: any[];
+    }
+  ): Promise<void> {
+    const { error } = await this.supabase
+      .from('tournaments')
+      .update({ bracket_data: bracketData })
+      .eq('id', tournamentId);
+
+    if (error) {
+      console.error('Error saving bracket data:', error);
+      // Non-critical: don't throw, just log
+    }
+  }
+
+  async getBracketData(tournamentId: string): Promise<{
+    seededPlayers: { name: string; avatar?: string | null }[];
+    rounds: any[];
+  } | null> {
+    const { data, error } = await this.supabase
+      .from('tournaments')
+      .select('bracket_data')
+      .eq('id', tournamentId)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching bracket data:', error);
+      return null;
+    }
+
+    return data.bracket_data || null;
   }
 
   // Participant operations
@@ -850,6 +896,7 @@ class DatabaseService {
       prizes: dbTournament.prizes || [],
       location: dbTournament.location,
       invited_users: dbTournament.invited_users || [],
+      bracket_data: dbTournament.bracket_data || null,
       created_at: dbTournament.created_at,
       updated_at: dbTournament.updated_at,
     };
@@ -1005,6 +1052,73 @@ class DatabaseService {
     }
 
     return { message: String(error) };
+  }
+
+  // =============================================
+  // REGISTRATION VALIDATION
+  // =============================================
+
+  /**
+   * Check if a nickname is already taken by another user.
+   * Calls the server-side API route that queries auth.users + profiles
+   * via SECURITY DEFINER functions (using service role key).
+   */
+  async isNicknameTaken(nickname: string, excludeEmail?: string): Promise<boolean> {
+    if (!nickname || nickname.trim().length < 2) return false;
+
+    try {
+      const res = await fetch('/api/auth/check-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'nickname',
+          value: nickname.trim(),
+          excludeEmail: excludeEmail || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error('Error checking nickname availability:', res.statusText);
+        return false; // Don't block registration on API failure
+      }
+
+      const data = await res.json();
+      return !data.available;
+    } catch (error) {
+      console.error('Error checking nickname availability:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if an email is already registered.
+   * Calls the server-side API route that queries auth.users
+   * via SECURITY DEFINER functions (using service role key).
+   */
+  async isEmailRegistered(email: string): Promise<boolean> {
+    if (!email || email.trim() === '') return false;
+
+    try {
+      const res = await fetch('/api/auth/check-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          value: email.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        console.error('Error checking email availability:', res.statusText);
+        return false;
+      }
+
+      const data = await res.json();
+      return !data.available;
+    } catch (error) {
+      console.error('Error checking email availability:', error);
+      return false;
+    }
   }
 
   // =============================================

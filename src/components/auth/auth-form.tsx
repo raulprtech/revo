@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -30,15 +31,41 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldAlert, CheckCircle2, XCircle, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
+import { db } from "@/lib/database";
+import {
+  requiresParentalConsent,
+  getConsentRegulation,
+  detectCountryFromTimezone,
+  type ConsentRegulation,
+} from "@/lib/consent-regulations";
 
-// Calculate minimum date for 13 years old (COPPA compliance)
-const getMaxBirthDate = () => {
+// Calculate age from birth date
+const calculateAge = (birthDateStr: string): number => {
+  const birthDate = new Date(birthDateStr);
   const today = new Date();
-  today.setFullYear(today.getFullYear() - 13);
-  return today.toISOString().split('T')[0];
+  const age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  return monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ? age - 1
+    : age;
+};
+
+// Check if user is a minor based on country-specific consent age
+// Falls back to age < 13 (COPPA) if no country is detected
+const isMinorForCountry = (birthDateStr: string, countryCode: string | null): boolean => {
+  if (!birthDateStr) return false;
+  const age = calculateAge(birthDateStr);
+  if (!countryCode) return false; // No country = no consent requirement
+  return requiresParentalConsent(countryCode, age);
+};
+
+// Legacy helper kept for schema validation (uses 13 as safe default)
+const isMinor = (birthDateStr: string): boolean => {
+  if (!birthDateStr) return false;
+  return calculateAge(birthDateStr) < 13;
 };
 
 // Login schema (simple)
@@ -47,7 +74,7 @@ const loginSchema = z.object({
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
-// Signup schema (complete)
+// Signup schema (complete) - Allows minors with parental consent (COPPA compliant)
 const signupSchema = z.object({
   email: z.string().email({ message: "Dirección de correo electrónico inválida." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
@@ -60,6 +87,10 @@ const signupSchema = z.object({
     required_error: "Selecciona tu género." 
   }),
   location: z.string().optional(),
+  // Parental consent fields (COPPA)
+  parentEmail: z.string().optional(),
+  parentFullName: z.string().optional(),
+  // Standard consent fields
   acceptTerms: z.boolean().refine(val => val === true, {
     message: "Debes aceptar los términos y condiciones.",
   }),
@@ -69,25 +100,16 @@ const signupSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
   path: ["confirmPassword"],
-}).refine((data) => {
-  const birthDate = new Date(data.birthDate);
-  const today = new Date();
-  const age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
-    ? age - 1 
-    : age;
-  return actualAge >= 13;
-}, {
-  message: "Debes tener al menos 13 años para registrarte.",
-  path: ["birthDate"],
 });
+// Note: Parental consent field validation is done dynamically in
+// onSignupSubmit() because it depends on the detected country.
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 type AuthFormProps = {
   mode: "login" | "signup";
+  redirectTo?: string;
 };
 
 // Terms and Conditions Content
@@ -115,7 +137,14 @@ const TermsContent = () => (
 
     <section className="space-y-2">
       <h4 className="font-semibold">3. Registro y Cuenta</h4>
-      <p>Para utilizar ciertas funciones de la plataforma, debes crear una cuenta. Debes tener al menos 13 años de edad para registrarte. Eres responsable de todas las actividades que ocurran bajo tu cuenta.</p>
+      <p>Para utilizar la plataforma, debes crear una cuenta. Los menores de 13 años pueden registrarse únicamente con el consentimiento verificable de su padre, madre o tutor legal, de conformidad con la Ley de Protección de la Privacidad Infantil en Línea (COPPA). El padre/madre/tutor es responsable de supervisar la actividad del menor en la plataforma.</p>
+      <p className="mt-2">El padre/madre/tutor tiene derecho a:</p>
+      <ul className="list-disc list-inside space-y-1 ml-2">
+        <li>Revisar los datos personales recopilados del menor</li>
+        <li>Solicitar la eliminación de los datos del menor en cualquier momento</li>
+        <li>Revocar el consentimiento y cerrar la cuenta del menor</li>
+        <li>Oponerse al uso o compartición de los datos del menor</li>
+      </ul>
     </section>
 
     <section className="space-y-2">
@@ -144,7 +173,30 @@ const TermsContent = () => (
     </section>
 
     <section className="space-y-2">
-      <h4 className="font-semibold">9. Contacto</h4>
+      <h4 className="font-semibold">9. Menores de Edad y COPPA</h4>
+      <p>TournaVerse cumple con la Ley de Protección de la Privacidad Infantil en Línea (COPPA). Para usuarios menores de 13 años:</p>
+      <ul className="list-disc list-inside space-y-1 ml-2">
+        <li>Se requiere consentimiento verificable del padre/madre/tutor legal antes de recopilar datos personales</li>
+        <li>Se recopilan únicamente los datos necesarios para la participación en torneos</li>
+        <li>Los datos del menor podrán ser compartidos con organizadores de torneos para fines de gestión y logística</li>
+        <li>Los datos podrán ser compartidos con patrocinadores de torneos y eventos con fines promocionales, siempre bajo el consentimiento del padre/madre/tutor</li>
+        <li>El padre/madre/tutor puede solicitar la revisión, eliminación o restricción de datos del menor en cualquier momento</li>
+        <li>No se condicionará la participación del menor a la recopilación de datos más allá de lo razonablemente necesario</li>
+      </ul>
+    </section>
+
+    <section className="space-y-2">
+      <h4 className="font-semibold">10. Compartición de Datos con Organizadores y Patrocinadores</h4>
+      <p>Al participar en torneos y eventos, tus datos (o los del menor bajo tu tutela) podrán ser compartidos con:</p>
+      <ul className="list-disc list-inside space-y-1 ml-2">
+        <li><strong>Organizadores de torneos:</strong> Nombre, nickname, edad, género y datos de contacto para la gestión, verificación de identidad y comunicación sobre futuros torneos</li>
+        <li><strong>Patrocinadores:</strong> Nombre (o nickname), edad, ubicación y resultados en torneos con fines promocionales, de marketing y para ofrecer premios o beneficios</li>
+      </ul>
+      <p className="mt-2">Los organizadores y patrocinadores se comprometen a tratar los datos conforme a las leyes aplicables de protección de datos.</p>
+    </section>
+
+    <section className="space-y-2">
+      <h4 className="font-semibold">11. Contacto</h4>
       <p>Si tienes preguntas sobre estos términos, puedes contactarnos a través de la plataforma.</p>
     </section>
   </div>
@@ -169,6 +221,7 @@ const PrivacyContent = () => (
         <li><strong>Datos de identificación:</strong> Nombre, apellido, nickname, fecha de nacimiento, género</li>
         <li><strong>Datos de contacto:</strong> Correo electrónico, ubicación (opcional)</li>
         <li><strong>Datos de uso:</strong> Historial de torneos, participaciones, resultados</li>
+        <li><strong>Datos del padre/madre/tutor (para menores de 13 años):</strong> Nombre completo y correo electrónico del responsable legal</li>
       </ul>
     </section>
 
@@ -194,10 +247,12 @@ const PrivacyContent = () => (
       <h4 className="font-semibold">4. Transferencia de Datos</h4>
       <p>Tus datos personales pueden ser transferidos a:</p>
       <ul className="list-disc list-inside space-y-1 ml-2">
-        <li>Organizadores de torneos en los que participes</li>
+        <li><strong>Organizadores de torneos:</strong> Al participar en un torneo, tus datos de identificación, edad y contacto serán compartidos con los organizadores para gestionar los torneos, verificar tu identidad y elegibilidad, y contactarte sobre futuros eventos</li>
+        <li><strong>Patrocinadores de torneos y eventos:</strong> Tu nombre (o nickname), edad, ubicación y resultados podrán ser compartidos con los patrocinadores de los torneos o eventos en los que participes, con fines promocionales, de marketing y para la entrega de premios o beneficios</li>
         <li>Proveedores de servicios tecnológicos (hosting, bases de datos)</li>
         <li>Autoridades competentes cuando sea requerido por ley</li>
       </ul>
+      <p className="mt-2 font-medium">Para menores de 13 años: La transferencia de datos a organizadores y patrocinadores se realizará únicamente con el consentimiento expreso del padre/madre/tutor legal, otorgado al momento del registro.</p>
     </section>
 
     <section className="space-y-2">
@@ -232,17 +287,102 @@ const PrivacyContent = () => (
     </section>
 
     <section className="space-y-2">
-      <h4 className="font-semibold">10. Consentimiento</h4>
-      <p>Al aceptar este aviso de privacidad, consientes expresamente el tratamiento de tus datos personales en los términos aquí descritos, de conformidad con el artículo 8 de la LFPDPPP.</p>
+      <h4 className="font-semibold">10. Protección de Datos de Menores (COPPA)</h4>
+      <p>TournaVerse cumple con la Ley de Protección de la Privacidad Infantil en Línea (COPPA) y la LFPDPPP de México en materia de menores:</p>
+      <ul className="list-disc list-inside space-y-1 ml-2">
+        <li>No recopilamos datos personales de menores de 13 años sin el consentimiento verificable de su padre, madre o tutor legal</li>
+        <li>El consentimiento parental incluye la autorización explícita para compartir datos del menor con organizadores de torneos y patrocinadores de eventos</li>
+        <li>Recopilamos solo los datos mínimos necesarios para la participación en torneos</li>
+        <li>El padre/madre/tutor puede en cualquier momento: revisar los datos del menor, solicitar su eliminación, revocar el consentimiento o cerrar la cuenta</li>
+        <li>Para ejercer estos derechos, contactar desde el correo electrónico registrado como padre/madre/tutor</li>
+        <li>No se comparten datos de menores con terceros más allá de lo estrictamente autorizado en el consentimiento parental</li>
+      </ul>
+    </section>
+
+    <section className="space-y-2">
+      <h4 className="font-semibold">11. Consentimiento</h4>
+      <p>Al aceptar este aviso de privacidad, consientes expresamente el tratamiento de tus datos personales en los términos aquí descritos, de conformidad con el artículo 8 de la LFPDPPP. En el caso de menores de 13 años, el consentimiento es otorgado por el padre, madre o tutor legal.</p>
     </section>
   </div>
 );
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, redirectTo }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const supabase = createClient();
+
+  // Country detection state
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
+  const [countryRegulation, setCountryRegulation] = useState<ConsentRegulation | null>(null);
+  const [countryLoading, setCountryLoading] = useState(true);
+
+  // Detect country on mount
+  useEffect(() => {
+    async function detectCountry() {
+      try {
+        // 1. Try server-side detection (geo headers / IP)
+        const res = await fetch('/api/auth/detect-country');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.country) {
+            setDetectedCountry(data.country);
+            setCountryRegulation(getConsentRegulation(data.country));
+            setCountryLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // Server detection failed
+      }
+
+      // 2. Fallback: client-side timezone detection
+      const tzCountry = detectCountryFromTimezone();
+      if (tzCountry) {
+        setDetectedCountry(tzCountry);
+        setCountryRegulation(getConsentRegulation(tzCountry));
+      }
+      setCountryLoading(false);
+    }
+
+    if (mode === 'signup') {
+      detectCountry();
+    } else {
+      setCountryLoading(false);
+    }
+  }, [mode]);
+
+  // Duplicate validation states
+  const [nicknameStatus, setNicknameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const nicknameTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const emailTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const checkNickname = useCallback((value: string) => {
+    if (nicknameTimerRef.current) clearTimeout(nicknameTimerRef.current);
+    if (!value || value.trim().length < 2) {
+      setNicknameStatus('idle');
+      return;
+    }
+    setNicknameStatus('checking');
+    nicknameTimerRef.current = setTimeout(async () => {
+      const taken = await db.isNicknameTaken(value.trim());
+      setNicknameStatus(taken ? 'taken' : 'available');
+    }, 500);
+  }, []);
+
+  const checkEmail = useCallback((value: string) => {
+    if (emailTimerRef.current) clearTimeout(emailTimerRef.current);
+    if (!value || !value.includes('@')) {
+      setEmailStatus('idle');
+      return;
+    }
+    setEmailStatus('checking');
+    emailTimerRef.current = setTimeout(async () => {
+      const registered = await db.isEmailRegistered(value.trim());
+      setEmailStatus(registered ? 'taken' : 'available');
+    }, 500);
+  }, []);
 
   // Login form
   const loginForm = useForm<LoginFormValues>({
@@ -266,10 +406,18 @@ export function AuthForm({ mode }: AuthFormProps) {
       birthDate: "",
       gender: undefined,
       location: "",
+      parentEmail: "",
+      parentFullName: "",
       acceptTerms: false,
       acceptPrivacy: false,
     },
   });
+
+  // Watch birthDate to show/hide parental consent section
+  const watchedBirthDate = signupForm.watch("birthDate");
+  const showParentalConsent = watchedBirthDate
+    ? isMinorForCountry(watchedBirthDate, detectedCountry)
+    : false;
 
   async function onLoginSubmit(values: LoginFormValues) {
     setLoading(true);
@@ -305,29 +453,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         });
       }
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const fullName = user.user_metadata?.full_name || 
-          `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() ||
-          user.email?.split('@')[0] || 'Usuario';
-        
-        const userData = {
-          displayName: user.user_metadata?.nickname || fullName,
-          email: user.email || '',
-          photoURL: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`,
-          firstName: user.user_metadata?.first_name,
-          lastName: user.user_metadata?.last_name,
-          nickname: user.user_metadata?.nickname,
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        window.dispatchEvent(new Event('storage'));
-      }
-
       toast({
         title: "Inicio de Sesión Exitoso",
-        description: "Redirigiendo a tu perfil...",
+        description: "Redirigiendo...",
       });
-      router.push("/profile");
+      router.push(redirectTo || "/profile");
     }
 
     setLoading(false);
@@ -335,8 +465,57 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSignupSubmit(values: SignupFormValues) {
     setLoading(true);
+
+    // Dynamic parental consent validation (depends on detected country)
+    const needsConsent = isMinorForCountry(values.birthDate, detectedCountry);
+    if (needsConsent) {
+      if (!values.parentEmail || !values.parentEmail.includes('@')) {
+        signupForm.setError('parentEmail', {
+          type: 'manual',
+          message: `Se requiere el correo del padre/madre/tutor para menores de ${countryRegulation?.consentAge ?? 13} años.`,
+        });
+        setLoading(false);
+        return;
+      }
+      if (!values.parentFullName || values.parentFullName.length < 3) {
+        signupForm.setError('parentFullName', {
+          type: 'manual',
+          message: 'Se requiere el nombre completo del padre/madre/tutor.',
+        });
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Pre-submit duplicate checks
+    const [nickTaken, emailTaken] = await Promise.all([
+      values.nickname ? db.isNicknameTaken(values.nickname.trim()) : false,
+      db.isEmailRegistered(values.email.trim()),
+    ]);
+
+    if (nickTaken) {
+      signupForm.setError('nickname', {
+        type: 'manual',
+        message: 'Este nickname ya está en uso. Elige otro.',
+      });
+      setNicknameStatus('taken');
+      setLoading(false);
+      return;
+    }
+
+    if (emailTaken) {
+      signupForm.setError('email', {
+        type: 'manual',
+        message: 'Este correo ya está registrado. ¿Quieres iniciar sesión?',
+      });
+      setEmailStatus('taken');
+      setLoading(false);
+      return;
+    }
     
     const fullName = `${values.firstName} ${values.lastName}`;
+    const userIsMinor = isMinorForCountry(values.birthDate, detectedCountry);
+    const regulation = detectedCountry ? getConsentRegulation(detectedCountry) : null;
     
     const { error } = await supabase.auth.signUp({
       email: values.email,
@@ -350,6 +529,15 @@ export function AuthForm({ mode }: AuthFormProps) {
           birth_date: values.birthDate,
           gender: values.gender,
           location: values.location || null,
+          detected_country: detectedCountry || null,
+          // Parental consent fields (conditional by country)
+          is_minor: userIsMinor,
+          consent_regulation: regulation?.law || null,
+          consent_age_threshold: regulation?.consentAge || null,
+          parent_email: userIsMinor ? values.parentEmail : null,
+          parent_full_name: userIsMinor ? values.parentFullName : null,
+          parental_consent_verified: false,
+          data_sharing_consent: !userIsMinor,
           terms_accepted_at: new Date().toISOString(),
           privacy_accepted_at: new Date().toISOString(),
         },
@@ -358,31 +546,68 @@ export function AuthForm({ mode }: AuthFormProps) {
     });
 
     if (error) {
+      // Translate common Supabase auth errors
+      let errorMessage = error.message;
+      if (error.message.includes('User already registered') || error.message.includes('already been registered')) {
+        errorMessage = 'Este correo electrónico ya está registrado. Intenta iniciar sesión.';
+        setEmailStatus('taken');
+        signupForm.setError('email', {
+          type: 'manual',
+          message: errorMessage,
+        });
+      } else if (error.message.includes('Password should be at least')) {
+        errorMessage = 'La contraseña debe tener al menos 6 caracteres.';
+      }
+
       toast({
         title: "Error al crear la cuenta",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } else {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const userData = {
-          displayName: values.nickname || fullName,
-          email: user.email || values.email,
-          photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${values.email}`,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          nickname: values.nickname,
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        window.dispatchEvent(new Event('storage'));
+        // If minor, send parental consent email
+        if (userIsMinor && values.parentEmail) {
+          try {
+            const consentResponse = await fetch("/api/parental-consent/send", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                parentEmail: values.parentEmail,
+                parentFullName: values.parentFullName,
+                childName: fullName,
+                childEmail: values.email,
+                userId: user.id,
+              }),
+            });
+
+            if (consentResponse.ok) {
+              toast({
+                title: "¡Cuenta Creada!",
+                description: `Se ha enviado un correo de autorización a ${values.parentEmail}. Tu cuenta estará limitada hasta que tu padre/madre/tutor autorice tu registro.`,
+                duration: 15000,
+              });
+            } else {
+              toast({
+                title: "Cuenta creada - Aviso",
+                description: "Tu cuenta fue creada pero hubo un problema al enviar el correo a tu tutor. Podrás reenviar el correo desde la página de consentimiento pendiente.",
+                duration: 10000,
+              });
+            }
+          } catch (consentError) {
+            console.error("Error sending parental consent email:", consentError);
+          }
+        }
       }
 
-      toast({
-        title: "¡Cuenta Creada Exitosamente!",
-        description: "Te hemos enviado un correo de verificación. Revisa tu bandeja de entrada (y la carpeta de spam) y haz clic en el enlace para activar tu cuenta. No podrás iniciar sesión hasta confirmar tu correo.",
-        duration: 10000, // Mostrar por 10 segundos para que lo lean
-      });
+      if (!userIsMinor) {
+        toast({
+          title: "¡Cuenta Creada Exitosamente!",
+          description: "Te hemos enviado un correo de verificación. Revisa tu bandeja de entrada (y la carpeta de spam) y haz clic en el enlace para activar tu cuenta. No podrás iniciar sesión hasta confirmar tu correo.",
+          duration: 10000,
+        });
+      }
       // No redirigir automáticamente, mostrar página de confirmación
       router.push("/login?registered=true");
     }
@@ -469,8 +694,33 @@ export function AuthForm({ mode }: AuthFormProps) {
                   <FormItem>
                     <FormLabel>Correo Electrónico *</FormLabel>
                     <FormControl>
-                      <Input placeholder="nombre@ejemplo.com" type="email" {...field} />
+                      <div className="relative">
+                        <Input
+                          placeholder="nombre@ejemplo.com"
+                          type="email"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            checkEmail(e.target.value);
+                          }}
+                        />
+                        {emailStatus === 'checking' && (
+                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        {emailStatus === 'available' && (
+                          <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />
+                        )}
+                        {emailStatus === 'taken' && (
+                          <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />
+                        )}
+                      </div>
                     </FormControl>
+                    {emailStatus === 'taken' && (
+                      <p className="text-sm text-destructive">
+                        Este correo ya está registrado.{' '}
+                        <Link href="/login" className="underline font-medium">¿Iniciar sesión?</Link>
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -514,11 +764,35 @@ export function AuthForm({ mode }: AuthFormProps) {
                   <FormItem>
                     <FormLabel>Nickname / Gamertag (Opcional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="ej., ProGamer123" {...field} />
+                      <div className="relative">
+                        <Input
+                          placeholder="ej., ProGamer123"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            checkNickname(e.target.value);
+                          }}
+                        />
+                        {nicknameStatus === 'checking' && (
+                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        {nicknameStatus === 'available' && (
+                          <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />
+                        )}
+                        {nicknameStatus === 'taken' && (
+                          <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />
+                        )}
+                      </div>
                     </FormControl>
-                    <FormDescription>
-                      Este nombre se mostrará en torneos y rankings
-                    </FormDescription>
+                    {nicknameStatus === 'taken' ? (
+                      <p className="text-sm text-destructive">
+                        Este nickname ya está en uso. Elige otro.
+                      </p>
+                    ) : (
+                      <FormDescription>
+                        Este nombre se mostrará en torneos y rankings
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -535,7 +809,6 @@ export function AuthForm({ mode }: AuthFormProps) {
                       <FormControl>
                         <Input 
                           type="date" 
-                          max={getMaxBirthDate()}
                           {...field} 
                         />
                       </FormControl>
@@ -567,6 +840,76 @@ export function AuthForm({ mode }: AuthFormProps) {
                   )}
                 />
               </div>
+
+              {/* Parental Consent Section - conditional by country regulation */}
+              {showParentalConsent && (
+                <div className="space-y-4 border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-amber-800 dark:text-amber-200">
+                        Consentimiento Parental Requerido
+                        {countryRegulation && (
+                          <span className="text-xs font-normal ml-2 text-amber-600">({countryRegulation.law})</span>
+                        )}
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                        {countryRegulation
+                          ? `Según la legislación ${countryRegulation.label}, los menores de ${countryRegulation.consentAge} años requieren el consentimiento verificable de un padre, madre o tutor legal.`
+                          : 'Se requiere el consentimiento verificable de un padre, madre o tutor legal para crear esta cuenta.'
+                        }
+                      </p>
+                      {detectedCountry && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                          <Globe className="h-3 w-3" />
+                          País detectado: {detectedCountry}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={signupForm.control}
+                      name="parentFullName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nombre del Padre/Madre/Tutor *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nombre completo" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="parentEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Correo del Padre/Madre/Tutor *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="padre@ejemplo.com" type="email" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Se enviará un correo de verificación de consentimiento
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Alert className="border-amber-300 bg-amber-100/50 dark:bg-amber-900/30">
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-700 dark:text-amber-300">
+                      Se enviará un correo de confirmación al padre/madre/tutor para verificar el consentimiento. 
+                      La cuenta del menor tendrá funcionalidad limitada hasta que el consentimiento sea verificado. 
+                      El padre/madre/tutor puede solicitar la eliminación de la cuenta y todos los datos del menor en cualquier momento.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
 
               {/* Location (optional) */}
               <FormField
@@ -615,6 +958,17 @@ export function AuthForm({ mode }: AuthFormProps) {
 
               {/* Terms and Conditions */}
               <div className="space-y-3 pt-2">
+                {/* Data Sharing Consent (for users 13+) */}
+                {!showParentalConsent && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                      <strong>Aviso de compartición de datos:</strong> Al registrarte y participar en torneos, tus datos 
+                      (nombre, nickname, edad, resultados) podrán ser compartidos con los <strong>organizadores</strong> para la gestión 
+                      de torneos y futuros eventos, y con los <strong>patrocinadores</strong> de torneos o eventos con fines promocionales.
+                    </p>
+                  </div>
+                )}
+
                 <FormField
                   control={signupForm.control}
                   name="acceptTerms"

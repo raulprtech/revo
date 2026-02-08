@@ -1,0 +1,136 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "TournaVerse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e6]
+          - generic [ref=e15]: TournaVerse
+        - navigation [ref=e16]:
+          - link "Eventos" [ref=e17] [cursor=pointer]:
+            - /url: /events
+            - img [ref=e18]
+            - text: Eventos
+          - link "Torneos" [ref=e24] [cursor=pointer]:
+            - /url: /tournaments
+            - img [ref=e25]
+            - text: Torneos
+      - generic [ref=e28]:
+        - link "Iniciar Sesión" [ref=e29] [cursor=pointer]:
+          - /url: /login
+        - link "Registrarse" [ref=e30] [cursor=pointer]:
+          - /url: /signup
+  - main [ref=e31]:
+    - generic [ref=e32]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - paragraph [ref=e38]: CADA JUEGO, CADA DEPORTE
+            - heading "GESTIÓN DE TORNEOS SIMPLIFICADA" [level=1] [ref=e39]
+            - paragraph [ref=e40]: Con un generador de brackets fácil de usar y funciones completas, TournaVerse es la plataforma definitiva para organizar, gestionar y participar en torneos de cualquier tamaño.
+          - generic [ref=e41]:
+            - link "Crear un Torneo" [ref=e42] [cursor=pointer]:
+              - /url: /tournaments/create
+              - text: Crear un Torneo
+              - img
+            - link "Explorar Torneos" [ref=e43] [cursor=pointer]:
+              - /url: "#explore"
+              - text: Explorar Torneos
+              - img
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - paragraph [ref=e49]: ¡Tu próximo torneo épico te espera!
+      - generic [ref=e52]:
+        - generic [ref=e55]:
+          - img [ref=e56]
+          - paragraph [ref=e59]: "Video Demo: Crea tu Bracket"
+        - generic [ref=e60]:
+          - heading "Tu Torneo. A Tu Manera." [level=2] [ref=e61]
+          - paragraph [ref=e62]: Nuestro generador de brackets admite una amplia gama de formatos, incluyendo eliminación simple, doble eliminación, suizo y todos contra todos. Personaliza tu evento para que se ajuste a tus necesidades.
+          - link "Crea tu Bracket" [ref=e63] [cursor=pointer]:
+            - /url: /tournaments/create
+            - text: Crea tu Bracket
+            - img
+      - generic [ref=e65]:
+        - generic [ref=e67]:
+          - heading "Torneos Destacados" [level=2] [ref=e68]
+          - paragraph [ref=e69]: Echa un vistazo a algunos de los emocionantes torneos que están sucediendo ahora mismo en TournaVerse.
+        - generic [ref=e71]:
+          - link "FIFA" [ref=e72] [cursor=pointer]:
+            - /url: /tournaments/612e7d6e-7c6a-4d5c-9716-05bc15d17fd9
+            - generic [ref=e74]:
+              - img [ref=e75]
+              - paragraph [ref=e77]: FIFA
+          - generic [ref=e78]:
+            - generic [ref=e79]: REVO TORNEO FC 26 CAMPECHE
+            - generic [ref=e80]:
+              - img [ref=e81]
+              - text: FIFA
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - generic [ref=e90]: 3 Participantes
+          - link "Ver Detalles" [ref=e92] [cursor=pointer]:
+            - /url: /tournaments/612e7d6e-7c6a-4d5c-9716-05bc15d17fd9
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - heading "Así es Como Funciona" [level=2] [ref=e97]
+          - list [ref=e98]:
+            - listitem [ref=e99]:
+              - generic [ref=e100]: "1."
+              - generic [ref=e101]:
+                - heading "Crea tu Torneo" [level=3] [ref=e102]
+                - paragraph [ref=e103]: Define el nombre, juego, formato y horario de tu torneo en minutos.
+            - listitem [ref=e104]:
+              - generic [ref=e105]: "2."
+              - generic [ref=e106]:
+                - heading "Invita a los Participantes" [level=3] [ref=e107]
+                - paragraph [ref=e108]: Comparte un enlace para que los jugadores se registren, o añádelos manualmente.
+            - listitem [ref=e109]:
+              - generic [ref=e110]: "3."
+              - generic [ref=e111]:
+                - heading "Comienza la Competición" [level=3] [ref=e112]
+                - paragraph [ref=e113]: Genera los brackets automáticamente y deja que los jugadores reporten sus resultados.
+          - link "Empieza Ahora" [ref=e114] [cursor=pointer]:
+            - /url: /tournaments/create
+            - text: Empieza Ahora
+            - img
+        - generic [ref=e117]:
+          - img [ref=e122]
+          - paragraph [ref=e127]: Proceso Simplificado
+          - paragraph [ref=e128]: Crear → Invitar → Competir
+      - generic [ref=e130]:
+        - generic [ref=e132]:
+          - heading "Crea y Gestiona tu Comunidad" [level=2] [ref=e133]
+          - paragraph [ref=e134]: Descubre torneos organizados por nuestra vibrante comunidad.
+        - generic [ref=e136]:
+          - link "FIFA" [ref=e137] [cursor=pointer]:
+            - /url: /tournaments/612e7d6e-7c6a-4d5c-9716-05bc15d17fd9
+            - generic [ref=e139]:
+              - img [ref=e140]
+              - paragraph [ref=e142]: FIFA
+          - generic [ref=e143]:
+            - generic [ref=e144]: REVO TORNEO FC 26 CAMPECHE
+            - generic [ref=e145]:
+              - img [ref=e146]
+              - text: FIFA
+          - generic [ref=e149]:
+            - img [ref=e150]
+            - generic [ref=e155]: 3 Participantes
+          - link "Ver Torneo" [ref=e157] [cursor=pointer]:
+            - /url: /tournaments/612e7d6e-7c6a-4d5c-9716-05bc15d17fd9
+      - generic [ref=e158]:
+        - paragraph [ref=e159]: © 2024 TournaVerse. Todos los derechos reservados.
+        - navigation [ref=e160]:
+          - link "Términos de Servicio" [ref=e161] [cursor=pointer]:
+            - /url: "#"
+          - link "Privacidad" [ref=e162] [cursor=pointer]:
+            - /url: "#"
+  - region "Notifications (F8)":
+    - list
+  - button "Open Next.js Dev Tools" [ref=e168] [cursor=pointer]:
+    - img [ref=e169]
+  - alert [ref=e172]
+```

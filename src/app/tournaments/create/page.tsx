@@ -2,41 +2,36 @@
 import { CreateTournamentForm } from "@/components/tournaments/create-tournament-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { Loader2, Calendar } from "lucide-react";
 import { db, type Event } from "@/lib/database";
 import Link from "next/link";
+import { useAuth } from "@/lib/supabase/auth-context";
 
 function CreateTournamentContent() {
-    const router = useRouter();
     const searchParams = useSearchParams();
-    const [loading, setLoading] = useState(true);
+    const { user, loading: authLoading } = useAuth();
+    const [loadingEvent, setLoadingEvent] = useState(false);
     const [linkedEvent, setLinkedEvent] = useState<Event | null>(null);
     
     const eventId = searchParams.get('eventId');
 
     useEffect(() => {
-        const init = async () => {
-            const user = localStorage.getItem('user');
-            if (!user) {
-                router.push('/login');
-                return;
-            }
-
+        const loadEvent = async () => {
             // Load linked event if eventId is provided
             if (eventId) {
+                setLoadingEvent(true);
                 const event = await db.getEventById(eventId);
                 setLinkedEvent(event);
+                setLoadingEvent(false);
             }
-
-            setLoading(false);
         };
 
-        init();
-    }, [router, eventId]);
+        loadEvent();
+    }, [eventId]);
 
-    if (loading) {
+    if (authLoading || loadingEvent) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
                 <Loader2 className="h-16 w-16 animate-spin" />

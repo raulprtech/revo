@@ -1,30 +1,23 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Gamepad2, Users, Calendar, PlayCircle } from "lucide-react";
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePublicTournaments } from "@/hooks/use-tournaments";
-
-const getDefaultTournamentImage = (gameName: string) => {
-  // Generate a consistent color based on game name
-  const colors = [
-    'from-blue-500 to-purple-600',
-    'from-green-500 to-teal-600',
-    'from-red-500 to-pink-600',
-    'from-yellow-500 to-orange-600',
-    'from-indigo-500 to-blue-600',
-    'from-purple-500 to-indigo-600'
-  ];
-
-  const colorIndex = gameName.length % colors.length;
-  return colors[colorIndex];
-};
+import { useTournamentsListRealtime } from "@/hooks/use-realtime";
+import { getDefaultTournamentImage } from "@/lib/utils";
 
 export default function Home() {
-  const { tournaments, isLoading: loading } = usePublicTournaments();
+  const { tournaments, isLoading: loading, refresh } = usePublicTournaments();
+
+  // Real-time updates for the home page tournament cards
+  useTournamentsListRealtime(
+    useCallback(() => { refresh(); }, [refresh]),
+    !loading
+  );
 
   // Derive featured and community tournaments from cached data
   const featuredTournaments = useMemo(() => {
