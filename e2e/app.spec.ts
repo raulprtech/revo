@@ -82,7 +82,7 @@ test.describe('Accessibility basics', () => {
 
   test('page has a title', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/tournaverse/i);
+    await expect(page).toHaveTitle(/duels esports/i);
   });
 
   test('main landmark exists', async ({ page }) => {

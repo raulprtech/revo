@@ -21,6 +21,8 @@ import {
   Star
 } from "lucide-react";
 import type { Event, Tournament } from "@/lib/database";
+import { ExportButton } from "@/components/shared/export-csv";
+import { RetentionMetrics } from "@/components/tournaments/retention-metrics";
 
 interface EventStatsProps {
   event: Event;
@@ -134,6 +136,14 @@ export default function EventStats({ event, tournaments }: EventStatsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Export Actions */}
+      <div className="flex justify-end">
+        <ExportButton
+          tournamentName={event.name}
+          participants={[]}
+        />
+      </div>
+
       {/* Main KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -419,6 +429,9 @@ export default function EventStats({ event, tournaments }: EventStatsProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Retention Metrics (Pro) */}
+      <RetentionMetrics tournaments={tournaments} />
     </div>
   );
 }

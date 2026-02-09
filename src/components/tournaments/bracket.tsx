@@ -60,14 +60,14 @@ const isFreeForAll = (gameMode: string) =>
     ['free-for-all', 'grand-prix', 'vs-race'].includes(gameMode);
 
 // Type for seeded player data (can be string or object with name and avatar)
-type SeededPlayer = string | { name: string; avatar?: string | null };
+type SeededPlayer = string | { name: string; avatar?: string | null; email?: string | null };
 
 // Helper to normalize player data
-const normalizePlayer = (player: SeededPlayer): { name: string; avatar?: string | null } => {
+const normalizePlayer = (player: SeededPlayer): { name: string; avatar?: string | null; email?: string | null } => {
     if (typeof player === 'string') {
-        return { name: player, avatar: null };
+        return { name: player, avatar: null, email: null };
     }
-    return player;
+    return { name: player.name, avatar: player.avatar ?? null, email: player.email ?? null };
 };
 
 export const generateRounds = (numParticipants: number, seededPlayers?: SeededPlayer[], format?: string) => {
@@ -99,7 +99,7 @@ export const generateRounds = (numParticipants: number, seededPlayers?: SeededPl
 }
 
 // Single Elimination bracket generation
-function generateSingleEliminationRounds(players: { name: string; avatar?: string | null }[]) {
+function generateSingleEliminationRounds(players: { name: string; avatar?: string | null; email?: string | null }[]) {
     const numParticipants = players.length;
     let n = 1;
     while (n < numParticipants) {
@@ -110,7 +110,7 @@ function generateSingleEliminationRounds(players: { name: string; avatar?: strin
 
     const allPlayers = [...players];
     for (let i = 0; i < byes; i++) {
-        allPlayers.push({ name: "BYE", avatar: null });
+        allPlayers.push({ name: "BYE", avatar: null, email: null });
     }
 
     const rounds: Round[] = [];
@@ -124,7 +124,7 @@ function generateSingleEliminationRounds(players: { name: string; avatar?: strin
                           currentPlayers.length === 8 ? "Cuartos" :
                           `Ronda ${roundIndex}`;
         const matches: Match[] = [];
-        const nextRoundPlayers: { name: string; avatar?: string | null }[] = [];
+        const nextRoundPlayers: { name: string; avatar?: string | null; email?: string | null }[] = [];
 
         for (let i = 0; i < currentPlayers.length; i += 2) {
             const top = currentPlayers[i];
@@ -136,14 +136,15 @@ function generateSingleEliminationRounds(players: { name: string; avatar?: strin
 
             matches.push({
                 id: matchId++,
-                top: { name: top.name, score: null, avatar: top.avatar },
-                bottom: { name: bottom.name, score: null, avatar: bottom.avatar },
+                top: { name: top.name, score: null, avatar: top.avatar, email: top.email },
+                bottom: { name: bottom.name, score: null, avatar: bottom.avatar, email: bottom.email },
                 winner: winner,
                 bracket: 'winners',
             });
 
             if (winner) {
-                nextRoundPlayers.push({ name: winner });
+                const winnerPlayer = isBottomBye ? top : bottom;
+                nextRoundPlayers.push({ name: winner, avatar: winnerPlayer.avatar, email: winnerPlayer.email });
             } else {
                 nextRoundPlayers.push({ name: "TBD" });
             }
@@ -159,7 +160,7 @@ function generateSingleEliminationRounds(players: { name: string; avatar?: strin
 }
 
 // Double Elimination bracket generation
-function generateDoubleEliminationRounds(players: { name: string; avatar?: string | null }[]) {
+function generateDoubleEliminationRounds(players: { name: string; avatar?: string | null; email?: string | null }[]) {
     const winnersRounds = generateSingleEliminationRounds(players);
     
     winnersRounds.forEach(round => {
@@ -229,7 +230,7 @@ function generateDoubleEliminationRounds(players: { name: string; avatar?: strin
 }
 
 // Swiss round generation
-function generateSwissRound(players: { name: string; avatar?: string | null }[], roundNumber: number) {
+function generateSwissRound(players: { name: string; avatar?: string | null; email?: string | null }[], roundNumber: number) {
     const matches: Match[] = [];
     let matchId = roundNumber * 100;
 
@@ -237,15 +238,15 @@ function generateSwissRound(players: { name: string; avatar?: string | null }[],
         if (i + 1 < players.length) {
             matches.push({
                 id: matchId++,
-                top: { name: players[i].name, score: null, avatar: players[i].avatar },
-                bottom: { name: players[i + 1].name, score: null, avatar: players[i + 1].avatar },
+                top: { name: players[i].name, score: null, avatar: players[i].avatar, email: players[i].email },
+                bottom: { name: players[i + 1].name, score: null, avatar: players[i + 1].avatar, email: players[i + 1].email },
                 winner: null,
                 bracket: 'swiss',
             });
         } else {
             matches.push({
                 id: matchId++,
-                top: { name: players[i].name, score: null, avatar: players[i].avatar },
+                top: { name: players[i].name, score: null, avatar: players[i].avatar, email: players[i].email },
                 bottom: { name: "BYE", score: null, avatar: null },
                 winner: players[i].name,
                 bracket: 'swiss',
@@ -300,10 +301,17 @@ function propagateWinners(rounds: Round[]) {
     }
 }
 
+export type MatchPlayer = {
+    name: string;
+    score: number | null;
+    avatar?: string | null;
+    email?: string | null;
+};
+
 export type Match = {
     id: number;
-    top: { name: string; score: number | null; avatar?: string | null };
-    bottom: { name: string; score: number | null; avatar?: string | null };
+    top: MatchPlayer;
+    bottom: MatchPlayer;
     winner: string | null;
     bracket?: 'winners' | 'losers' | 'finals' | 'swiss';
     station?: {
@@ -319,6 +327,16 @@ export type Round = {
     bracket?: 'winners' | 'losers' | 'finals' | 'swiss';
 };
 
+/** Cosmetics data for a single player, keyed by email */
+export type PlayerCosmetics = {
+    bracketFrame?: { border_color?: string; border_style?: string; glow?: boolean; glow_color?: string; gradient?: string[]; animation?: string } | null;
+    nicknameColor?: { color?: string; gradient?: boolean; colors?: string[]; animated?: boolean } | null;
+    avatarCollection?: { dicebear_style?: string; seeds?: string[] } | null;
+};
+
+/** Map of email → cosmetics for all participants */
+export type CosmeticsMap = Record<string, PlayerCosmetics>;
+
 interface MatchCardProps {
     match: Match;
     onScoreReported: (matchId: number, scores: { top: number, bottom: number }) => void;
@@ -326,9 +344,10 @@ interface MatchCardProps {
     gameMode?: string;
     stations?: GameStation[];
     onStationAssigned?: (matchId: number, stationId: string | null) => void;
+    cosmeticsMap?: CosmeticsMap;
 }
 
-const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStationAssigned }: MatchCardProps) => {
+const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStationAssigned, cosmeticsMap }: MatchCardProps) => {
     const isTopWinner = match.winner === match.top.name;
     const isBottomWinner = match.winner === match.bottom.name;
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -387,6 +406,63 @@ const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStat
         ) : null;
     };
 
+    // Resolve cosmetics for a player
+    const getPlayerCosmetics = (player: MatchPlayer) => {
+        if (!cosmeticsMap || !player.email) return null;
+        return cosmeticsMap[player.email] || null;
+    };
+
+    // Get avatar src considering cosmetics
+    const getAvatarSrc = (player: MatchPlayer) => {
+        const cosmetics = getPlayerCosmetics(player);
+        if (cosmetics?.avatarCollection?.dicebear_style) {
+            const seed = cosmetics.avatarCollection.seeds?.[0] || player.name;
+            return `https://api.dicebear.com/9.x/${cosmetics.avatarCollection.dicebear_style}/svg?seed=${encodeURIComponent(seed)}`;
+        }
+        return player.avatar || undefined;
+    };
+
+    // Get frame style for avatar
+    const getFrameStyle = (player: MatchPlayer): React.CSSProperties | undefined => {
+        const cosmetics = getPlayerCosmetics(player);
+        if (!cosmetics?.bracketFrame) return undefined;
+        const frame = cosmetics.bracketFrame;
+        if (frame.gradient) {
+            return {
+                border: '2px solid transparent',
+                backgroundImage: `linear-gradient(var(--card), var(--card)), linear-gradient(135deg, ${frame.gradient.join(', ')})`,
+                backgroundOrigin: 'border-box',
+                backgroundClip: 'padding-box, border-box',
+                ...(frame.glow ? { boxShadow: `0 0 8px ${frame.glow_color || '#FFD700'}40` } : {}),
+            };
+        }
+        return {
+            border: `2px solid ${frame.border_color || '#FFD700'}`,
+            ...(frame.glow ? { boxShadow: `0 0 8px ${frame.glow_color || frame.border_color || '#FFD700'}40` } : {}),
+        };
+    };
+
+    // Get nickname style
+    const getNicknameStyle = (player: MatchPlayer): React.CSSProperties | undefined => {
+        const cosmetics = getPlayerCosmetics(player);
+        if (!cosmetics?.nicknameColor) return undefined;
+        const nick = cosmetics.nicknameColor;
+        if (nick.gradient && nick.colors) {
+            return {
+                backgroundImage: `linear-gradient(90deg, ${nick.colors.join(', ')})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+            };
+        }
+        if (nick.color) {
+            return { color: nick.color };
+        }
+        return undefined;
+    };
+
+    const hasFrame = (player: MatchPlayer) => !!getPlayerCosmetics(player)?.bracketFrame;
+
     return (
         <>
             <Card className={cn(
@@ -398,21 +474,29 @@ const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStat
                     {/* Top player */}
                     <div className="flex justify-between items-center gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Avatar className={cn(
-                                "h-7 w-7 flex-shrink-0",
-                                isTopWinner && "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                            )}>
-                                <AvatarImage src={match.top.avatar || undefined} alt={match.top.name} />
+                            <Avatar
+                                className={cn(
+                                    "h-7 w-7 flex-shrink-0",
+                                    isTopWinner && !hasFrame(match.top) && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                                    getPlayerCosmetics(match.top)?.bracketFrame?.animation === 'fire' && "animate-pulse"
+                                )}
+                                style={getFrameStyle(match.top)}
+                            >
+                                <AvatarImage src={getAvatarSrc(match.top)} alt={match.top.name} />
                                 <AvatarFallback className={cn("text-xs", getAvatarColor(match.top.name))}>
                                     {getInitials(match.top.name)}
                                 </AvatarFallback>
                             </Avatar>
-                            <span className={cn(
-                                "text-sm truncate",
-                                isTopWinner && "font-bold text-primary",
-                                match.top.name === 'BYE' && "text-muted-foreground italic",
-                                match.top.name === 'TBD' && "text-muted-foreground"
-                            )}>
+                            <span
+                                className={cn(
+                                    "text-sm truncate",
+                                    isTopWinner && !getNicknameStyle(match.top) && "font-bold text-primary",
+                                    isTopWinner && getNicknameStyle(match.top) && "font-bold",
+                                    match.top.name === 'BYE' && "text-muted-foreground italic",
+                                    match.top.name === 'TBD' && "text-muted-foreground"
+                                )}
+                                style={match.top.name !== 'TBD' && match.top.name !== 'BYE' ? getNicknameStyle(match.top) : undefined}
+                            >
                                 {match.top.name}
                             </span>
                         </div>
@@ -430,21 +514,29 @@ const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStat
                     {/* Bottom player */}
                     <div className="flex justify-between items-center gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Avatar className={cn(
-                                "h-7 w-7 flex-shrink-0",
-                                isBottomWinner && "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                            )}>
-                                <AvatarImage src={match.bottom.avatar || undefined} alt={match.bottom.name} />
+                            <Avatar
+                                className={cn(
+                                    "h-7 w-7 flex-shrink-0",
+                                    isBottomWinner && !hasFrame(match.bottom) && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                                    getPlayerCosmetics(match.bottom)?.bracketFrame?.animation === 'fire' && "animate-pulse"
+                                )}
+                                style={getFrameStyle(match.bottom)}
+                            >
+                                <AvatarImage src={getAvatarSrc(match.bottom)} alt={match.bottom.name} />
                                 <AvatarFallback className={cn("text-xs", getAvatarColor(match.bottom.name))}>
                                     {getInitials(match.bottom.name)}
                                 </AvatarFallback>
                             </Avatar>
-                            <span className={cn(
-                                "text-sm truncate",
-                                isBottomWinner && "font-bold text-primary",
-                                match.bottom.name === 'BYE' && "text-muted-foreground italic",
-                                match.bottom.name === 'TBD' && "text-muted-foreground"
-                            )}>
+                            <span
+                                className={cn(
+                                    "text-sm truncate",
+                                    isBottomWinner && !getNicknameStyle(match.bottom) && "font-bold text-primary",
+                                    isBottomWinner && getNicknameStyle(match.bottom) && "font-bold",
+                                    match.bottom.name === 'BYE' && "text-muted-foreground italic",
+                                    match.bottom.name === 'TBD' && "text-muted-foreground"
+                                )}
+                                style={match.bottom.name !== 'TBD' && match.bottom.name !== 'BYE' ? getNicknameStyle(match.bottom) : undefined}
+                            >
                                 {match.bottom.name}
                             </span>
                         </div>
@@ -527,9 +619,13 @@ interface BracketProps {
     rounds: Round[];
     onScoreReported: (matchId: number, scores: { top: number, bottom: number }) => void;
     onStationAssigned?: (matchId: number, stationId: string | null) => void;
+    /** Optional branding colors from Pro plan */
+    brandingColors?: { primary?: string; secondary?: string };
+    /** Cosmetics for bracket display */
+    cosmeticsMap?: CosmeticsMap;
 }
 
-export default function Bracket({ tournament, isOwner, rounds, onScoreReported, onStationAssigned }: BracketProps) {
+export default function Bracket({ tournament, isOwner, rounds, onScoreReported, onStationAssigned, brandingColors, cosmeticsMap }: BracketProps) {
     const bracketRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     
@@ -572,7 +668,16 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
     const isFFA = gameMode ? isFreeForAll(gameMode) : false;
 
     return (
-        <Card ref={cardRef} className="print:shadow-none print:border-none bg-card fullscreen:bg-background fullscreen:p-4 fullscreen:border-none">
+        <Card 
+            ref={cardRef} 
+            className="print:shadow-none print:border-none bg-card fullscreen:bg-background fullscreen:p-4 fullscreen:border-none"
+            style={brandingColors?.primary ? {
+                borderColor: brandingColors.primary,
+                borderWidth: '2px',
+                '--bracket-accent': brandingColors.primary,
+                '--bracket-bg': brandingColors.secondary,
+            } as React.CSSProperties : undefined}
+        >
             <CardHeader className="flex-row justify-between items-center print:hidden">
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
@@ -633,12 +738,13 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
                                                     gameMode={tournament.game_mode}
                                                     stations={tournament.stations}
                                                     onStationAssigned={onStationAssigned}
+                                                    cosmeticsMap={cosmeticsMap}
                                                 />
                                             ))}
                                         </div>
                                     </div>
                                 ))}
-                                
+                
                                 {!isDoubleElimination && (
                                     <div className="flex flex-col space-y-4 min-w-[250px] items-center justify-center">
                                         <h3 className="text-xl font-bold text-center font-headline">Campeón</h3>
@@ -669,6 +775,7 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
                                                         gameMode={tournament.game_mode}
                                                         stations={tournament.stations}
                                                         onStationAssigned={onStationAssigned}
+                                                        cosmeticsMap={cosmeticsMap}
                                                     />
                                                 ))}
                                             </div>
@@ -694,6 +801,7 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
                                             gameMode={tournament.game_mode}
                                             stations={tournament.stations}
                                             onStationAssigned={onStationAssigned}
+                                            cosmeticsMap={cosmeticsMap}
                                         />
                                     ))}
                                 </div>

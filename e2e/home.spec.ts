@@ -13,7 +13,7 @@ test.describe('Home page', () => {
     await page.goto('/');
 
     // Header brand (first match since it also appears in footer)
-    await expect(page.getByText('TournaVerse').first()).toBeVisible();
+    await expect(page.getByText('Duels Esports').first()).toBeVisible();
 
     // Nav links in header — use exact to avoid matching hero CTA text
     await expect(page.getByRole('link', { name: 'Eventos' })).toBeVisible();

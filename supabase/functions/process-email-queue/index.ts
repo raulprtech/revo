@@ -3,7 +3,7 @@
 //
 // Required secrets (set via Supabase Dashboard or CLI):
 //   RESEND_API_KEY  - Your Resend API key
-//   RESEND_FROM     - Sender email (e.g., "TournaVerse <noreply@tournaverse.com>")
+//   RESEND_FROM     - Sender email (e.g., "Duels Esports <noreply@duelsesports.com>")
 //
 // Deploy with: supabase functions deploy process-email-queue --no-verify-jwt
 //
@@ -13,7 +13,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const RESEND_FROM = Deno.env.get("RESEND_FROM") || "TournaVerse <noreply@tournaverse.com>";
+const RESEND_FROM = Deno.env.get("RESEND_FROM") || "Duels Esports <noreply@duelsesports.com>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

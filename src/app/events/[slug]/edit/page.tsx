@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db, type Event, type UpdateEventData, type Sponsor } from "@/lib/database";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { ProFeatureGate } from "@/lib/subscription";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -639,7 +640,8 @@ export default function EditEventPage() {
                                 </div>
                             </div>
 
-                            {/* Sponsors */}
+                            {/* Sponsors (Pro) */}
+                            <ProFeatureGate showPreview>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-semibold">Patrocinadores</h3>
@@ -691,6 +693,7 @@ export default function EditEventPage() {
                                     </Card>
                                 ))}
                             </div>
+                            </ProFeatureGate>
 
                             {/* Visibility */}
                             <div className="space-y-4">

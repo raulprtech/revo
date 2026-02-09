@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db, type CreateEventData, type Sponsor, type BadgeTemplate } from "@/lib/database";
 import { cn } from "@/lib/utils";
 import { BadgeManager } from "@/components/tournaments/badge-manager";
+import { ProFeatureGate } from "@/lib/subscription";
 
 const sponsorSchema = z.object({
     name: z.string().min(1, "Nombre requerido"),
@@ -513,7 +514,8 @@ export default function CreateEventPage() {
                                 </div>
                             </div>
 
-                            {/* Sponsors */}
+                            {/* Sponsors (Pro) */}
+                            <ProFeatureGate showPreview>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-semibold">Patrocinadores</h3>
@@ -566,6 +568,7 @@ export default function CreateEventPage() {
                                     </Card>
                                 ))}
                             </div>
+                            </ProFeatureGate>
 
                             {/* Badges */}
                             <BadgeManager

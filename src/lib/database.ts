@@ -42,6 +42,9 @@ export type BadgeTemplate = {
   customEmails?: string[]; // If awardTo is 'custom', list of emails
 };
 
+export type BadgeRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type BadgeSourceType = 'achievement' | 'tournament_prize' | 'event_prize' | 'admin_grant';
+
 export type AwardedBadge = {
   id: string;
   badge: Badge;
@@ -52,6 +55,8 @@ export type AwardedBadge = {
   game?: string;
   awarded_at: string;
   position?: string;
+  rarity: BadgeRarity;
+  source_type: BadgeSourceType;
 };
 
 export type Event = {
@@ -140,6 +145,19 @@ export type Tournament = {
     seededPlayers: { name: string; avatar?: string | null }[];
     rounds: any[];
   } | null;
+  // Pro plan fields
+  entry_fee?: number;
+  entry_fee_currency?: string;
+  stripe_payment_link?: string;
+  collected_fees?: number;
+  prize_pool_percentage?: number;
+  bracket_primary_color?: string;
+  bracket_secondary_color?: string;
+  sponsor_logos?: { name: string; logoUrl: string; website?: string }[];
+  // Legacy Pro (one-time event purchase)
+  is_legacy_pro?: boolean;
+  legacy_pro_purchased_at?: string;
+  legacy_pro_purchased_by?: string;
   created_at?: string;
   updated_at?: string;
   // Computed fields (not in DB)
@@ -213,6 +231,13 @@ class DatabaseService {
     // Gaming stations for in-person tournaments
     if (tournament.stations && tournament.stations.length > 0) insertData.stations = tournament.stations;
     if (tournament.auto_assign_stations !== undefined) insertData.auto_assign_stations = tournament.auto_assign_stations;
+    // Pro plan fields
+    if (tournament.entry_fee) insertData.entry_fee = tournament.entry_fee;
+    if (tournament.entry_fee_currency) insertData.entry_fee_currency = tournament.entry_fee_currency;
+    if (tournament.prize_pool_percentage) insertData.prize_pool_percentage = tournament.prize_pool_percentage;
+    if (tournament.bracket_primary_color) insertData.bracket_primary_color = tournament.bracket_primary_color;
+    if (tournament.bracket_secondary_color) insertData.bracket_secondary_color = tournament.bracket_secondary_color;
+    if (tournament.sponsor_logos && tournament.sponsor_logos.length > 0) insertData.sponsor_logos = tournament.sponsor_logos;
     // Note: 'organizers' is intentionally not included - add column to DB first if needed
 
     const { data, error } = await this.supabase
@@ -1147,6 +1172,8 @@ class DatabaseService {
       game: row.game,
       awarded_at: row.awarded_at,
       position: row.position,
+      rarity: (row.rarity || 'common') as BadgeRarity,
+      source_type: (row.source_type || 'tournament_prize') as BadgeSourceType,
     }));
   }
 
@@ -1160,8 +1187,14 @@ class DatabaseService {
       event_name?: string;
       game?: string;
       position?: string;
+      rarity?: BadgeRarity;
+      source_type?: BadgeSourceType;
     }
   ): Promise<AwardedBadge | null> {
+    // Auto-assign rarity based on badge type if not provided
+    const rarity = options.rarity || this.inferRarityFromBadge(badge);
+    const source_type = options.source_type || (options.event_id ? 'event_prize' : 'tournament_prize');
+
     const { data, error } = await this.supabase
       .from('user_badges')
       .insert({
@@ -1173,6 +1206,8 @@ class DatabaseService {
         event_name: options.event_name || null,
         game: options.game || null,
         position: options.position || null,
+        rarity,
+        source_type,
       })
       .select()
       .single();
@@ -1192,7 +1227,21 @@ class DatabaseService {
       game: data.game,
       awarded_at: data.awarded_at,
       position: data.position,
+      rarity: data.rarity as BadgeRarity,
+      source_type: data.source_type as BadgeSourceType,
     };
+  }
+
+  /** Infer rarity from badge type */
+  private inferRarityFromBadge(badge: Badge): BadgeRarity {
+    switch (badge.type) {
+      case 'champion':
+      case 'mvp': return 'legendary';
+      case 'runner-up': return 'epic';
+      case 'third-place':
+      case 'top-4': return 'rare';
+      default: return 'common';
+    }
   }
 
   async awardBadgesToParticipants(
@@ -1256,6 +1305,160 @@ class DatabaseService {
 
     return true;
   }
+
+  // =============================================
+  // BADGE EQUIP & ACHIEVEMENT OPERATIONS
+  // =============================================
+
+  /** Get the currently equipped badge for a user */
+  async getEquippedBadge(userEmail: string): Promise<AwardedBadge | null> {
+    const { data: profile, error: profileError } = await this.supabase
+      .from('profiles')
+      .select('equipped_badge')
+      .eq('email', userEmail)
+      .single();
+
+    if (profileError || !profile?.equipped_badge) return null;
+
+    const { data: badge, error: badgeError } = await this.supabase
+      .from('user_badges')
+      .select('*')
+      .eq('id', profile.equipped_badge)
+      .single();
+
+    if (badgeError || !badge) return null;
+
+    return {
+      id: badge.id,
+      badge: badge.badge as Badge,
+      tournament_id: badge.tournament_id,
+      tournament_name: badge.tournament_name,
+      event_id: badge.event_id,
+      event_name: badge.event_name,
+      game: badge.game,
+      awarded_at: badge.awarded_at,
+      position: badge.position,
+      rarity: (badge.rarity || 'common') as BadgeRarity,
+      source_type: (badge.source_type || 'tournament_prize') as BadgeSourceType,
+    };
+  }
+
+  /** Equip a badge as the user's display flair */
+  async equipBadge(userEmail: string, badgeId: string): Promise<{ success: boolean; error?: string }> {
+    // Verify user owns this badge
+    const { data: owned, error: ownError } = await this.supabase
+      .from('user_badges')
+      .select('id')
+      .eq('id', badgeId)
+      .eq('user_email', userEmail)
+      .single();
+
+    if (ownError || !owned) {
+      return { success: false, error: 'No posees este logro' };
+    }
+
+    const { error } = await this.supabase
+      .from('profiles')
+      .update({ equipped_badge: badgeId })
+      .eq('email', userEmail);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+
+  /** Unequip the current badge */
+  async unequipBadge(userEmail: string): Promise<{ success: boolean; error?: string }> {
+    const { error } = await this.supabase
+      .from('profiles')
+      .update({ equipped_badge: null })
+      .eq('email', userEmail);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+
+  /** Get all available achievement definitions */
+  async getAchievementDefinitions(): Promise<AchievementDefinition[]> {
+    const { data, error } = await this.supabase
+      .from('achievement_titles')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error fetching achievements:', error);
+      return [];
+    }
+    return (data ?? []) as AchievementDefinition[];
+  }
+
+  /** Check if a user already has a specific achievement badge */
+  async hasAchievement(userEmail: string, achievementType: string): Promise<boolean> {
+    const { data: achDef } = await this.supabase
+      .from('achievement_titles')
+      .select('title')
+      .eq('achievement_type', achievementType)
+      .single();
+
+    if (!achDef) return false;
+
+    const achName = (achDef.title as { name: string }).name;
+    const { data: existing } = await this.supabase
+      .from('user_badges')
+      .select('id')
+      .eq('user_email', userEmail)
+      .eq('source_type', 'achievement')
+      .contains('badge', { name: achName });
+
+    return (existing ?? []).length > 0;
+  }
+
+  /** Award an achievement badge to a user */
+  async awardAchievement(
+    userEmail: string,
+    achievementType: string
+  ): Promise<AwardedBadge | null> {
+    // Get the achievement definition
+    const { data: achDef } = await this.supabase
+      .from('achievement_titles')
+      .select('*')
+      .eq('achievement_type', achievementType)
+      .single();
+
+    if (!achDef) return null;
+
+    const titleData = achDef.title as { name: string; description?: string; icon: string; color: string; rarity: string };
+
+    const badge: Badge = {
+      id: achDef.id,
+      type: 'custom',
+      name: titleData.name,
+      description: titleData.description || '',
+      icon: titleData.icon,
+      color: titleData.color,
+      isCustom: true,
+    };
+
+    return this.awardBadge(userEmail, badge, {
+      rarity: (titleData.rarity || 'common') as BadgeRarity,
+      source_type: 'achievement',
+    });
+  }
 }
+
+/** Achievement definition from the achievement_titles table */
+export type AchievementDefinition = {
+  id: string;
+  slug: string;
+  title: {
+    name: string;
+    description?: string;
+    icon: string;
+    color: string;
+    rarity: string;
+  };
+  achievement_type: string;
+  is_active: boolean;
+  created_at: string;
+};
 
 export const db = new DatabaseService();

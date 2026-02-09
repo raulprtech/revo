@@ -110,7 +110,7 @@ function ParentalConsentContent() {
               ¡Consentimiento Verificado!
             </CardTitle>
             <CardDescription className="text-base">
-              Ha autorizado exitosamente la cuenta de <strong>{childName}</strong> en TournaVerse.
+              Ha autorizado exitosamente la cuenta de <strong>{childName}</strong> en Duels Esports.
               El menor ahora puede acceder a todas las funcionalidades de la plataforma.
             </CardDescription>
           </CardHeader>
@@ -124,7 +124,7 @@ function ParentalConsentContent() {
             </div>
             <div className="text-center">
               <Link href="/">
-                <Button>Ir a TournaVerse</Button>
+                <Button>Ir a Duels Esports</Button>
               </Link>
             </div>
           </CardContent>
@@ -156,7 +156,7 @@ function ParentalConsentContent() {
             </div>
             <div className="text-center">
               <Link href="/">
-                <Button variant="outline">Ir a TournaVerse</Button>
+                <Button variant="outline">Ir a Duels Esports</Button>
               </Link>
             </div>
           </CardContent>
@@ -177,7 +177,7 @@ function ParentalConsentContent() {
           <CardDescription className="text-base">
             {actionParam === "revoke" 
               ? "¿Está seguro de que desea revocar la autorización para esta cuenta?"
-              : "Un menor ha solicitado su autorización para crear una cuenta en TournaVerse."
+              : "Un menor ha solicitado su autorización para crear una cuenta en Duels Esports."
             }
           </CardDescription>
         </CardHeader>

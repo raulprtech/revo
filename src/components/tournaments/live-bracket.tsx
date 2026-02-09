@@ -6,14 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, Users, Gamepad2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Round, Match } from "./bracket";
+import type { Round, Match, MatchPlayer, CosmeticsMap } from "./bracket";
 import { useEffect, useState } from "react";
 
 // =============================================
 // Read-only Match Card with live highlight animations
 // =============================================
 
-function LiveMatchCard({ match, isNew }: { match: Match; isNew?: boolean }) {
+function LiveMatchCard({ match, isNew, cosmeticsMap }: { match: Match; isNew?: boolean; cosmeticsMap?: CosmeticsMap }) {
   const isTopWinner = match.winner === match.top.name;
   const isBottomWinner = match.winner === match.bottom.name;
   const hasResult = match.winner !== null;
@@ -68,6 +68,60 @@ function LiveMatchCard({ match, isNew }: { match: Match; isNew?: boolean }) {
     match.bottom.name !== "BYE" &&
     !match.winner;
 
+  // ─── Cosmetics helpers ───
+  const getPlayerCosmetics = (player: MatchPlayer) => {
+    if (!cosmeticsMap || !player.email) return null;
+    return cosmeticsMap[player.email] || null;
+  };
+
+  const getAvatarSrc = (player: MatchPlayer) => {
+    const cosmetics = getPlayerCosmetics(player);
+    if (cosmetics?.avatarCollection?.dicebear_style) {
+      const seed = cosmetics.avatarCollection.seeds?.[0] || player.name;
+      return `https://api.dicebear.com/9.x/${cosmetics.avatarCollection.dicebear_style}/svg?seed=${encodeURIComponent(seed)}`;
+    }
+    return player.avatar || undefined;
+  };
+
+  const getFrameStyle = (player: MatchPlayer): React.CSSProperties | undefined => {
+    const cosmetics = getPlayerCosmetics(player);
+    if (!cosmetics?.bracketFrame) return undefined;
+    const frame = cosmetics.bracketFrame;
+    if (frame.gradient) {
+      return {
+        border: '2px solid transparent',
+        backgroundImage: `linear-gradient(var(--card), var(--card)), linear-gradient(135deg, ${frame.gradient.join(', ')})`,
+        backgroundOrigin: 'border-box',
+        backgroundClip: 'padding-box, border-box',
+        ...(frame.glow ? { boxShadow: `0 0 8px ${frame.glow_color || '#FFD700'}40` } : {}),
+      };
+    }
+    return {
+      border: `2px solid ${frame.border_color || '#FFD700'}`,
+      ...(frame.glow ? { boxShadow: `0 0 8px ${frame.glow_color || frame.border_color || '#FFD700'}40` } : {}),
+    };
+  };
+
+  const getNicknameStyle = (player: MatchPlayer): React.CSSProperties | undefined => {
+    const cosmetics = getPlayerCosmetics(player);
+    if (!cosmetics?.nicknameColor) return undefined;
+    const nick = cosmetics.nicknameColor;
+    if (nick.gradient && nick.colors) {
+      return {
+        backgroundImage: `linear-gradient(90deg, ${nick.colors.join(', ')})`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+      };
+    }
+    if (nick.color) {
+      return { color: nick.color };
+    }
+    return undefined;
+  };
+
+  const hasFrame = (player: MatchPlayer) => !!getPlayerCosmetics(player)?.bracketFrame;
+
   return (
     <Card
       className={cn(
@@ -99,12 +153,14 @@ function LiveMatchCard({ match, isNew }: { match: Match; isNew?: boolean }) {
             <Avatar
               className={cn(
                 "h-7 w-7 flex-shrink-0",
-                isTopWinner &&
-                  "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                isTopWinner && !hasFrame(match.top) &&
+                  "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                getPlayerCosmetics(match.top)?.bracketFrame?.animation === 'fire' && "animate-pulse"
               )}
+              style={getFrameStyle(match.top)}
             >
               <AvatarImage
-                src={match.top.avatar || undefined}
+                src={getAvatarSrc(match.top)}
                 alt={match.top.name}
               />
               <AvatarFallback
@@ -116,10 +172,12 @@ function LiveMatchCard({ match, isNew }: { match: Match; isNew?: boolean }) {
             <span
               className={cn(
                 "text-sm truncate",
-                isTopWinner && "font-bold text-primary",
+                isTopWinner && !getNicknameStyle(match.top) && "font-bold text-primary",
+                isTopWinner && getNicknameStyle(match.top) && "font-bold",
                 match.top.name === "BYE" && "text-muted-foreground italic",
                 match.top.name === "TBD" && "text-muted-foreground"
               )}
+              style={match.top.name !== 'TBD' && match.top.name !== 'BYE' ? getNicknameStyle(match.top) : undefined}
             >
               {match.top.name}
             </span>
@@ -145,12 +203,14 @@ function LiveMatchCard({ match, isNew }: { match: Match; isNew?: boolean }) {
             <Avatar
               className={cn(
                 "h-7 w-7 flex-shrink-0",
-                isBottomWinner &&
-                  "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                isBottomWinner && !hasFrame(match.bottom) &&
+                  "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                getPlayerCosmetics(match.bottom)?.bracketFrame?.animation === 'fire' && "animate-pulse"
               )}
+              style={getFrameStyle(match.bottom)}
             >
               <AvatarImage
-                src={match.bottom.avatar || undefined}
+                src={getAvatarSrc(match.bottom)}
                 alt={match.bottom.name}
               />
               <AvatarFallback
@@ -162,10 +222,12 @@ function LiveMatchCard({ match, isNew }: { match: Match; isNew?: boolean }) {
             <span
               className={cn(
                 "text-sm truncate",
-                isBottomWinner && "font-bold text-primary",
+                isBottomWinner && !getNicknameStyle(match.bottom) && "font-bold text-primary",
+                isBottomWinner && getNicknameStyle(match.bottom) && "font-bold",
                 match.bottom.name === "BYE" && "text-muted-foreground italic",
                 match.bottom.name === "TBD" && "text-muted-foreground"
               )}
+              style={match.bottom.name !== 'TBD' && match.bottom.name !== 'BYE' ? getNicknameStyle(match.bottom) : undefined}
             >
               {match.bottom.name}
             </span>
@@ -207,6 +269,8 @@ interface LiveBracketProps {
   gameMode?: string;
   /** IDs of matches that were just updated (for flash animation) */
   updatedMatchIds?: Set<number>;
+  /** Cosmetics for bracket display */
+  cosmeticsMap?: CosmeticsMap;
 }
 
 export default function LiveBracket({
@@ -214,6 +278,7 @@ export default function LiveBracket({
   format,
   gameMode,
   updatedMatchIds,
+  cosmeticsMap,
 }: LiveBracketProps) {
   const [flashIds, setFlashIds] = useState<Set<number>>(new Set());
 
@@ -347,6 +412,7 @@ export default function LiveBracket({
                     key={match.id}
                     match={match}
                     isNew={flashIds.has(match.id)}
+                    cosmeticsMap={cosmeticsMap}
                   />
                 ))}
               </div>
@@ -400,6 +466,7 @@ export default function LiveBracket({
                       key={match.id}
                       match={match}
                       isNew={flashIds.has(match.id)}
+                      cosmeticsMap={cosmeticsMap}
                     />
                   ))}
                 </div>
@@ -422,6 +489,7 @@ export default function LiveBracket({
                 key={match.id}
                 match={match}
                 isNew={flashIds.has(match.id)}
+                cosmeticsMap={cosmeticsMap}
               />
             ))}
           </div>

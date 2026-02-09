@@ -229,10 +229,11 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
         const byesNeeded = bracketSize - shuffled.length;
         
         const seededParticipantsData = JSON.parse(localStorage.getItem("seededParticipantsData") || "{}");
-        // Store both name and avatar for bracket display
+        // Store name, avatar and email for bracket display and cosmetics
         seededParticipantsData[tournamentId] = shuffled.map(p => ({
             name: p.name,
-            avatar: p.avatar || null
+            avatar: p.avatar || null,
+            email: p.email || null
         }));
         localStorage.setItem("seededParticipantsData", JSON.stringify(seededParticipantsData));
 
@@ -269,7 +270,8 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                 const shuffled = [...acceptedParticipants].sort(() => Math.random() - 0.5);
                 seededParticipantsData[tournamentId] = shuffled.map(p => ({
                     name: p.name,
-                    avatar: p.avatar || null
+                    avatar: p.avatar || null,
+                    email: p.email || null
                 }));
                 localStorage.setItem("seededParticipantsData", JSON.stringify(seededParticipantsData));
                 window.dispatchEvent(new CustomEvent('seedsAssigned'));
@@ -615,10 +617,15 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                                     <Flag className="mr-2 h-4 w-4" /> Finalizar
                                 </Button>
                             )}
-                            {tournament?.status === 'Finalizado' && (
+                            {tournament?.status === 'Finalizado' && !tournament?.is_legacy_pro && (
                                 <Button variant="outline" size="sm" onClick={handleRepeatTournament}>
                                     <RotateCcw className="mr-2 h-4 w-4" /> Reiniciar
                                 </Button>
+                            )}
+                            {tournament?.status === 'Finalizado' && tournament?.is_legacy_pro && (
+                                <Badge variant="secondary" className="text-xs">
+                                    🏛️ Legacy – No reiniciable
+                                </Badge>
                             )}
                             {/* Export Button */}
                             <Button variant="outline" size="sm" onClick={handleExportToExcel}>

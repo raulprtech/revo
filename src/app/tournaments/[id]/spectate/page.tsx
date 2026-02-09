@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import LiveBracket from "@/components/tournaments/live-bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
 import { calculateStandings } from "@/components/tournaments/standings-table";
-import { generateRounds, type Round } from "@/components/tournaments/bracket";
+import { generateRounds, type Round, type CosmeticsMap } from "@/components/tournaments/bracket";
 import { db, type Tournament } from "@/lib/database";
 import { useTournament, useParticipants } from "@/hooks/use-tournaments";
 import { useTournamentRealtime, type TournamentRealtimeEvent } from "@/hooks/use-realtime";
@@ -40,7 +40,8 @@ export default function SpectatePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [updatedMatchIds, setUpdatedMatchIds] = useState<Set<number>>(new Set());
-  const [spectatorCount] = useState(() => Math.floor(Math.random() * 20) + 1); // Simulated viewer count
+  const [spectatorCount] = useState(() => Math.floor(Math.random() * 20) + 1);
+  const [cosmeticsMap, setCosmeticsMap] = useState<CosmeticsMap>({});
 
   // Load bracket data from Supabase (not localStorage — spectators don't have it)
   const loadBracketFromDB = useCallback(async () => {
@@ -48,21 +49,50 @@ export default function SpectatePage() {
 
     try {
       const bracketData = await db.getBracketData(id);
+      let loadedRounds: Round[] = [];
+
       if (bracketData && bracketData.rounds && bracketData.rounds.length > 0) {
-        // Use persisted rounds directly (they contain scores and winners)
-        setRounds(bracketData.rounds);
+        loadedRounds = bracketData.rounds;
+        setRounds(loadedRounds);
         setLastUpdate(new Date());
       } else if (bracketData?.seededPlayers && bracketData.seededPlayers.length > 0) {
-        // Fallback: regenerate from seeded players
-        const newRounds = generateRounds(
+        loadedRounds = generateRounds(
           bracketData.seededPlayers.length,
           bracketData.seededPlayers,
           tournament.format
         );
-        setRounds(newRounds);
+        setRounds(loadedRounds);
         setLastUpdate(new Date());
       } else {
         setRounds([]);
+      }
+
+      // Fetch cosmetics from seededPlayers or rounds
+      const emails: string[] = [];
+      if (bracketData?.seededPlayers) {
+        for (const p of bracketData.seededPlayers) {
+          const player = p as { email?: string };
+          if (typeof player === 'object' && player.email) emails.push(player.email);
+        }
+      }
+      if (emails.length === 0 && loadedRounds.length > 0) {
+        for (const round of loadedRounds) {
+          for (const match of round.matches) {
+            if (match.top.email) emails.push(match.top.email);
+            if (match.bottom.email) emails.push(match.bottom.email);
+          }
+        }
+      }
+      const uniqueEmails = [...new Set(emails)];
+      if (uniqueEmails.length > 0) {
+        fetch('/api/coins/cosmetics-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emails: uniqueEmails }),
+        })
+          .then(res => res.json())
+          .then(data => setCosmeticsMap(data || {}))
+          .catch(() => {});
       }
     } catch (error) {
       console.error("Error loading bracket data:", error);
@@ -199,15 +229,18 @@ export default function SpectatePage() {
               </Link>
 
               <div className="relative h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden">
-                <Image
-                  src={
-                    tournament.image ||
-                    getDefaultTournamentImage(tournament.game)
-                  }
-                  alt={tournament.name}
-                  fill
-                  className="object-cover"
-                />
+                {tournament.image && tournament.image.trim() !== '' ? (
+                  <Image
+                    src={tournament.image}
+                    alt={tournament.name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className={`h-full w-full bg-gradient-to-br ${getDefaultTournamentImage(tournament.game)} flex items-center justify-center`}>
+                    <Gamepad2 className="h-5 w-5 text-white/80" />
+                  </div>
+                )}
               </div>
 
               <div className="min-w-0">
@@ -300,6 +333,7 @@ export default function SpectatePage() {
               format={tournament.format}
               gameMode={tournament.game_mode}
               updatedMatchIds={updatedMatchIds}
+              cosmeticsMap={cosmeticsMap}
             />
           </TabsContent>
 

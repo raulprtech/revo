@@ -38,6 +38,9 @@ import { createClient } from "@/lib/supabase/client";
 import { PrizeManager } from "./prize-manager";
 import { StationManager } from "./station-manager";
 import { BadgeManager } from "./badge-manager";
+import { PrizePoolCalculator } from "./prize-pool-calculator";
+import { BracketBrandingEditor, type BracketBranding } from "./bracket-branding";
+import { ProFeatureGate } from "@/lib/subscription";
 
 // Game configurations with recommended formats and game modes
 const GAMES_CONFIG = {
@@ -179,6 +182,11 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
   const [badges, setBadges] = useState<BadgeTemplate[]>((tournamentData as { badges?: BadgeTemplate[] })?.badges || []);
   const [stations, setStations] = useState<GameStation[]>([]);
   const [autoAssignStations, setAutoAssignStations] = useState(true);
+  const [branding, setBranding] = useState<BracketBranding>({
+    primaryColor: '#e8590c',
+    secondaryColor: '#1a1a2e',
+    sponsorLogos: [],
+  });
   const [selectedGame, setSelectedGame] = useState<GameKey | "">(
     tournamentData?.game && tournamentData.game in GAMES_CONFIG 
       ? tournamentData.game as GameKey 
@@ -383,6 +391,10 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           event_id: finalEventId || undefined,
           stations: tournamentStations,
           auto_assign_stations: values.tournamentMode === 'presencial' ? autoAssignStations : undefined,
+          // Pro plan fields
+          bracket_primary_color: branding.primaryColor !== '#e8590c' ? branding.primaryColor : undefined,
+          bracket_secondary_color: branding.secondaryColor !== '#1a1a2e' ? branding.secondaryColor : undefined,
+          sponsor_logos: branding.sponsorLogos.length > 0 ? branding.sponsorLogos : undefined,
         };
 
         console.log('Tournament payload:', tournamentPayload);
@@ -423,6 +435,9 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           prizes: prizes.length > 0 ? prizes : null,
           badges: badges.length > 0 ? badges : null,
           location: values.tournamentMode === 'presencial' ? (values.location || null) : null,
+          bracket_primary_color: branding.primaryColor !== '#e8590c' ? branding.primaryColor : null,
+          bracket_secondary_color: branding.secondaryColor !== '#1a1a2e' ? branding.secondaryColor : null,
+          sponsor_logos: branding.sponsorLogos.length > 0 ? branding.sponsorLogos : null,
         };
 
         // Only add game_mode if it has a value (column may not exist in older schemas)
@@ -790,14 +805,16 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
             />
             )}
 
-            {/* Station Manager - Solo para torneos presenciales */}
+            {/* Station Manager - Solo para torneos presenciales (Pro) */}
             {form.watch("tournamentMode") === "presencial" && (
-              <StationManager
-                stations={stations}
-                onStationsChange={setStations}
-                autoAssign={autoAssignStations}
-                onAutoAssignChange={setAutoAssignStations}
-              />
+              <ProFeatureGate showPreview>
+                <StationManager
+                  stations={stations}
+                  onStationsChange={setStations}
+                  autoAssign={autoAssignStations}
+                  onAutoAssignChange={setAutoAssignStations}
+                />
+              </ProFeatureGate>
             )}
 
             {/* Prize Manager */}
@@ -807,11 +824,23 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
               maxParticipants={form.watch("maxParticipants")}
             />
 
+            {/* Prize Pool Calculator (Pro) */}
+            <PrizePoolCalculator
+              maxParticipants={form.watch("maxParticipants")}
+              onPrizesGenerated={(generatedPrizes) => setPrizes(generatedPrizes)}
+            />
+
             {/* Badge Manager */}
             <BadgeManager
               badges={badges}
               onChange={setBadges}
               type="tournament"
+            />
+
+            {/* Bracket Branding (Pro) */}
+            <BracketBrandingEditor
+              branding={branding}
+              onChange={setBranding}
             />
 
             <FormField

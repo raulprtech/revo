@@ -1,4 +1,4 @@
--- Database schema for TournaVerse
+-- Database schema for Duels Esports
 -- Run this in Supabase SQL Editor
 
 -- =============================================
@@ -56,6 +56,7 @@ CREATE POLICY "Authenticated users can create events" ON public.events
 FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IS NOT NULL);
 
 -- Trigger for events updated_at
+DROP TRIGGER IF EXISTS handle_events_updated_at ON public.events;
 CREATE TRIGGER handle_events_updated_at
   BEFORE UPDATE ON public.events
   FOR EACH ROW
@@ -202,6 +203,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS handle_tournaments_updated_at ON public.tournaments;
 CREATE TRIGGER handle_tournaments_updated_at
   BEFORE UPDATE ON public.tournaments
   FOR EACH ROW
@@ -211,3 +213,109 @@ CREATE TRIGGER handle_tournaments_updated_at
 GRANT ALL ON public.tournaments TO authenticated;
 GRANT ALL ON public.participants TO authenticated;
 GRANT SELECT ON public.tournaments TO anon;  -- Allow anonymous users to see public tournaments
+
+-- =============================================
+-- DUELS COINS SYSTEM
+-- =============================================
+
+-- Coin Wallets — One per user
+CREATE TABLE IF NOT EXISTS public.coin_wallets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_email TEXT NOT NULL UNIQUE,
+  balance INTEGER NOT NULL DEFAULT 50 CHECK (balance >= 0),
+  lifetime_earned INTEGER NOT NULL DEFAULT 50,
+  lifetime_spent INTEGER NOT NULL DEFAULT 0,
+  daily_allowance_claimed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Coin Transactions — Audit trail
+CREATE TABLE IF NOT EXISTS public.coin_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_email TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  balance_after INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  description TEXT,
+  reference_id TEXT,
+  reference_type TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Cosmetic Items — Shop catalog
+CREATE TABLE IF NOT EXISTS public.cosmetic_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT NOT NULL,
+  price INTEGER NOT NULL CHECK (price > 0),
+  image_preview TEXT,
+  rarity TEXT NOT NULL DEFAULT 'common',
+  metadata JSONB DEFAULT '{}',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- User Cosmetics — Owned items
+CREATE TABLE IF NOT EXISTS public.user_cosmetics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_email TEXT NOT NULL,
+  item_id UUID NOT NULL REFERENCES public.cosmetic_items(id) ON DELETE CASCADE,
+  is_equipped BOOLEAN DEFAULT false,
+  purchased_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_email, item_id)
+);
+
+-- Exploration Quests — Onboarding reward system
+CREATE TABLE IF NOT EXISTS public.exploration_quests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT '🎯',
+  reward_amount INTEGER NOT NULL CHECK (reward_amount > 0),
+  category TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  validation_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- User Quest Progress
+CREATE TABLE IF NOT EXISTS public.user_quest_progress (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_email TEXT NOT NULL,
+  quest_id UUID NOT NULL REFERENCES public.exploration_quests(id) ON DELETE CASCADE,
+  completed_at TIMESTAMPTZ DEFAULT NOW(),
+  reward_claimed BOOLEAN DEFAULT false,
+  reward_claimed_at TIMESTAMPTZ,
+  UNIQUE(user_email, quest_id)
+);
+
+-- Coin Purchase Packages
+CREATE TABLE IF NOT EXISTS public.coin_packages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  coin_amount INTEGER NOT NULL,
+  bonus_amount INTEGER DEFAULT 0,
+  price_mxn DECIMAL(10,2) NOT NULL,
+  stripe_price_id TEXT,
+  is_featured BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tournament Coin Unlocks
+CREATE TABLE IF NOT EXISTS public.tournament_coin_unlocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tournament_id UUID NOT NULL REFERENCES public.tournaments(id) ON DELETE CASCADE,
+  user_email TEXT NOT NULL,
+  unlock_type TEXT NOT NULL,
+  cost INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tournament_id, unlock_type)
+);

@@ -120,12 +120,12 @@ const TermsContent = () => (
     
     <section className="space-y-2">
       <h4 className="font-semibold">1. Aceptación de los Términos</h4>
-      <p>Al acceder y utilizar TournaVerse, aceptas estar sujeto a estos términos y condiciones de uso, todas las leyes y regulaciones aplicables, y aceptas que eres responsable del cumplimiento de las leyes locales aplicables.</p>
+      <p>Al acceder y utilizar Duels Esports, aceptas estar sujeto a estos términos y condiciones de uso, todas las leyes y regulaciones aplicables, y aceptas que eres responsable del cumplimiento de las leyes locales aplicables.</p>
     </section>
 
     <section className="space-y-2">
       <h4 className="font-semibold">2. Uso de la Plataforma</h4>
-      <p>TournaVerse es una plataforma para la organización y gestión de torneos de videojuegos. Te comprometes a:</p>
+      <p>Duels Esports es una plataforma para la organización y gestión de torneos de videojuegos. Te comprometes a:</p>
       <ul className="list-disc list-inside space-y-1 ml-2">
         <li>Proporcionar información veraz y actualizada</li>
         <li>Mantener la seguridad de tu cuenta y contraseña</li>
@@ -154,12 +154,12 @@ const TermsContent = () => (
 
     <section className="space-y-2">
       <h4 className="font-semibold">5. Propiedad Intelectual</h4>
-      <p>Todo el contenido de TournaVerse, incluyendo pero no limitado a texto, gráficos, logotipos, iconos y software, es propiedad de TournaVerse o sus licenciantes y está protegido por las leyes de propiedad intelectual.</p>
+      <p>Todo el contenido de Duels Esports, incluyendo pero no limitado a texto, gráficos, logotipos, iconos y software, es propiedad de Duels Esports o sus licenciantes y está protegido por las leyes de propiedad intelectual.</p>
     </section>
 
     <section className="space-y-2">
       <h4 className="font-semibold">6. Limitación de Responsabilidad</h4>
-      <p>TournaVerse no será responsable de ningún daño directo, indirecto, incidental, especial o consecuente que resulte del uso o la imposibilidad de usar la plataforma.</p>
+      <p>Duels Esports no será responsable de ningún daño directo, indirecto, incidental, especial o consecuente que resulte del uso o la imposibilidad de usar la plataforma.</p>
     </section>
 
     <section className="space-y-2">
@@ -174,7 +174,7 @@ const TermsContent = () => (
 
     <section className="space-y-2">
       <h4 className="font-semibold">9. Menores de Edad y COPPA</h4>
-      <p>TournaVerse cumple con la Ley de Protección de la Privacidad Infantil en Línea (COPPA). Para usuarios menores de 13 años:</p>
+      <p>Duels Esports cumple con la Ley de Protección de la Privacidad Infantil en Línea (COPPA). Para usuarios menores de 13 años:</p>
       <ul className="list-disc list-inside space-y-1 ml-2">
         <li>Se requiere consentimiento verificable del padre/madre/tutor legal antes de recopilar datos personales</li>
         <li>Se recopilan únicamente los datos necesarios para la participación en torneos</li>
@@ -211,7 +211,7 @@ const PrivacyContent = () => (
     
     <section className="space-y-2">
       <h4 className="font-semibold">1. Identidad y Domicilio del Responsable</h4>
-      <p>TournaVerse es responsable del tratamiento de tus datos personales. Puedes contactarnos a través de la plataforma para cualquier asunto relacionado con la protección de tus datos personales.</p>
+      <p>Duels Esports es responsable del tratamiento de tus datos personales. Puedes contactarnos a través de la plataforma para cualquier asunto relacionado con la protección de tus datos personales.</p>
     </section>
 
     <section className="space-y-2">
@@ -288,7 +288,7 @@ const PrivacyContent = () => (
 
     <section className="space-y-2">
       <h4 className="font-semibold">10. Protección de Datos de Menores (COPPA)</h4>
-      <p>TournaVerse cumple con la Ley de Protección de la Privacidad Infantil en Línea (COPPA) y la LFPDPPP de México en materia de menores:</p>
+      <p>Duels Esports cumple con la Ley de Protección de la Privacidad Infantil en Línea (COPPA) y la LFPDPPP de México en materia de menores:</p>
       <ul className="list-disc list-inside space-y-1 ml-2">
         <li>No recopilamos datos personales de menores de 13 años sin el consentimiento verificable de su padre, madre o tutor legal</li>
         <li>El consentimiento parental incluye la autorización explícita para compartir datos del menor con organizadores de torneos y patrocinadores de eventos</li>
@@ -680,7 +680,7 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
         <CardHeader>
           <CardTitle className="text-2xl">Crear una cuenta</CardTitle>
           <CardDescription>
-            Completa tus datos para unirte a TournaVerse
+            Completa tus datos para unirte a Duels Esports
           </CardDescription>
         </CardHeader>
         <CardContent>

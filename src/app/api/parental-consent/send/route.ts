@@ -80,12 +80,12 @@ export async function POST(request: NextRequest) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consentimiento Parental - TournaVerse</title>
+  <title>Consentimiento Parental - Duels Esports</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
   <div style="background-color: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
     <div style="text-align: center; margin-bottom: 24px;">
-      <h1 style="color: #6366f1; margin: 0;">🎮 TournaVerse</h1>
+      <h1 style="color: #6366f1; margin: 0;">🎮 Duels Esports</h1>
       <p style="color: #666; font-size: 14px;">Plataforma de Torneos de Videojuegos</p>
     </div>
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     
     <p>Estimado/a <strong>${parentFullName}</strong>,</p>
     
-    <p>El menor <strong>${childName}</strong> (${childEmail}) ha solicitado crear una cuenta en TournaVerse, 
+    <p>El menor <strong>${childName}</strong> (${childEmail}) ha solicitado crear una cuenta en Duels Esports, 
     una plataforma para la organización y participación en torneos de videojuegos.</p>
 
     <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
     
     <p style="font-size: 12px; color: #9ca3af; text-align: center;">
-      TournaVerse - Plataforma de Torneos de Videojuegos<br/>
+      Duels Esports - Plataforma de Torneos de Videojuegos<br/>
       Este correo fue enviado porque el menor indicó su dirección como padre/madre/tutor al registrarse.<br/>
       Si tiene preguntas, puede contactarnos respondiendo a este correo.
     </p>
@@ -160,11 +160,11 @@ export async function POST(request: NextRequest) {
 </html>
     `.trim();
 
-    const emailSubject = `Consentimiento Parental Requerido - Cuenta de ${childName} en TournaVerse`;
+    const emailSubject = `Consentimiento Parental Requerido - Cuenta de ${childName} en Duels Esports`;
 
     // Send email directly via Resend API
     const resendApiKey = process.env.RESEND_API_KEY;
-    const resendFrom = process.env.RESEND_FROM || 'TournaVerse <onboarding@resend.dev>';
+    const resendFrom = process.env.RESEND_FROM || 'Duels Esports <onboarding@resend.dev>';
 
     let emailSent = false;
 

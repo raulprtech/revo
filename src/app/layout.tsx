@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "TournaVerse",
+  title: "Duels Esports",
   description: "Crea, gestiona y compite en torneos de cualquier juego o deporte.",
 };
 

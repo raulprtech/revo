@@ -1,4 +1,4 @@
-# **App Name**: TournaVerse
+# **App Name**: Duels Esports
 
 ## Core Features:
 

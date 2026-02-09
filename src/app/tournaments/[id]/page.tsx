@@ -6,9 +6,9 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2, Radio, Eye } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2, Radio, Eye, DollarSign, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Bracket, { generateRounds, type Round } from "@/components/tournaments/bracket";
+import Bracket, { generateRounds, type Round, type CosmeticsMap } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
 import ParticipantManager from "@/components/tournaments/participant-manager";
 import { InvitationManager } from "@/components/tournaments/invitation-manager";
@@ -63,6 +63,8 @@ export default function TournamentPage() {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [isParticipant, setIsParticipant] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
+  const [cosmeticsMap, setCosmeticsMap] = useState<CosmeticsMap>({});
+  const [legacyCheckoutLoading, setLegacyCheckoutLoading] = useState(false);
 
   // Sync fetched tournament to local state
   useEffect(() => {
@@ -104,6 +106,21 @@ export default function TournamentPage() {
       setRounds(newRounds);
       // Persist bracket data to DB for spectator mode
       db.saveBracketData(id, { seededPlayers, rounds: newRounds });
+
+      // Fetch cosmetics for all participants with emails
+      const emails = seededPlayers
+        .map((p: { email?: string }) => p.email)
+        .filter(Boolean) as string[];
+      if (emails.length > 0) {
+        fetch('/api/coins/cosmetics-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emails }),
+        })
+          .then(res => res.json())
+          .then(data => setCosmeticsMap(data || {}))
+          .catch(() => {});
+      }
     } else {
       setRounds([]);
     }
@@ -273,7 +290,7 @@ export default function TournamentPage() {
   const handleShare = async () => {
     const shareData = {
       title: tournament?.name,
-      text: `Únete a mi torneo "${tournament?.name}" en TournaVerse!`,
+      text: `Únete a mi torneo "${tournament?.name}" en Duels Esports!`,
       url: window.location.href,
     };
 
@@ -663,6 +680,11 @@ export default function TournamentPage() {
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">{tournament.name}</h1>
           <div className="flex items-center gap-2 mt-2">
             <Badge className="text-sm" variant={tournament.status === 'En curso' ? 'default' : 'secondary'}>{tournament.status}</Badge>
+            {tournament.is_legacy_pro && (
+              <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/50">
+                🏛️ Legacy Plus
+              </Badge>
+            )}
             {linkedEvent && (
               <Badge variant="outline" className="bg-accent/20 text-accent-foreground border-accent">
                 <Calendar className="h-3 w-3 mr-1" />
@@ -813,8 +835,109 @@ export default function TournamentPage() {
                     </div>
                 )}
               </div>
+              {tournament.entry_fee && tournament.entry_fee > 0 && (
+                <div className="flex items-center space-x-3">
+                  <DollarSign className="h-8 w-8 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Cuota de inscripción</p>
+                    <p className="text-lg text-foreground">
+                      {tournament.entry_fee_currency === 'MXN' ? '$' : '$'}{tournament.entry_fee} {tournament.entry_fee_currency || 'USD'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy Pro Purchase (visible to owner only, if not already purchased) */}
+              {isOwner && !tournament.is_legacy_pro && (
+                <div className="col-span-full pt-4 border-t border-border">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                    <div className="flex items-center gap-3">
+                      <Landmark className="h-8 w-8 text-amber-500" />
+                      <div>
+                        <p className="font-semibold">Pago por Evento – Legacy Plus</p>
+                        <p className="text-sm text-muted-foreground">
+                          $299 MXN único · Funciones Plus permanentes · Datos preservados para siempre
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={legacyCheckoutLoading}
+                      onClick={async () => {
+                        setLegacyCheckoutLoading(true);
+                        try {
+                          const res = await fetch('/api/stripe/event-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              tournamentId: tournament.id,
+                              tournamentName: tournament.name,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.url) window.location.href = data.url;
+                          else toast({ title: 'Error', description: data.error || 'No se pudo crear la sesión de pago', variant: 'destructive' });
+                        } catch {
+                          toast({ title: 'Error', description: 'Error al procesar el pago', variant: 'destructive' });
+                        } finally {
+                          setLegacyCheckoutLoading(false);
+                        }
+                      }}
+                    >
+                      {legacyCheckoutLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Landmark className="mr-2 h-4 w-4" />
+                      )}
+                      Comprar Legacy Plus
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {tournament.is_legacy_pro && (
+                <div className="col-span-full pt-4 border-t border-border">
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                    <Landmark className="h-6 w-6 text-amber-500" />
+                    <div>
+                      <p className="font-semibold text-amber-500">🏛️ Torneo Legacy Plus</p>
+                      <p className="text-sm text-muted-foreground">
+                        Datos preservados permanentemente. Brackets, estadísticas y récords accesibles para siempre.
+                        {tournament.status === 'Finalizado' && ' Este torneo no puede reiniciarse.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="pt-6 border-t">
-                  {canJoin && <Button size="lg" onClick={handleJoinTournament}>Unirse al Torneo</Button>}
+                  {canJoin && tournament.entry_fee && tournament.entry_fee > 0 ? (
+                    <Button size="lg" onClick={async () => {
+                      try {
+                        const res = await fetch('/api/stripe/entry-fee', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            tournamentId: tournament.id,
+                            participantEmail: user?.email,
+                            amount: tournament.entry_fee,
+                            currency: tournament.entry_fee_currency || 'usd',
+                            tournamentName: tournament.name,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.url) window.location.href = data.url;
+                        else toast({ title: 'Error', description: data.error || 'No se pudo crear la sesión de pago', variant: 'destructive' });
+                      } catch {
+                        toast({ title: 'Error', description: 'Error al procesar el pago', variant: 'destructive' });
+                      }
+                    }}>
+                      <DollarSign className="mr-2 h-5 w-5" />
+                      Pagar e inscribirse ({tournament.entry_fee_currency === 'MXN' ? '$' : '$'}{tournament.entry_fee} {tournament.entry_fee_currency || 'USD'})
+                    </Button>
+                  ) : canJoin ? (
+                    <Button size="lg" onClick={handleJoinTournament}>Unirse al Torneo</Button>
+                  ) : null}
                   {isParticipant && <Button size="lg" variant="secondary" disabled><CheckCircle2 className="mr-2 h-5 w-5"/> Ya estás inscrito</Button>}
               </div>
             </CardContent>
@@ -839,6 +962,11 @@ export default function TournamentPage() {
             rounds={rounds} 
             onScoreReported={handleScoreReported}
             onStationAssigned={handleStationAssigned}
+            brandingColors={tournament.bracket_primary_color ? {
+              primary: tournament.bracket_primary_color,
+              secondary: tournament.bracket_secondary_color,
+            } : undefined}
+            cosmeticsMap={cosmeticsMap}
           />
         </TabsContent>
         <TabsContent value="standings" className="mt-6">

@@ -22,7 +22,7 @@ test.describe('Navigation', () => {
 
   test('clicking logo returns to home', async ({ page }) => {
     await page.goto('/tournaments');
-    await page.locator('header').getByText('TournaVerse').click();
+    await page.locator('header').getByText('Duels Esports').click();
     await expect(page).toHaveURL('/');
   });
 

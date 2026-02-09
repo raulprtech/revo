@@ -47,7 +47,7 @@ function AuthCallbackContent() {
           
           toast({
             title: "¡Cuenta verificada!",
-            description: "Tu cuenta ha sido activada. Bienvenido a TournaVerse.",
+            description: "Tu cuenta ha sido activada. Bienvenido a Duels Esports.",
           });
           
           // Redirigir al perfil después de 2 segundos

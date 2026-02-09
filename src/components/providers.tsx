@@ -2,6 +2,8 @@
 
 import { ReactNode } from "react";
 import { AuthProvider } from "@/lib/supabase/auth-context";
+import { SubscriptionProvider } from "@/lib/subscription";
+import { CoinsProvider } from "@/hooks/use-coins";
 import { SWRConfig } from "swr";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -20,7 +22,11 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <CoinsProvider>{children}</CoinsProvider>
+        </SubscriptionProvider>
+      </AuthProvider>
     </SWRConfig>
   );
 }

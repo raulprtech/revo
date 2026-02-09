@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,19 +21,24 @@ import {
   Video,
   Twitter,
   Instagram,
-  Youtube
+  Youtube,
+  Zap
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { EditProfileForm } from "@/components/profile/edit-profile-form";
 import { CompetitiveProfile } from "@/components/profile/competitive-profile";
 import { MatchHistory, type TournamentHistoryEntry } from "@/components/profile/match-history";
+import { AchievementsManager } from "@/components/profile/achievements-manager";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { useSubscription } from "@/lib/subscription";
 import { useUserTournaments } from "@/hooks/use-tournaments";
 import { db, type Tournament, type Participant, type AwardedBadge } from "@/lib/database";
 import useSWR from "swr";
 import { getDefaultTournamentImage } from "@/lib/utils";
+import { coinsService } from "@/lib/coins";
+import type { CosmeticItem } from "@/types/coins";
 
 interface ParticipatingTournament extends Tournament {
     participantStatus: ParticipantStatus;
@@ -100,8 +105,25 @@ const TournamentListItem = ({ tournament, isParticipating = false, participantSt
 
 export default function ProfilePage() {
     const { user, loading: authLoading, refreshUser } = useAuth();
+    const { isPro } = useSubscription();
     const { ownedTournaments, participatingTournaments: participatingIds, isLoading: tournamentsLoading } = useUserTournaments();
     const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [equippedBadge, setEquippedBadge] = useState<AwardedBadge | null>(null);
+    const [equippedCosmetics, setEquippedCosmetics] = useState<Record<string, CosmeticItem | null>>({});
+
+    const refreshEquipped = async () => {
+        if (!user?.email) return;
+        const badge = await db.getEquippedBadge(user.email);
+        setEquippedBadge(badge);
+    };
+
+    useEffect(() => {
+        refreshEquipped();
+        // Fetch equipped cosmetics
+        if (user?.email) {
+            coinsService.getEquippedCosmetics(user.email).then(setEquippedCosmetics);
+        }
+    }, [user]);
 
     // Fetch user's earned badges
     const { data: userBadges = [] } = useSWR<AwardedBadge[]>(
@@ -298,27 +320,118 @@ export default function ProfilePage() {
             )}
 
             {/* Profile Header Card */}
-            <Card className="mb-8">
-                <CardContent className="p-6">
+            <Card className="mb-8 overflow-hidden">
+                {/* Profile Banner */}
+                {equippedCosmetics.profile_banner && (() => {
+                    const bannerMeta = equippedCosmetics.profile_banner!.metadata || {};
+                    const gradient = (bannerMeta.gradient as string[]) || ['#6366f1', '#8b5cf6'];
+                    const pattern = bannerMeta.pattern;
+                    const isAnimated = bannerMeta.animated;
+                    return (
+                        <div
+                            className="h-24 md:h-32 relative"
+                            style={{ background: `linear-gradient(135deg, ${gradient.join(', ')})` }}
+                        >
+                            {pattern === 'stars' && (
+                                <div className="absolute inset-0 opacity-50">
+                                    {[...Array(20)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className={`absolute w-1 h-1 bg-white rounded-full ${isAnimated ? 'animate-pulse' : ''}`}
+                                            style={{
+                                                left: `${(i * 17 + 5) % 100}%`,
+                                                top: `${(i * 23 + 10) % 100}%`,
+                                                animationDelay: `${(i * 0.3) % 2}s`,
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+                <CardContent className={`p-6 ${equippedCosmetics.profile_banner ? '-mt-14' : ''}`}>
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                        {/* Avatar */}
-                        <Avatar className="h-28 w-28 ring-4 ring-primary/10">
-                            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || ''} />
-                            <AvatarFallback className="text-3xl">{getInitials(user.displayName)}</AvatarFallback>
-                        </Avatar>
+                        {/* Avatar with optional frame */}
+                        {(() => {
+                            const frameMeta = equippedCosmetics.bracket_frame?.metadata;
+                            const avatarMeta = equippedCosmetics.avatar_collection?.metadata;
+                            const dicebearStyle = avatarMeta?.dicebear_style;
+                            // Use first seed from collection, or user's name as seed
+                            const avatarSeed = avatarMeta?.seeds?.[0] || user.displayName || 'user';
+                            const avatarSrc = dicebearStyle
+                                ? `https://api.dicebear.com/9.x/${dicebearStyle}/svg?seed=${encodeURIComponent(avatarSeed)}`
+                                : user.photoURL || undefined;
+
+                            const frameStyle: React.CSSProperties = frameMeta
+                                ? frameMeta.gradient
+                                    ? {
+                                        border: '4px solid transparent',
+                                        backgroundImage: `linear-gradient(var(--card), var(--card)), linear-gradient(135deg, ${(frameMeta.gradient as string[]).join(', ')})`,
+                                        backgroundOrigin: 'border-box',
+                                        backgroundClip: 'padding-box, border-box',
+                                        ...(frameMeta.glow ? { boxShadow: `0 0 16px ${frameMeta.glow_color || '#FFD700'}40` } : {}),
+                                    }
+                                    : {
+                                        border: `4px solid ${frameMeta.border_color || '#FFD700'}`,
+                                        ...(frameMeta.glow ? { boxShadow: `0 0 16px ${frameMeta.glow_color || frameMeta.border_color || '#FFD700'}40` } : {}),
+                                    }
+                                : {};
+
+                            return (
+                                <Avatar
+                                    className={`h-28 w-28 ${!frameMeta ? 'ring-4 ring-primary/10' : ''} ${frameMeta?.border_style === 'animated' ? 'animate-pulse' : ''}`}
+                                    style={frameStyle}
+                                >
+                                    <AvatarImage src={avatarSrc} alt={user.displayName || ''} />
+                                    <AvatarFallback className="text-3xl">{getInitials(user.displayName)}</AvatarFallback>
+                                </Avatar>
+                            );
+                        })()}
 
                         {/* Main Info */}
                         <div className="flex-grow space-y-2">
                             <div className="flex flex-col md:flex-row md:items-center gap-2">
-                                <h1 className="text-3xl font-bold font-headline">
-                                    {user.nickname || user.displayName}
-                                </h1>
+                                {(() => {
+                                    const nickMeta = equippedCosmetics.nickname_color?.metadata;
+                                    const nickStyle: React.CSSProperties = nickMeta
+                                        ? nickMeta.gradient
+                                            ? {
+                                                backgroundImage: `linear-gradient(90deg, ${(nickMeta.colors as string[] || ['#FFD700']).join(', ')})`,
+                                                WebkitBackgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent',
+                                                backgroundClip: 'text',
+                                            }
+                                            : { color: nickMeta.color || '#FFD700' }
+                                        : {};
+                                    return (
+                                        <h1
+                                            className={`text-3xl font-bold font-headline ${nickMeta?.animated ? 'animate-pulse' : ''}`}
+                                            style={nickStyle}
+                                        >
+                                            {user.nickname || user.displayName}
+                                        </h1>
+                                    );
+                                })()}
+                                {isPro && (
+                                    <Badge className="bg-primary text-primary-foreground text-xs">
+                                        <Zap className="h-3 w-3 mr-1" /> PLUS
+                                    </Badge>
+                                )}
                                 {user.nickname && (
                                     <span className="text-muted-foreground text-sm">
                                         ({user.firstName} {user.lastName})
                                     </span>
                                 )}
                             </div>
+
+                            {equippedBadge && (
+                                <div className="mt-1">
+                                    <span className="font-bold text-sm inline-flex items-center gap-1">
+                                        {equippedBadge.badge.icon} {equippedBadge.badge.name}
+                                    </span>
+                                </div>
+                            )}
                             
                             <p className="text-muted-foreground">{user.email}</p>
 
@@ -470,65 +583,21 @@ export default function ProfilePage() {
                 </CardContent>
             </Card>
 
-            {/* User Badges Section */}
-            {userBadges.length > 0 && (
-                <Card className="mb-8">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <span className="text-xl">🏆</span>
-                            Mis Logros
-                        </CardTitle>
-                        <CardDescription>
-                            Badges obtenidos en torneos y eventos
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {userBadges.map((awardedBadge) => (
-                                <div
-                                    key={awardedBadge.id}
-                                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                                >
-                                    {awardedBadge.badge.image ? (
-                                        <img
-                                            src={awardedBadge.badge.image}
-                                            alt={awardedBadge.badge.name}
-                                            className="h-12 w-12 rounded-full object-cover ring-2 ring-background shadow-lg"
-                                        />
-                                    ) : (
-                                        <div
-                                            className="h-12 w-12 rounded-full flex items-center justify-center text-2xl ring-2 ring-background shadow-lg"
-                                            style={{
-                                                backgroundColor: awardedBadge.badge.color,
-                                                boxShadow: `0 4px 14px ${awardedBadge.badge.color}40`,
-                                            }}
-                                        >
-                                            {awardedBadge.badge.icon}
-                                        </div>
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium truncate">{awardedBadge.badge.name}</p>
-                                        <p className="text-sm text-muted-foreground truncate">
-                                            {awardedBadge.tournament_name || awardedBadge.event_name}
-                                        </p>
-                                        {awardedBadge.game && (
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                <Gamepad2 className="h-3 w-3" />
-                                                {awardedBadge.game}
-                                            </p>
-                                        )}
-                                    </div>
-                                    {awardedBadge.position && (
-                                        <Badge variant="outline" className="shrink-0">
-                                            #{awardedBadge.position}
-                                        </Badge>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+            {/* Logros y Colección */}
+            <Card className="mb-8">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <span className="text-xl">🏆</span>
+                        Logros y Colección
+                    </CardTitle>
+                    <CardDescription>
+                        Tus medallas, logros y premios. Equipa cualquiera para mostrarlo en tu perfil.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <AchievementsManager onUpdate={refreshEquipped} />
+                </CardContent>
+            </Card>
 
             {/* Competitive Profile & Match History */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

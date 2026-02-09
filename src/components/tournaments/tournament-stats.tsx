@@ -21,6 +21,7 @@ import {
 import { useParticipants } from "@/hooks/use-tournaments";
 import type { Tournament } from "@/lib/database";
 import type { Round } from "./bracket";
+import { ExportButton } from "@/components/shared/export-csv";
 
 interface TournamentStatsProps {
   tournament: Tournament;
@@ -141,6 +142,15 @@ export default function TournamentStats({ tournament, rounds }: TournamentStatsP
 
   return (
     <div className="space-y-6">
+      {/* Export Actions */}
+      <div className="flex justify-end">
+        <ExportButton
+          tournamentName={tournament.name}
+          participants={participants}
+          rounds={rounds}
+        />
+      </div>
+
       {/* Main KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>

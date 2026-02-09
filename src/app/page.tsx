@@ -4,6 +4,7 @@ import { useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Gamepad2, Users, Calendar, PlayCircle } from "lucide-react";
+import { PricingPreview } from "@/components/shared/pricing-preview";
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePublicTournaments } from "@/hooks/use-tournaments";
@@ -46,7 +47,7 @@ export default function Home() {
                     GESTIÓN DE TORNEOS SIMPLIFICADA
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    Con un generador de brackets fácil de usar y funciones completas, TournaVerse es la plataforma definitiva para organizar, gestionar y participar en torneos de cualquier tamaño.
+                    Con un generador de brackets fácil de usar y funciones completas, Duels Esports es la plataforma definitiva para organizar, gestionar y participar en torneos de cualquier tamaño.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -109,7 +110,7 @@ export default function Home() {
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Torneos Destacados</h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Echa un vistazo a algunos de los emocionantes torneos que están sucediendo ahora mismo en TournaVerse.
+                  Echa un vistazo a algunos de los emocionantes torneos que están sucediendo ahora mismo en Duels Esports.
                 </p>
               </div>
             </div>
@@ -246,6 +247,9 @@ export default function Home() {
             </div>
         </section>
         
+        {/* Pricing Preview */}
+        <PricingPreview />
+
         {/* Community Section */}
         <section id="community" className="w-full py-12 md:py-24 lg:py-32 bg-card">
           <div className="container mx-auto px-4 md:px-6">
@@ -338,7 +342,7 @@ export default function Home() {
         </section>
 
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t border-border">
-        <p className="text-xs text-muted-foreground">&copy; 2024 TournaVerse. Todos los derechos reservados.</p>
+        <p className="text-xs text-muted-foreground">&copy; 2024 Duels Esports. Todos los derechos reservados.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link href="#" className="text-xs hover:underline underline-offset-4">Términos de Servicio</Link>
           <Link href="#" className="text-xs hover:underline underline-offset-4">Privacidad</Link>

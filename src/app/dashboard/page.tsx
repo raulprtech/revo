@@ -9,10 +9,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Users, Search, Loader2, Plus, Trophy, CalendarDays } from "lucide-react";
+import { ChevronDown, Users, Search, Loader2, Plus, Trophy, CalendarDays, Zap, CreditCard, Coins } from "lucide-react";
 import Link from 'next/link';
 import { useState } from "react";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { useSubscription } from "@/lib/subscription";
+import { useCoins } from "@/hooks/use-coins";
 import { useUserTournaments } from "@/hooks/use-tournaments";
 import { Pagination, paginateArray } from "@/components/ui/pagination";
 
@@ -20,6 +22,8 @@ const DASHBOARD_PER_PAGE = 10;
 
 export default function DashboardPage() {
     const { user, loading: authLoading } = useAuth();
+    const { isPro, subscription } = useSubscription();
+    const { balance, dailyAvailable } = useCoins();
     const { ownedTournaments, participatingTournaments, isLoading: tournamentsLoading } = useUserTournaments();
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
@@ -122,6 +126,59 @@ export default function DashboardPage() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </header>
+
+                {/* Plan Card */}
+                <div className="mb-6 p-4 rounded-lg border border-border bg-card flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {isPro ? (
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <Zap className="h-5 w-5 text-primary" />
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-muted rounded-full">
+                        <Zap className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold">
+                        Plan {isPro ? 'Organizer Plus' : 'Community'}
+                        {isPro && subscription?.cancel_at_period_end && (
+                          <span className="ml-2 text-xs text-destructive">(se cancela pronto)</span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {isPro ? 'Acceso completo a todas las funciones' : 'Funciones básicas gratuitas'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant={isPro ? 'outline' : 'default'} size="sm" asChild>
+                    <Link href={isPro ? '/billing' : '/pricing'}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      {isPro ? 'Facturación' : 'Upgrade'}
+                    </Link>
+                  </Button>
+                </div>
+
+                {/* Duels Coins Card */}
+                <div className="mb-6 p-4 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-500/10 rounded-full">
+                      <Coins className="h-5 w-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-amber-400">{balance.toLocaleString()} Duels Coins</p>
+                      <p className="text-sm text-muted-foreground">
+                        {dailyAvailable ? '¡Coins del Día disponibles!' : 'Gana más jugando y organizando'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10" asChild>
+                    <Link href="/coins">
+                      <Coins className="mr-2 h-4 w-4" />
+                      Ver Tienda
+                    </Link>
+                  </Button>
+                </div>
 
                 <div className="flex border-b border-border mb-6 overflow-x-auto">
                     <button 
