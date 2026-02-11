@@ -19,13 +19,15 @@ DECLARE
     v_new_cash_balance DECIMAL;
 BEGIN
     -- 1. Verify Admin
-    SELECT id INTO v_admin_id FROM auth.users WHERE email = p_admin_email;
-    IF NOT EXISTS (
-        SELECT 1 FROM public.profiles 
-        WHERE email = p_admin_email AND (is_admin = true OR email = 'admin@duels.pro')
+    IF NOT (
+        p_admin_email = 'raul_vrm_2134@hotmail.com' OR 
+        p_admin_email = 'admin@duels.pro' OR
+        (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
     ) THEN
         RETURN jsonb_build_object('success', false, 'error', 'No tienes permisos de administrador');
     END IF;
+
+    SELECT id INTO v_admin_id FROM auth.users WHERE email = p_admin_email;
 
     -- 2. Get Target Wallet
     SELECT id INTO v_wallet_id FROM public.coin_wallets WHERE user_email = p_target_email;
