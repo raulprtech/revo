@@ -32,11 +32,13 @@ import {
     Download,
     DownloadCloud,
     BrainCircuit,
-    BarChart as BarChartIcon
+    BarChart as BarChartIcon,
+    ShoppingBag
 } from "lucide-react";
 import AILabPage from "./ai-lab/page";
 import PlatformIntelligence from "./intelligence/page";
 import RetentionEngine from "./retention/page";
+import CosmeticsManager from "./cosmetics/page";
 import { 
     LineChart, 
     Line, 
@@ -503,6 +505,9 @@ export default function MissionControl() {
                     </TabsTrigger>
                     <TabsTrigger value="retention" className="gap-2 font-bold px-6">
                         <Users className="h-4 w-4" /> RETENTION
+                    </TabsTrigger>
+                    <TabsTrigger value="cosmetics" className="gap-2 font-bold px-6 text-emerald-400">
+                        <ShoppingBag className="h-4 w-4" /> STORE ADMIN
                     </TabsTrigger>
                 </TabsList>
 
@@ -1092,6 +1097,11 @@ export default function MissionControl() {
                 {/* --- 2.7 RETENTION ENGINE --- */}
                 <TabsContent value="retention">
                     <RetentionEngine />
+                </TabsContent>
+
+                {/* --- 2.8 STORE ADMIN --- */}
+                <TabsContent value="cosmetics">
+                    <CosmeticsManager />
                 </TabsContent>
 
                 {/* --- 4. GHOST ACCOUNTS --- */}

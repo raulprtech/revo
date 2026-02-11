@@ -273,19 +273,19 @@ export default function PlatformIntelligence() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-slate-950 border-rose-500/20">
+                <Card className="bg-slate-950 border-orange-500/20">
                     <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Platform Hype</p>
-                                <h3 className="text-2xl font-black text-white italic">{platformStats.platformHype}</h3>
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Master Burn ROI</p>
+                                <h3 className="text-2xl font-black text-white italic">{platformStats.totalBurned?.toLocaleString() || 0}</h3>
                             </div>
-                            <div className="h-10 w-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500">
-                                <Zap className="h-5 w-5" />
+                            <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+                                <RefreshCcw className="h-5 w-5" />
                             </div>
                         </div>
-                        <div className="mt-2 text-[10px] text-rose-400 font-bold uppercase">
-                            {platformStats.concurrentEvents} Concurrent Tournaments
+                        <div className="mt-2 text-[10px] text-orange-500 font-bold uppercase">
+                            Coins recovered by AI
                         </div>
                     </CardContent>
                 </Card>
@@ -298,7 +298,73 @@ export default function PlatformIntelligence() {
                         <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
                             <UsersRound className="h-4 w-4 text-indigo-400" /> Player Concurrent Traffic
                         </CardTitle>
-                        <CardDescription className="text-[10px]">Tráfico de usuarios activos en tiempo real (últimas 24h)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={heartbeatData}>
+                                    <defs>
+                                        <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                                    <XAxis 
+                                        dataKey="time" 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{fill: '#475569', fontSize: 10, fontWeight: 'bold'}}
+                                    />
+                                    <YAxis 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{fill: '#475569', fontSize: 10, fontWeight: 'bold'}}
+                                    />
+                                    <Tooltip 
+                                        contentStyle={{backgroundColor: '#020617', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '10px'}}
+                                        itemStyle={{fontWeight: 'bold'}}
+                                    />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="users" 
+                                        stroke="#6366f1" 
+                                        strokeWidth={3}
+                                        fillOpacity={1} 
+                                        fill="url(#colorUsers)" 
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Success Monitor: Prediction vs Reality */}
+                <Card className="bg-slate-950 border-white/5">
+                    <CardHeader>
+                        <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-indigo-400">
+                            <Target className="h-4 w-4" /> Success Monitor
+                        </CardTitle>
+                        <CardDescription className="text-[10px] uppercase font-bold tracking-widest">IA Prediction Accuracy</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[250px]">
+                             <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={velocityStats}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" vertical={false} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 'bold'}} />
+                                    <Tooltip 
+                                        cursor={{fill: '#ffffff05'}}
+                                        contentStyle={{backgroundColor: '#020617', border: '1px solid #1e293b', fontSize: '10px'}}
+                                    />
+                                    <Bar dataKey="conversions" name="Predicted" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <Bar dataKey="fillRate" name="Reality" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>                        <CardDescription className="text-[10px]">Tráfico de usuarios activos en tiempo real (últimas 24h)</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">

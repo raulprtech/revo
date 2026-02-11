@@ -47,6 +47,13 @@ export async function getIntelligenceMetrics(filters: any) {
         trend: 'up' // Simplified
     })).slice(0, 3);
 
+    // 5. Burn Master Performance (ROI of automated events)
+    const { data: burnPerformance } = await supabase
+        .from('burn_master_performance')
+        .select('*')
+        .order('executed_at', { ascending: false })
+        .limit(5);
+
     // If no data, return empty structures instead of mocks
     return {
         heartbeatData: heartbeat?.reverse().map(h => ({
@@ -68,8 +75,10 @@ export async function getIntelligenceMetrics(filters: any) {
         platformStats: {
             sponsorValue: (engagement?.length || 0) * 0.5, // Simple formula
             platformHype: (latestHeartbeat?.active_tournaments || 0) > 5 ? 'HIGH' : 'NORMAL',
-            concurrentEvents: latestHeartbeat?.active_tournaments || 0
-        }
+            concurrentEvents: latestHeartbeat?.active_tournaments || 0,
+            totalBurned: burnPerformance?.reduce((acc: number, curr: any) => acc + (curr.actual_burn_collected || 0), 0) || 0
+        },
+        burnPerformance: burnPerformance || []
     };
 }
 

@@ -41,7 +41,8 @@ export const defineBurnStrategy = ai.defineFlow(
       intelligence_data: z.any(),
       retention_data: z.any(),
       available_items: z.array(z.string()),
-      intensity_level: z.enum(["normal", "aggressive", "crisis"])
+      intensity_level: z.enum(["normal", "aggressive", "crisis"]),
+      historical_roi: z.any().optional()
     }),
     outputSchema: BurnActionSchema
   },
@@ -56,12 +57,16 @@ export const defineBurnStrategy = ai.defineFlow(
         - Datos de Inteligencia: ${JSON.stringify(input.intelligence_data)}
         - Riesgos de Retención: ${JSON.stringify(input.retention_data)}
         - Items Raros disponibles para premios: ${input.available_items.join(', ')}
+        
+        HISTÓRICO DE RENDIMIENTO (AUTO-CORRECCIÓN):
+        ${JSON.stringify(input.historical_roi || "No hay datos históricos aún.")}
 
         INSTRUCCIONES:
-        1. Si la intensidad es 'normal', propón un (single_tournament).
-        2. Si la intensidad es 'aggressive' o 'crisis', propón un (multi_day_event) de 3-7 días con múltiples torneos.
-        3. Analiza qué juegos tienen más "hype".
-        4. Justifica tu estrategia basándote en los datos.
+        1. Analiza el HISTÓRICO DE RENDIMIENTO. Si un juego ha demostrado tener un ROI bajo o predicciones inexactas en el pasado, ajusta tu estrategia (cambia de juego o ajusta los entry fees).
+        2. Si la intensidad es 'normal', propón un (single_tournament).
+        3. Si la intensidad es 'aggressive' o 'crisis', propón un (multi_day_event) de 3-7 días con múltiples torneos.
+        4. Prioriza los formatos que históricamente han tenido mayor quema (total_burned).
+        5. Justifica tu estrategia basándote en la combinación de datos actuales y rendimiento histórico.
 
         Devuelve un objeto JSON que siga el esquema definido por discriminador "type".
       `
@@ -78,13 +83,17 @@ export async function generateAutomatedBurnAction(intensity: "normal" | "aggress
     const { data: intelligence } = await supabase.from('platform_heartbeat').select('*').limit(5);
     const { data: profiles } = await supabase.from('player_intelligence_profiles').select('*').gt('churn_risk_score', 50);
     const { data: items } = await supabase.from('cosmetic_items').select('slug').limit(10);
+    
+    // 1b. Fetch Historical ROI for Auto-Correction
+    const { data: historicalRoi } = await supabase.from('burn_efficiency_stats').select('*');
 
     // 2. Run AI Strategy
     const strategy = await defineBurnStrategy({
         intelligence_data: intelligence,
         retention_data: profiles,
         available_items: items?.map(i => i.slug) || [],
-        intensity_level: intensity
+        intensity_level: intensity,
+        historical_roi: historicalRoi // Pass historical performance to AI
     });
 
     // 3. Log to AI Refinement Loop (ai_conversations)
