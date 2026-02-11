@@ -150,7 +150,7 @@ export type Tournament = {
   entry_fee_currency?: string;
   stripe_payment_link?: string;
   collected_fees?: number;
-  prize_pool_percentage?: number;
+  prize_pool_percentage?: { position: number; percentage: number }[];
   bracket_primary_color?: string;
   bracket_secondary_color?: string;
   sponsor_logos?: { name: string; logoUrl: string; website?: string }[];

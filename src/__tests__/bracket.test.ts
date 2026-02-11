@@ -331,4 +331,32 @@ describe('Match and Round structure', () => {
     const firstMatch = rounds[0].matches[0];
     expect(firstMatch.top.avatar).toBeNull();
   });
+
+  it('propagates player details (avatar/email) to next rounds when using BYEs', () => {
+    const players = [
+      { name: 'P1', avatar: 'avatar1', email: 'p1@test.com' },
+      { name: 'BYE', avatar: null, email: null },
+      { name: 'P2', avatar: 'avatar2', email: 'p2@test.com' },
+      { name: 'BYE', avatar: null, email: null },
+    ];
+    // 2 real players, 2 implicit BYEs if I pass 2 as count, but generateRounds takes seededPlayers length if provided.
+    // Actually, if I pass these 4, it's a 4-player bracket.
+    const rounds = generateRounds(4, players, 'single-elimination');
+    
+    // First round matches:
+    // Match 0 (id 1): P1 vs BYE -> winner P1 (auto-propagated)
+    // Match 1 (id 2): P2 vs BYE -> winner P2 (auto-propagated)
+    
+    const finalRound = rounds[1]; // Final
+    const finalMatch = finalRound.matches[0];
+    
+    // Check that P1 and P2 moved to the next round with their details
+    expect(finalMatch.top.name).toBe('P1');
+    expect(finalMatch.top.avatar).toBe('avatar1');
+    expect(finalMatch.top.email).toBe('p1@test.com');
+    
+    expect(finalMatch.bottom.name).toBe('P2');
+    expect(finalMatch.bottom.avatar).toBe('avatar2');
+    expect(finalMatch.bottom.email).toBe('p2@test.com');
+  });
 });

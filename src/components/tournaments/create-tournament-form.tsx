@@ -182,6 +182,12 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
   const [badges, setBadges] = useState<BadgeTemplate[]>((tournamentData as { badges?: BadgeTemplate[] })?.badges || []);
   const [stations, setStations] = useState<GameStation[]>([]);
   const [autoAssignStations, setAutoAssignStations] = useState(true);
+  const [entryFeeData, setEntryFeeData] = useState<{amount: number, currency: string, enabled: boolean}>({
+    amount: 100,
+    currency: 'MXN',
+    enabled: false
+  });
+  const [prizeDistributions, setPrizeDistributions] = useState<{position: number, percentage: number}[]>([]);
   const [branding, setBranding] = useState<BracketBranding>({
     primaryColor: '#e8590c',
     secondaryColor: '#1a1a2e',
@@ -395,6 +401,10 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           bracket_primary_color: branding.primaryColor !== '#e8590c' ? branding.primaryColor : undefined,
           bracket_secondary_color: branding.secondaryColor !== '#1a1a2e' ? branding.secondaryColor : undefined,
           sponsor_logos: branding.sponsorLogos.length > 0 ? branding.sponsorLogos : undefined,
+          // Financial fields
+          entry_fee: entryFeeData.enabled ? entryFeeData.amount : 0,
+          entry_fee_currency: entryFeeData.enabled ? entryFeeData.currency : 'MXN',
+          prize_pool_percentage: prizeDistributions.length > 0 ? prizeDistributions : undefined,
         };
 
         console.log('Tournament payload:', tournamentPayload);
@@ -438,6 +448,9 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           bracket_primary_color: branding.primaryColor !== '#e8590c' ? branding.primaryColor : null,
           bracket_secondary_color: branding.secondaryColor !== '#1a1a2e' ? branding.secondaryColor : null,
           sponsor_logos: branding.sponsorLogos.length > 0 ? branding.sponsorLogos : null,
+          entry_fee: entryFeeData.enabled ? entryFeeData.amount : 0,
+          entry_fee_currency: entryFeeData.enabled ? entryFeeData.currency : 'MXN',
+          prize_pool_percentage: prizeDistributions.length > 0 ? prizeDistributions : null,
         };
 
         // Only add game_mode if it has a value (column may not exist in older schemas)
@@ -818,16 +831,41 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
             )}
 
             {/* Prize Manager */}
-            <PrizeManager
-              prizes={prizes}
-              onChange={setPrizes}
-              maxParticipants={form.watch("maxParticipants")}
-            />
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="prizePool"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Resumen de Premios</FormLabel>
+                    <FormControl>
+                      <Input placeholder="ej., $10,000 MXN en total, Trofeo + Medalla, etc." {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Una descripción general de lo que ganan los participantes.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <PrizeManager
+                prizes={prizes}
+                onChange={setPrizes}
+                maxParticipants={form.watch("maxParticipants")}
+              />
+            </div>
 
             {/* Prize Pool Calculator (Pro) */}
             <PrizePoolCalculator
               maxParticipants={form.watch("maxParticipants")}
-              onPrizesGenerated={(generatedPrizes) => setPrizes(generatedPrizes)}
+              onPrizesGenerated={(generatedPrizes) => {
+                setPrizes(generatedPrizes);
+                const summary = generatedPrizes.map(p => `${p.label}: ${p.reward}`).join(', ');
+                form.setValue("prizePool", summary);
+              }}
+              onEntryFeeUpdate={setEntryFeeData}
+              onDistributionUpdate={setPrizeDistributions}
             />
 
             {/* Badge Manager */}

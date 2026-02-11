@@ -273,13 +273,20 @@ function propagateWinners(rounds: Round[]) {
                 const match = round.matches[j];
 
                 if (match.winner) {
+                    const winnerPlayer = match.top.name === match.winner ? match.top : 
+                                       (match.bottom.name === match.winner ? match.bottom : null);
+                    
+                    if (!winnerPlayer) continue;
+
                     const nextMatchIndex = Math.floor(j / 2);
                     const nextMatch = nextRound.matches[nextMatchIndex];
                     if (nextMatch) {
                         const isTopSlot = j % 2 === 0;
                         if (isTopSlot) {
                             if (nextMatch.top.name === "TBD") {
-                                nextMatch.top.name = match.winner;
+                                nextMatch.top.name = winnerPlayer.name;
+                                nextMatch.top.avatar = winnerPlayer.avatar;
+                                nextMatch.top.email = winnerPlayer.email;
                                 if (nextMatch.bottom.name === 'BYE') {
                                     nextMatch.winner = match.winner;
                                 }
@@ -287,7 +294,9 @@ function propagateWinners(rounds: Round[]) {
                             }
                         } else {
                             if (nextMatch.bottom.name === "TBD") {
-                                nextMatch.bottom.name = match.winner;
+                                nextMatch.bottom.name = winnerPlayer.name;
+                                nextMatch.bottom.avatar = winnerPlayer.avatar;
+                                nextMatch.bottom.email = winnerPlayer.email;
                                 if (nextMatch.top.name === 'BYE') {
                                     nextMatch.winner = match.winner;
                                 }

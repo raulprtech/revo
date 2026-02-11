@@ -77,34 +77,50 @@ export interface PrizePoolConfig {
   source: 'manual' | 'entry-fees';
   manualAmount: number;
   distribution: { position: string; label: string; percentage: number }[];
-  platformFeePercent: number; // % kept by platform
+  platformFeePercent: number; // % kept by platform (Hardcoded to 10% for system consistency)
 }
 
 interface PrizePoolCalculatorProps {
-  entryFee: EntryFeeConfig;
-  onEntryFeeChange: (config: EntryFeeConfig) => void;
-  prizePoolConfig: PrizePoolConfig;
-  onPrizePoolConfigChange: (config: PrizePoolConfig) => void;
-  currentParticipants: number;
   maxParticipants: number;
-  /** Emit calculated prizes for the parent form */
-  onPrizesCalculated: (prizes: Prize[]) => void;
+  onPrizesGenerated: (prizes: Prize[]) => void;
+  onDistributionUpdate?: (distribution: { position: string; percentage: number }[]) => void;
+  onEntryFeeUpdate?: (fee: { amount: number; enabled: boolean; currency: string }) => void;
 }
 
-// =============================================
-// COMPONENT
-// =============================================
-
 export function PrizePoolCalculator({
-  entryFee,
-  onEntryFeeChange,
-  prizePoolConfig,
-  onPrizePoolConfigChange,
-  currentParticipants,
   maxParticipants,
-  onPrizesCalculated,
+  onPrizesGenerated,
+  onDistributionUpdate,
+  onEntryFeeUpdate,
 }: PrizePoolCalculatorProps) {
   const { isPro } = useSubscription();
+
+  const [entryFee, setEntryFee] = useState<EntryFeeConfig>({
+    enabled: false,
+    amount: 100,
+    currency: "MXN",
+  });
+
+  const [prizePoolConfig, setPrizePoolConfig] = useState<PrizePoolConfig>({
+    source: 'entry-fees',
+    manualAmount: 0,
+    distribution: DISTRIBUTION_PRESETS[1].distribution,
+    platformFeePercent: 10,
+  });
+
+  // Proxy state updates to parent if needed
+  const updateEntryFee = (config: EntryFeeConfig) => {
+    setEntryFee(config);
+    onEntryFeeUpdate?.(config);
+  };
+
+  const updatePrizeConfig = (config: PrizePoolConfig) => {
+    setPrizePoolConfig(config);
+    onDistributionUpdate?.(config.distribution.map(d => ({ position: d.position, percentage: d.percentage })));
+  };
+
+  const currentParticipants = 0; // Assuming initial creation context
+
 
   // Calculate total pool
   const calculations = useMemo(() => {
@@ -142,11 +158,11 @@ export function PrizePoolCalculator({
       reward: `$${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       type: 'cash' as const,
     }));
-    onPrizesCalculated(prizes);
+    onPrizesGenerated(prizes);
   };
 
   const handlePreset = (preset: DistributionPreset) => {
-    onPrizePoolConfigChange({
+    updatePrizeConfig({
       ...prizePoolConfig,
       distribution: preset.distribution,
     });
@@ -186,7 +202,7 @@ export function PrizePoolCalculator({
             </Label>
             <Switch
               checked={entryFee.enabled}
-              onCheckedChange={(v) => onEntryFeeChange({ ...entryFee, enabled: v })}
+              onCheckedChange={(v) => updateEntryFee({ ...entryFee, enabled: v })}
             />
           </div>
 
@@ -201,7 +217,7 @@ export function PrizePoolCalculator({
                     min={0}
                     step={0.5}
                     value={entryFee.amount}
-                    onChange={(e) => onEntryFeeChange({ ...entryFee, amount: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => updateEntryFee({ ...entryFee, amount: parseFloat(e.target.value) || 0 })}
                     className="pl-9"
                     placeholder="10.00"
                   />
@@ -211,7 +227,7 @@ export function PrizePoolCalculator({
                 <Label className="text-sm">Moneda</Label>
                 <Select
                   value={entryFee.currency}
-                  onValueChange={(v) => onEntryFeeChange({ ...entryFee, currency: v })}
+                  onValueChange={(v) => updateEntryFee({ ...entryFee, currency: v })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -238,7 +254,7 @@ export function PrizePoolCalculator({
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => onPrizePoolConfigChange({ ...prizePoolConfig, source: 'entry-fees' })}
+              onClick={() => updatePrizeConfig({ ...prizePoolConfig, source: 'entry-fees' })}
               className={`p-4 rounded-lg border text-left transition-colors ${
                 prizePoolConfig.source === 'entry-fees'
                   ? 'border-primary bg-primary/10'
@@ -251,7 +267,7 @@ export function PrizePoolCalculator({
             </button>
             <button
               type="button"
-              onClick={() => onPrizePoolConfigChange({ ...prizePoolConfig, source: 'manual' })}
+              onClick={() => updatePrizeConfig({ ...prizePoolConfig, source: 'manual' })}
               className={`p-4 rounded-lg border text-left transition-colors ${
                 prizePoolConfig.source === 'manual'
                   ? 'border-primary bg-primary/10'
@@ -274,7 +290,7 @@ export function PrizePoolCalculator({
                   min={0}
                   value={prizePoolConfig.manualAmount}
                   onChange={(e) =>
-                    onPrizePoolConfigChange({
+                    updatePrizeConfig({
                       ...prizePoolConfig,
                       manualAmount: parseFloat(e.target.value) || 0,
                     })
@@ -287,30 +303,19 @@ export function PrizePoolCalculator({
           )}
 
           {prizePoolConfig.source === 'entry-fees' && (
-            <div className="space-y-2 pl-2">
-              <Label className="text-sm">Comisión de plataforma (%)</Label>
-              <div className="relative">
-                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="number"
-                  min={0}
-                  max={50}
-                  step={1}
-                  value={prizePoolConfig.platformFeePercent}
-                  onChange={(e) =>
-                    onPrizePoolConfigChange({
-                      ...prizePoolConfig,
-                      platformFeePercent: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="pl-9"
-                  placeholder="5"
-                />
+            <div className="space-y-4 pl-2 animate-in fade-in slide-in-from-left-2">
+              <div className="p-3 bg-muted/50 rounded-lg border border-primary/20">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-primary" />
+                    Comisión de plataforma (Duels Fee)
+                  </Label>
+                  <Badge variant="outline" className="bg-background">10% Fijo</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Esta comisión cubre el procesamiento de pagos (Stripe), impuestos y el mantenimiento de la infraestructura. El organizador recibe el 90% neto de lo recaudado.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                Porcentaje que retiene la plataforma/organizador
-              </p>
             </div>
           )}
         </div>
@@ -351,7 +356,7 @@ export function PrizePoolCalculator({
                       onChange={(e) => {
                         const updated = [...prizePoolConfig.distribution];
                         updated[idx] = { ...d, percentage: parseFloat(e.target.value) || 0 };
-                        onPrizePoolConfigChange({ ...prizePoolConfig, distribution: updated });
+                        updatePrizeConfig({ ...prizePoolConfig, distribution: updated });
                       }}
                       className="w-20 h-8"
                     />

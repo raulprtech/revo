@@ -21,3 +21,43 @@ export function getDefaultTournamentImage(gameName: string): string {
   const colorIndex = gameName.length % colors.length;
   return colors[colorIndex];
 }
+
+/**
+ * Financial calculations for tournament economy
+ */
+export const FINANCIAL_CONFIG = {
+  PLATFORM_FEE_PERCENT: 10,
+};
+
+export function calculatePlatformFee(grossAmount: number): number {
+  return Math.round((grossAmount * (FINANCIAL_CONFIG.PLATFORM_FEE_PERCENT / 100)) * 100) / 100;
+}
+
+export function calculateNetRevenue(grossAmount: number): number {
+  return grossAmount - calculatePlatformFee(grossAmount);
+}
+
+export interface PrizeDistributionRecord {
+  position: string | number;
+  percentage: number;
+  amount?: number;
+}
+
+export function calculatePrizeSplits(
+  totalNetRevenue: number, 
+  distributions: PrizeDistributionRecord[]
+): (PrizeDistributionRecord & { amount: number })[] {
+  return distributions.map(d => ({
+    ...d,
+    amount: Math.round((totalNetRevenue * (d.percentage / 100)) * 100) / 100
+  }));
+}
+
+export function formatCurrency(amount: number, currency: string = 'MXN'): string {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
