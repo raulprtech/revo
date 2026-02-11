@@ -6,6 +6,7 @@
  */
 
 import { Tournament } from './database';
+import { tournamentCaster } from '@/ai/genkit';
 
 export class DiscordBotService {
     /**
@@ -45,25 +46,52 @@ export class DiscordBotService {
 
     /**
      * Triggered when both players are READY in a match room.
-     * Logic:
-     * 1. Post an announcement in #📢-anuncios or the specific general chat.
      */
-    static async announceMatchStart(tournamentId: string, player1: string, player2: string) {
-        console.log(`[DiscordBot] Announcing match start: ${player1} vs ${player2}`);
-        // Post message to Discord
+    static async announceMatchStart(tournamentName: string, player1: string, player2: string) {
+        console.log(`[DiscordBot] Generating AI comment for match: ${player1} vs ${player2}`);
+        
+        try {
+            const aiComment = await tournamentCaster({
+                eventType: 'match_start',
+                tournamentName,
+                p1Name: player1,
+                p2Name: player2
+            });
+
+            console.log(`[DiscordBot] AI Caster: "${aiComment}"`);
+            // En producción: enviar aiComment al canal de #anuncios
+        } catch (error) {
+            console.error('Error generating AI comment:', error);
+            console.log(`[DiscordBot] Fallback: ¡Empieza la partida entre ${player1} y ${player2}!`);
+        }
     }
 
     /**
      * Triggered when a player decides to stream their match.
      * Logic:
-     * 1. Send a Rich Embed to #streams-en-vivo channel.
+     * 1. Generate AI Caster comment.
+     * 2. Send a Rich Embed to #streams-en-vivo channel.
      */
     static async announceStream(tournamentName: string, playerName: string, vsName: string, streamUrl: string) {
-        console.log(`[DiscordBot] Announcing stream in #streams-en-vivo:`);
+        console.log(`[DiscordBot] Generating AI comment for stream: ${playerName}`);
+
+        let aiComment = `¡${playerName} está transmitiendo su enfrentamiento contra ${vsName} en el torneo ${tournamentName}!`;
+        try {
+            aiComment = await tournamentCaster({
+                eventType: 'stream_start',
+                tournamentName,
+                p1Name: playerName,
+                p2Name: vsName,
+                additionalContext: `Stream link: ${streamUrl}`
+            });
+        } catch (error) {
+            console.error('Error in AI Caster for stream:', error);
+        }
+
         console.log({
             embeds: [{
                 title: "🔴 ¡PARTIDA EN VIVO!",
-                description: `**${playerName}** está transmitiendo su enfrentamiento contra **${vsName}** en el torneo **${tournamentName}**.`,
+                description: aiComment,
                 url: streamUrl,
                 color: 0xff0000,
                 fields: [
@@ -71,7 +99,7 @@ export class DiscordBotService {
                     { name: "Oponente", value: vsName, inline: true },
                     { name: "Torneo", value: tournamentName }
                 ],
-                footer: { text: "Revo Platform - Stream Integration" },
+                footer: { text: "Revo Platform - AI Caster Integration" },
                 timestamp: new Date().toISOString()
             }]
         });

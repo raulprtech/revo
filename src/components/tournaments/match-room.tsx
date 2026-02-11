@@ -44,7 +44,7 @@ export function MatchRoomComponent({ room: initialRoom, currentUserEmail, tourna
                 
                 // Update match start announcement logic if ready status changes
                 if (newRoom.p1_ready && newRoom.p2_ready && (room.p1_ready === false || room.p2_ready === false)) {
-                    DiscordBotService.announceMatchStart(tournament.id, p1.name, p2.name);
+                    DiscordBotService.announceMatchStart(tournament.name, p1.name, p2.name);
                 }
             }
         });
