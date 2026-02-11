@@ -96,7 +96,7 @@ export const tournamentCaster = ai.defineFlow(
       },
     });
 
-    return response.text();
+    return response.text;
   }
 );
 
@@ -156,7 +156,7 @@ export const tournamentBuilderFlow = ai.defineFlow(
 
     const response = await ai.generate({
       prompt,
-      model: 'googleai/gemini-1.5-flash-latest', // Usando Flash para velocidad y menor costo en chat lite
+      model: 'googleai/gemini-2.5-flash-lite', // Usando Flash para velocidad y menor costo en chat lite
       config: {
         temperature: 0.7,
       },
@@ -164,11 +164,12 @@ export const tournamentBuilderFlow = ai.defineFlow(
 
     try {
       // Intentar limpiar la respuesta si Gemini devuelve markdown
-      const text = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(text);
+      const aiText = response.text;
+      const cleanText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanText);
     } catch (e) {
       return { 
-        reply: response.text(),
+        reply: response.text,
         tournamentData: {}
       };
     }
