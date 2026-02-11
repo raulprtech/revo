@@ -79,20 +79,44 @@ export default function AILabPage() {
   };
 
   const exportForFineTuning = () => {
+    // Transformamos los datos al formato "Gemini 1.5 Tuned Model" 
+    // que requiere Google AI Studio (JSONL)
     const dataset = conversations
       .filter(c => c.is_useful === true)
-      .map(c => ({
-        messages: c.messages,
-        expected_json: c.extracted_data
-      }));
+      .map(c => {
+        // Transformar historial de [{role, content}] a [{role, parts: [{text}]}]
+        const contents = (c.messages || []).map((msg: any, idx: number, arr: any[]) => {
+          let text = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+          
+          // Si es el último mensaje del modelo y tenemos datos extraídos/corregidos, 
+          // nos aseguramos de que el dataset contenga la "Verdad Absoluta" (Ground Truth)
+          if (idx === arr.length - 1 && msg.role === 'model' && c.extracted_data) {
+             // Si el objeto extraído está vacío, mantenemos el texto original
+             if (Object.keys(c.extracted_data).length > 0) {
+                text = JSON.stringify(c.extracted_data, null, 2);
+             }
+          }
 
-    const blob = new Blob([JSON.stringify(dataset, null, 2)], { type: 'application/json' });
+          return {
+            role: msg.role === 'model' ? 'model' : 'user',
+            parts: [{ text }]
+          };
+        });
+
+        return JSON.stringify({ contents });
+      })
+      .join('\n');
+
+    const blob = new Blob([dataset], { type: 'application/x-jsonlines' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `duels-training-data-${activeTab}-${format(new Date(), 'yyyyMMdd')}.json`;
+    a.download = `gemini-1.5-tuning-${activeTab}-${format(new Date(), 'yyyyMMdd')}.jsonl`;
     a.click();
-    toast({ title: "Checkpoint", description: "Data exportada correctamente." });
+    toast({ 
+      title: "Dataset Generado", 
+      description: "Archivo .jsonl listo para Google AI Studio (Gemini 1.5 Fine-tuning)." 
+    });
   };
 
   return (

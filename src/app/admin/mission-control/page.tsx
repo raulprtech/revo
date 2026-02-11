@@ -50,6 +50,7 @@ import {
 } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
 export default function MissionControl() {
     const [activeTab, setActiveTab] = useState("god-mode");
