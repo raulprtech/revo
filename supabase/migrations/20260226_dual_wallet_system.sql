@@ -35,11 +35,12 @@ CREATE INDEX IF NOT EXISTS idx_cash_tx_created ON public.cash_transactions(creat
 -- 3. RLS for Cash Transactions
 ALTER TABLE public.cash_transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own cash transactions" ON public.cash_transactions;
 CREATE POLICY "Users can view own cash transactions" ON public.cash_transactions
     FOR SELECT USING (user_email = auth.jwt() ->> 'email');
 
 -- 4. Secure RPC for Cash-to-Coins Conversion (Option B)
--- Requirement: $1 MXN = 10 Coins + 10% Bonus
+-- Requirement: $1 MXN = 5 Coins + 10% Bonus (Aligned with 100 Coins = $20 MXN)
 CREATE OR REPLACE FUNCTION public.convert_cash_to_coins(
     p_user_email TEXT,
     p_cash_amount DECIMAL(12, 2)
@@ -52,7 +53,7 @@ DECLARE
     v_current_cash DECIMAL(12, 2);
     v_coin_amount INTEGER;
     v_bonus_multiplier DECIMAL := 1.10; -- 10% Extra
-    v_exchange_rate INTEGER := 10; -- 1 MXN = 10 Coins
+    v_exchange_rate INTEGER := 5; -- 1 MXN = 5 Coins (Base: 100 DC = $20 MXN)
     v_res_coins JSONB;
 BEGIN
     -- Get current cash

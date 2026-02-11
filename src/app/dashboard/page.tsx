@@ -2,6 +2,7 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -14,7 +15,7 @@ import {
   ArrowRightLeft, AlertCircle, Banknote
 } from "lucide-react";
 import Link from 'next/link';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useSubscription } from "@/lib/subscription";
 import { useCoins } from "@/hooks/use-coins";
@@ -30,7 +31,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 const DASHBOARD_PER_PAGE = 10;
 
@@ -586,9 +586,9 @@ export default function DashboardPage() {
                         <div className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-center">
                           <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Recibirás aproximadamente</p>
                           <p className="text-2xl font-black text-emerald-400">
-                            {(parseFloat(convertAmount) * 11).toLocaleString()} Coins
+                            {(parseFloat(convertAmount) * 5.5).toLocaleString()} Coins
                           </p>
-                          <p className="text-[10px] text-emerald-500/70 mt-1">Incluye bono de {(parseFloat(convertAmount) * 1).toLocaleString()} Coins</p>
+                          <p className="text-[10px] text-emerald-500/70 mt-1">Incluye bono de {(parseFloat(convertAmount) * 0.5).toLocaleString()} Coins (+10%)</p>
                         </div>
                       )}
                     </div>

@@ -293,6 +293,58 @@ export async function POST(request: Request) {
         break;
       }
 
+      // --- DUELS CASH PAYOUTS (Stripe Connect) ---
+      
+      case 'payout.created':
+      case 'payout.updated':
+      case 'payout.paid':
+      case 'payout.failed': {
+        const payout = event.data.object as Stripe.Payout;
+        const payoutRequestId = payout.metadata?.payout_request_id;
+        
+        if (payoutRequestId) {
+          let newStatus = 'processing';
+          if (event.type === 'payout.paid') newStatus = 'completed';
+          if (event.type === 'payout.failed') newStatus = 'failed';
+
+          // 1. Update Payout Request
+          const { data: updatedReq, error: reqError } = await supabase
+            .from('payout_requests')
+            .update({ 
+              status: newStatus,
+              updated_at: new Date().toISOString(),
+              stripe_payout_id: payout.id,
+              error_message: event.type === 'payout.failed' ? payout.failure_message : null,
+              bank_account_last4: (payout as any).destination_details?.bank_account?.last4 || null
+            })
+            .eq('id', payoutRequestId)
+            .select('user_email, amount')
+            .single();
+
+          // 2. Sync Cash Transaction status
+          if (!reqError && updatedReq) {
+            await supabase
+              .from('cash_transactions')
+              .update({ status: newStatus })
+              .eq('reference_id', payoutRequestId)
+              .eq('reference_type', 'payout_request');
+
+            // 3. Handle failure: Refund the user's cash balance
+            if (newStatus === 'failed' && updatedReq.user_email) {
+               // Re-sumar el dinero al balance (RPC payout_cash_reward se encarga de sumar)
+               await supabase.rpc('payout_cash_reward', {
+                 p_user_email: updatedReq.user_email,
+                 p_amount: updatedReq.amount,
+                 p_type: 'admin_adjustment',
+                 p_ref_id: payoutRequestId,
+                 p_description: `Reembolso por retiro fallido (Stripe ID: ${payout.id})`
+               });
+            }
+          }
+        }
+        break;
+      }
+
       default:
         // Unhandled event type — log and continue
         console.log(`Unhandled Stripe event: ${event.type}`);
