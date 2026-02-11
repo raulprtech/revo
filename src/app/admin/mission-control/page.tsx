@@ -77,6 +77,10 @@ export default function MissionControl() {
     const [currentSample, setCurrentSample] = useState<any>(null);
     const [labelInput, setLabelInput] = useState({ p1: "", p2: "" });
 
+    // --- Ghost State ---
+    const [ghosts, setGhosts] = useState<any[]>([]);
+    const [tournaments, setTournaments] = useState<any[]>([]);
+
     // --- Economics State ---
     const [econStats, setEconStats] = useState({
         minted: 1250000,
@@ -92,7 +96,27 @@ export default function MissionControl() {
         fetchDisputes();
         fetchLabelingSamples();
         fetchConfigs();
+        fetchGhosts();
+        fetchTournaments();
     }, []);
+
+    const fetchGhosts = async () => {
+        const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .like('email', '%@duels.pro')
+            .order('created_at', { ascending: false });
+        if (data) setGhosts(data);
+    };
+
+    const fetchTournaments = async () => {
+        const { data } = await supabase
+            .from('tournaments')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(10);
+        if (data) setTournaments(data);
+    };
 
     const fetchConfigs = async () => {
         const { data } = await supabase
@@ -913,6 +937,7 @@ export default function MissionControl() {
 
                                             if (error) throw error;
                                             toast({ title: "Fantasma Creado", description: `Email: ${data.email}` });
+                                            fetchGhosts();
                                         } catch (err: any) {
                                             toast({ title: "Error", description: err.message, variant: "destructive" });
                                         } finally {
@@ -952,6 +977,7 @@ export default function MissionControl() {
                                             });
                                             if (error) throw error;
                                             toast({ title: "Limpieza Completada", description: `Se eliminaron ${data.deleted_records} registros de prueba.` });
+                                            setGhosts([]);
                                         } catch (err: any) {
                                             toast({ title: "Error", description: err.message, variant: "destructive" });
                                         } finally {
@@ -965,6 +991,166 @@ export default function MissionControl() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    <Card className="border-primary/20 bg-card/50">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                                <Cpu className="h-4 w-4" /> Simulador de Comportamiento (AI Ghosts)
+                            </CardTitle>
+                            <CardDescription>Ejecuta acciones masivas para generar tráfico y data en el sistema.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="p-4 rounded-lg bg-muted/20 border border-border space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase opacity-60">Tournaments</h4>
+                                    <select id="sim_tournament" className="w-full bg-background border border-border rounded p-2 text-xs">
+                                        {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                    </select>
+                                    <Button 
+                                        size="sm" 
+                                        className="w-full text-[10px] font-bold"
+                                        onClick={async () => {
+                                            const tId = (document.getElementById('sim_tournament') as HTMLSelectElement).value;
+                                            if (!tId) return;
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                let joined = 0;
+                                                for (const g of ghosts) {
+                                                    await supabase.rpc('admin_ghost_join_tournament', {
+                                                        p_admin_email: user?.email,
+                                                        p_ghost_email: g.email,
+                                                        p_tournament_id: tId
+                                                    });
+                                                    joined++;
+                                                }
+                                                toast({ title: "Inscripción Masiva", description: `${joined} fantasmas se han unido al torneo.` });
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                    >JOIN ALL GHOSTS</Button>
+                                </div>
+
+                                <div className="p-4 rounded-lg bg-muted/20 border border-border space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase opacity-60">Store Activity</h4>
+                                    <p className="text-[9px] text-muted-foreground">Fantasmas comprarán un item aleatorio si tienen saldo.</p>
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        className="w-full text-[10px] font-bold"
+                                        onClick={async () => {
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                let bought = 0;
+                                                for (const g of ghosts) {
+                                                    const { data } = await supabase.rpc('admin_ghost_buy_item', {
+                                                        p_admin_email: user?.email,
+                                                        p_ghost_email: g.email
+                                                    });
+                                                    if (data?.success) bought++;
+                                                }
+                                                toast({ title: "Simulación de Tienda", description: `${bought} compras realizadas por fantasmas.` });
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                    >SHOPPING SPREE</Button>
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost"
+                                        className="w-full text-[9px] font-bold h-7"
+                                        onClick={async () => {
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                let equipped = 0;
+                                                for (const g of ghosts) {
+                                                    const { data } = await supabase.rpc('admin_ghost_equip_item', {
+                                                        p_admin_email: user?.email,
+                                                        p_ghost_email: g.email
+                                                    });
+                                                    if (data?.success) equipped++;
+                                                }
+                                                toast({ title: "Cosméticos Equipados", description: `${equipped} fantasmas han actualizado su equipo.` });
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                    >EQUIP NEWEST ITEM</Button>
+                                </div>
+
+                                <div className="p-4 rounded-lg bg-muted/20 border border-border space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase opacity-60">Tournament Ops</h4>
+                                    <p className="text-[9px] text-muted-foreground">Un fantasma aleatorio creará un torneo de prueba.</p>
+                                    <Button 
+                                        size="sm" 
+                                        className="w-full text-[10px] font-bold"
+                                        onClick={async () => {
+                                            if (ghosts.length === 0) return;
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                const randomGhost = ghosts[Math.floor(Math.random() * ghosts.length)];
+                                                const { data, error } = await supabase.rpc('admin_ghost_create_tournament', {
+                                                    p_admin_email: user?.email,
+                                                    p_ghost_email: randomGhost.email,
+                                                    p_name: `Ghost Cup #${Math.floor(Math.random()*1000)}`,
+                                                    p_game: "League of Legends"
+                                                });
+                                                if (error) throw error;
+                                                toast({ title: "Torneo Creado", description: `Organizado por: ${randomGhost.nickname}` });
+                                                fetchTournaments();
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                    >CREATE GHOST TOURNAMENT</Button>
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        className="w-full text-[10px] font-bold"
+                                        onClick={async () => {
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                const { data: activeMatches } = await supabase
+                                                    .from('match_rooms')
+                                                    .select('id, player_1_email, player_2_email')
+                                                    .eq('status', 'pending');
+                                                
+                                                let simulated = 0;
+                                                if (activeMatches) {
+                                                    for (const m of activeMatches) {
+                                                        const isGhost1 = m.player_1_email.endsWith('@duels.pro');
+                                                        const isGhost2 = m.player_2_email.endsWith('@duels.pro');
+                                                        
+                                                        if (isGhost1) await supabase.rpc('admin_ghost_report_score', { p_admin_email: user?.email, p_match_room_id: m.id, p_player_email: m.player_1_email, p_score: Math.floor(Math.random() * 5) });
+                                                        if (isGhost2) await supabase.rpc('admin_ghost_report_score', { p_admin_email: user?.email, p_match_room_id: m.id, p_player_email: m.player_2_email, p_score: Math.floor(Math.random() * 5) });
+                                                        simulated++;
+                                                    }
+                                                }
+                                                toast({ title: "Resultados Simulados", description: `${simulated} partidas actualizadas.` });
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                    >AUTO-REPORT SCORES</Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>
