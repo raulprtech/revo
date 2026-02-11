@@ -17,11 +17,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Zap, CreditCard, Calendar, Loader2, ExternalLink, Shield, CheckCircle2, XCircle, ArrowLeft, Receipt } from "lucide-react";
+import { Zap, CreditCard, Calendar, Loader2, ExternalLink, Shield, CheckCircle2, XCircle, ArrowLeft, Receipt, Wallet, Landmark, ArrowUpCircle, ArrowDownCircle, Info } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useSubscription } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/database";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface StripeInvoice {
   id: string;
@@ -34,6 +37,20 @@ interface StripeInvoice {
   invoice_pdf: string | null;
 }
 
+interface FiatWallet {
+  balance: number;
+  currency: string;
+}
+
+interface FiatTransaction {
+  id: string;
+  amount: number;
+  type: string;
+  description: string;
+  created_at: string;
+  status: string;
+}
+
 export default function BillingPage() {
   const { user, loading: authLoading } = useAuth();
   const { subscription, plan, isPro, isLoading: subLoading, refresh } = useSubscription();
@@ -42,24 +59,52 @@ export default function BillingPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
+  
+  // Fiat wallet state
+  const [fiatWallet, setFiatWallet] = useState<FiatWallet | null>(null);
+  const [fiatTransactions, setFiatTransactions] = useState<FiatTransaction[]>([]);
+  const [payoutAmount, setPayoutAmount] = useState<string>("");
+  const [clabe, setClabe] = useState<string>("");
+  const [walletLoading, setWalletLoading] = useState(true);
 
   const loading = authLoading || subLoading;
 
-  // Fetch invoices when user has a subscription
+  // Fetch wallet and invoices
   useEffect(() => {
-    if (!user?.email || !isPro) return;
-    setInvoicesLoading(true);
-    fetch("/api/stripe/invoices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: user.email }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.invoices) setInvoices(data.invoices);
+    if (!user?.email) return;
+    
+    const loadWalletData = async () => {
+      setWalletLoading(true);
+      try {
+        const [wallet, txs] = await Promise.all([
+          db.getFiatWallet(user.email!),
+          db.getFiatTransactions(user.email!)
+        ]);
+        setFiatWallet(wallet);
+        setFiatTransactions(txs as any[]);
+      } catch (err) {
+        console.error("Error loading wallet:", err);
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+
+    loadWalletData();
+
+    if (isPro) {
+      setInvoicesLoading(true);
+      fetch("/api/stripe/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
       })
-      .catch(() => {})
-      .finally(() => setInvoicesLoading(false));
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.invoices) setInvoices(data.invoices);
+        })
+        .catch(() => {})
+        .finally(() => setInvoicesLoading(false));
+    }
   }, [user?.email, isPro]);
 
   if (loading) {
@@ -74,6 +119,47 @@ export default function BillingPage() {
     router.push("/login");
     return null;
   }
+
+  const handlePayout = async () => {
+    const amount = parseFloat(payoutAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Error", description: "Monto inválido", variant: "destructive" });
+      return;
+    }
+    if (amount > (fiatWallet?.balance || 0)) {
+      toast({ title: "Error", description: "Saldo insuficiente", variant: "destructive" });
+      return;
+    }
+    if (clabe.length !== 18) {
+      toast({ title: "Error", description: "La CLABE debe tener 18 dígitos", variant: "destructive" });
+      return;
+    }
+
+    setActionLoading("payout");
+    try {
+      await db.requestPayout(user.email!, amount, 'bank_transfer', { clabe });
+      toast({
+        title: "Solicitud enviada",
+        description: `Tu retiro de $${amount} MXN está en proceso.`,
+      });
+      setPayoutAmount("");
+      // Refresh wallet
+      const [wallet, txs] = await Promise.all([
+        db.getFiatWallet(user.email!),
+        db.getFiatTransactions(user.email!)
+      ]);
+      setFiatWallet(wallet);
+      setFiatTransactions(txs as any[]);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo procesar el retiro",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const handleAction = async (action: "cancel" | "resume" | "portal") => {
     setActionLoading(action);
@@ -161,6 +247,106 @@ export default function BillingPage() {
             <p className="text-muted-foreground">Gestiona tu plan y método de pago</p>
           </div>
         </div>
+
+        {/* Fiat Wallet Section */}
+        <Card className="mb-6 border-primary/20 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <Wallet className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl text-primary">Billetera de Ganancias</CardTitle>
+                  <CardDescription>Retira tus ganancias de torneos y premios</CardDescription>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-primary">
+                  {(fiatWallet?.balance || 0).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                </p>
+                <p className="text-xs text-muted-foreground">Saldo disponible</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4 p-4 rounded-lg border bg-background/50">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Landmark className="h-4 w-4" /> Solicitud de Retiro
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="clabe" className="text-xs">CLABE Interbancaria (18 dígitos)</Label>
+                  <Input 
+                    id="clabe"
+                    placeholder="000000000000000000"
+                    value={clabe}
+                    onChange={(e) => setClabe(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="amount" className="text-xs">Monto a retirar ($MXN)</Label>
+                  <Input 
+                    id="amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  className="w-full" 
+                  disabled={!clabe || !payoutAmount || actionLoading === 'payout' || (fiatWallet?.balance || 0) <= 0}
+                  onClick={handlePayout}
+                >
+                  {actionLoading === 'payout' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Solicitar Retiro"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  * Las transferencias SPEI suelen procesarse en 24-48 horas hábiles.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2 px-2">
+                  <Receipt className="h-4 w-4" /> Movimientos Recientes
+                </h3>
+                <div className="max-h-48 overflow-y-auto space-y-2 px-2">
+                  {fiatTransactions.length > 0 ? (
+                    fiatTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between p-2 rounded border bg-background text-sm">
+                        <div className="flex items-center gap-2">
+                          {tx.amount > 0 ? (
+                            <ArrowUpCircle className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <ArrowDownCircle className="h-4 w-4 text-red-500" />
+                          )}
+                          <div>
+                            <p className="font-medium leading-none">{tx.description}</p>
+                            <p className="text-[10px] text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        <p className={`font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                      <p className="text-xs">No hay movimientos aún</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-400">
+              <Info className="h-4 w-4 shrink-0 mt-0.5" />
+              <p>
+                <strong>Transparencia:</strong> Duels Esports aplica una comisión única del 10% que cubre los costos de procesamiento de Stripe (~3.6% + $3) y el soporte de la plataforma. El dinero que ves aquí ya es neto y libre para retiro.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Current Plan */}
         <Card className="mb-6">

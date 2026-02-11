@@ -586,9 +586,21 @@ export default function TournamentPage() {
         const updatedTournament = { ...tournament, status: newStatus };
         setTournament(updatedTournament);
 
-        // Award badges when tournament is finalized
-        if (newStatus === 'Finalizado' && tournament.badges && tournament.badges.length > 0) {
-          await awardBadgesToParticipants();
+        // Logic when tournament is finalized
+        if (newStatus === 'Finalizado') {
+          // 1. Award badges
+          if (tournament.badges && tournament.badges.length > 0) {
+            await awardBadgesToParticipants();
+          }
+
+          // 2. Distribute funds if it was a paid tournament
+          if (tournament.entry_fee && tournament.entry_fee > 0) {
+            const standings = calculateStandings(rounds, tournament.format);
+            const { success, message } = await db.distributeTournamentFunds(tournament, standings, participants);
+            if (success) {
+              toast({ title: "Fondos procesados", description: message });
+            }
+          }
         }
     }
   }

@@ -16,7 +16,10 @@ import {
   Target,
   Zap,
   Timer,
-  AlertCircle
+  AlertCircle,
+  DollarSign,
+  Briefcase,
+  PieChart
 } from "lucide-react";
 import { useParticipants } from "@/hooks/use-tournaments";
 import type { Tournament } from "@/lib/database";
@@ -118,6 +121,14 @@ export default function TournamentStats({ tournament, rounds }: TournamentStatsP
         fillRate,
         showRate
       },
+      financial: {
+        isPaid: !!tournament.entry_fee && tournament.entry_fee > 0,
+        totalRevenue: tournament.collected_fees || 0,
+        platformFee: (tournament.collected_fees || 0) * 0.10, // 10%
+        netRevenue: (tournament.collected_fees || 0) * 0.90,  // 90%
+        prizePercentage: (tournament.prize_pool_percentage as any[])?.reduce((sum, p) => sum + Number(p.percentage), 0) || 0,
+        currency: tournament.entry_fee_currency || 'MXN',
+      },
       timing: {
         peakHours,
         peakDay: { name: dayNames[peakDay], count: dailyRegistrations[peakDay] },
@@ -150,6 +161,73 @@ export default function TournamentStats({ tournament, rounds }: TournamentStatsP
           rounds={rounds}
         />
       </div>
+
+      {/* Financial Breakdown for Paid Tournaments */}
+      {stats.financial.isPaid && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              Resumen Financiero Acumulado
+            </CardTitle>
+            <CardDescription>
+              Desglose de ingresos y comisiones aplicables
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Recaudado</p>
+                <p className="text-2xl font-bold">
+                  {stats.financial.totalRevenue.toLocaleString('es-MX', { style: 'currency', currency: stats.financial.currency })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Comisión Duels (10%)</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-2xl font-bold text-muted-foreground">
+                    - {stats.financial.platformFee.toLocaleString('es-MX', { style: 'currency', currency: stats.financial.currency })}
+                  </p>
+                  <div className="group relative">
+                    <AlertCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-popover text-popover-foreground text-xs rounded border border-border opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-lg pointer-events-none">
+                      Incluye comisiones de procesamiento de tarjetas (Stripe ~3.6% + $3) y mantenimiento de la plataforma.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Para Bolsa de Premios ({stats.financial.prizePercentage}%)</p>
+                <p className="text-2xl font-bold text-amber-500">
+                  {((stats.financial.netRevenue * stats.financial.prizePercentage) / 100).toLocaleString('es-MX', { style: 'currency', currency: stats.financial.currency })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground font-medium text-primary">Ganancia Neta Organizador</p>
+                <p className="text-2xl font-bold text-primary">
+                  {((stats.financial.netRevenue * (100 - stats.financial.prizePercentage)) / 100).toLocaleString('es-MX', { style: 'currency', currency: stats.financial.currency })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-primary/20 flex flex-col md:flex-row gap-4 items-center justify-between text-sm">
+              <div className="flex items-center gap-4 text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <PieChart className="h-4 w-4" />
+                  <span>Distribución: {100 - stats.financial.prizePercentage}% Org / {stats.financial.prizePercentage}% Premios</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Briefcase className="h-4 w-4" />
+                  <span>Referencia: {stats.totals.accepted} pagos confirmados</span>
+                </div>
+              </div>
+              <div className="text-xs italic text-muted-foreground">
+                * Los fondos se distribuirán a las billeteras Duels al finalizar el torneo.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

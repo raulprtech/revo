@@ -1292,6 +1292,129 @@ class DatabaseService {
     }
   }
 
+  /** Distribute tournament funds to organizer and winners */
+  async distributeTournamentFunds(
+    tournament: Tournament,
+    standings: { name: string; rank: number }[],
+    participants: Participant[]
+  ): Promise<{ success: boolean; message: string }> {
+    if (!tournament.id) throw new Error('Tournament ID is required');
+    
+    // 1. Get all payments
+    const { data: payments, error: paymentsError } = await this.supabase
+      .from('tournament_payments')
+      .select('net_amount')
+      .eq('tournament_id', tournament.id)
+      .eq('status', 'completed');
+
+    if (paymentsError) throw paymentsError;
+
+    const totalNetRevenue = (payments || []).reduce((sum, p) => sum + Number(p.net_amount), 0);
+    if (totalNetRevenue <= 0) return { success: true, message: 'No hay fondos para distribuir' };
+
+    // 2. Prize distribution logic
+    const prizePercentages = (tournament.prize_pool_percentage as any[]) || [];
+    const totalPrizeAllocPercent = prizePercentages.reduce((sum, p) => sum + Number(p.percentage), 0);
+    
+    const prizeFund = (totalNetRevenue * totalPrizeAllocPercent) / 100;
+    const organizerFund = totalNetRevenue - prizeFund;
+
+    // 3. Organizer Payout
+    if (organizerFund > 0) {
+      await this.supabase.rpc('process_fiat_transaction', {
+        p_user_email: tournament.owner_email,
+        p_amount: organizerFund,
+        p_type: 'tournament_earnings',
+        p_description: `Ganancias organizador: ${tournament.name}`,
+        p_reference_id: tournament.id
+      });
+    }
+
+    // 4. Winner Payouts
+    for (const config of prizePercentages) {
+      const position = config.position;
+      const amount = (totalNetRevenue * Number(config.percentage)) / 100;
+      
+      if (amount <= 0) continue;
+
+      const positionWinners = standings.filter(s => s.rank.toString() === position);
+      if (positionWinners.length > 0) {
+        const splitAmount = amount / positionWinners.length;
+        for (const wInfo of positionWinners) {
+          const participant = participants.find(p => p.name === wInfo.name);
+          if (participant) {
+            await this.supabase.rpc('process_fiat_transaction', {
+              p_user_email: participant.email,
+              p_amount: splitAmount,
+              p_type: 'prize_win',
+              p_description: `Premio ${position}°: ${tournament.name}`,
+              p_reference_id: tournament.id
+            });
+          }
+        }
+      }
+    }
+
+    return { success: true, message: 'Fondos distribuidos exitosamente' };
+  }
+
+  /** Get fiat wallet balance for a user */
+  async getFiatWallet(email: string) {
+    const { data } = await this.supabase
+      .from('fiat_wallets')
+      .select('*')
+      .eq('user_email', email)
+      .maybeSingle();
+    return data;
+  }
+
+  /** Get fiat transactions for a user */
+  async getFiatTransactions(email: string) {
+    const { data } = await this.supabase
+      .from('fiat_transactions')
+      .select('*')
+      .eq('user_email', email)
+      .order('created_at', { ascending: false });
+    return data || [];
+  }
+
+  /** Request a payout */
+  async requestPayout(email: string, amount: number, method: string, details: any) {
+    const { data, error } = await this.supabase.rpc('process_fiat_transaction', {
+      p_user_email: email,
+      p_amount: -amount, // Deduct from balance
+      p_type: 'withdrawal',
+      p_description: `Retiro solicitado (${method})`,
+      p_reference_id: 'pending_payout'
+    });
+
+    if (error || !data.success) throw new Error(data?.error || 'Saldo insuficiente');
+
+    const { data: request, error: reqError } = await this.supabase
+      .from('payout_requests')
+      .insert({
+        user_email: email,
+        amount,
+        method,
+        method_details: details,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (reqError) throw reqError;
+    return request;
+  }
+
+  async getPayoutRequests(email: string) {
+    const { data } = await this.supabase
+      .from('payout_requests')
+      .select('*')
+      .eq('user_email', email)
+      .order('created_at', { ascending: false });
+    return data || [];
+  }
+
   async removeBadge(badgeId: string): Promise<boolean> {
     const { error } = await this.supabase
       .from('user_badges')

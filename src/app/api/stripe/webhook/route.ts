@@ -84,11 +84,17 @@ export async function POST(request: Request) {
               .maybeSingle();
 
             if (!existingPayment) {
-              // Record payment
+              const platformFeePercentage = 0.10; // 10% flat platform fee (covers Stripe + maintenance)
+              const platformFee = amountTotal * platformFeePercentage;
+              const netAmount = amountTotal - platformFee;
+
+              // Record payment with fee breakdown
               await supabase.from('tournament_payments').insert({
                 tournament_id: tournamentId,
                 participant_email: participantEmail,
                 amount: amountTotal,
+                platform_fee: platformFee,
+                net_amount: netAmount,
                 currency: session.currency?.toUpperCase() || 'USD',
                 stripe_payment_intent_id: paymentIntentId,
                 status: 'completed',
