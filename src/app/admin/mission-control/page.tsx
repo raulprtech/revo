@@ -1211,7 +1211,7 @@ export default function MissionControl() {
                                                     setIsUpdating(false);
                                                 }
                                             }}
-                                        >GHOSTS -> PLUS</Button>
+                                        >GHOSTS {'->'} PLUS</Button>
                                     </div>
                                 </div>
 
