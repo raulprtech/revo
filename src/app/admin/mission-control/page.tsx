@@ -30,8 +30,12 @@ import {
     FileText,
     Camera,
     Download,
-    DownloadCloud
+    DownloadCloud,
+    BrainCircuit,
+    BarChart as BarChartIcon
 } from "lucide-react";
+import AILabPage from "./ai-lab/page";
+import PlatformIntelligence from "./intelligence/page";
 import { 
     LineChart, 
     Line, 
@@ -417,11 +421,17 @@ export default function MissionControl() {
                     <TabsTrigger value="ai-lab" className="gap-2 font-bold px-6">
                         <Microscope className="h-4 w-4" /> AI LAB
                     </TabsTrigger>
+                    <TabsTrigger value="conversations" className="gap-2 font-bold px-6">
+                        <BrainCircuit className="h-4 w-4" /> REFINEMENT LAB
+                    </TabsTrigger>
                     <TabsTrigger value="ghost-accounts" className="gap-2 font-bold px-6">
                         <Users className="h-4 w-4" /> GHOSTS
                     </TabsTrigger>
                     <TabsTrigger value="economy" className="gap-2 font-bold px-6">
                         <TrendingUp className="h-4 w-4" /> TOKENOMICS
+                    </TabsTrigger>
+                    <TabsTrigger value="intelligence" className="gap-2 font-bold px-6">
+                        <BarChartIcon className="h-4 w-4" /> INTELLIGENCE
                     </TabsTrigger>
                 </TabsList>
 
@@ -731,9 +741,9 @@ export default function MissionControl() {
                                     </DialogHeader>
                                     
                                     {currentSample && (
-                                        <div key={sample.id} className="space-y-6 pt-4">
+                                        <div key={currentSample.id} className="space-y-6 pt-4">
                                             <div className="aspect-video w-full rounded-lg border border-border/50 overflow-hidden bg-black">
-                                                <img src={sample.screenshot_url} alt="Full Match Screenshot" className="w-full h-full object-contain" />
+                                                <img src={currentSample.screenshot_url} alt="Full Match Screenshot" className="w-full h-full object-contain" />
                                             </div>
                                             
                                             <div className="grid grid-cols-2 gap-4">
@@ -967,6 +977,16 @@ export default function MissionControl() {
                             </CardContent>
                          </Card>
                     </div>
+                </TabsContent>
+
+                {/* --- 2.5 CONVERSATIONS LAB --- */}
+                <TabsContent value="conversations">
+                    <AILabPage />
+                </TabsContent>
+
+                {/* --- 2.6 INTELLIGENCE LAB --- */}
+                <TabsContent value="intelligence">
+                    <PlatformIntelligence />
                 </TabsContent>
 
                 {/* --- 4. GHOST ACCOUNTS --- */}
