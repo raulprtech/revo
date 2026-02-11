@@ -6,12 +6,35 @@
 export interface CoinWallet {
   id: string;
   user_email: string;
-  balance: number;
+  balance: number; // Duels Coins (Virtual)
+  cash_balance: number; // Duels Cash (Retirable MXN)
   lifetime_earned: number;
   lifetime_spent: number;
+  lifetime_cash_earned: number;
+  lifetime_cash_withdrawn: number;
   daily_allowance_claimed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// --- Cash Transactions ---
+export type CashTransactionType = 
+  | 'prize_payout'
+  | 'organizer_earnings'
+  | 'cash_withdrawal'
+  | 'conversion_to_coins'
+  | 'admin_adjustment';
+
+export interface CashTransaction {
+  id: string;
+  user_email: string;
+  amount: number;
+  balance_after: number;
+  type: CashTransactionType;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  description: string | null;
+  fee_amount: number;
+  created_at: string;
 }
 
 // --- Transaction types ---

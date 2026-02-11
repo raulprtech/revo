@@ -11,7 +11,8 @@ import type { CoinWallet } from "@/types/coins";
 
 interface CoinsContextType {
   wallet: CoinWallet | null;
-  balance: number;
+  balance: number; // Virtual Coins
+  cashBalance: number; // Retirable Cash (MXN)
   isLoading: boolean;
   dailyAvailable: boolean;
   refresh: () => Promise<void>;
@@ -21,6 +22,7 @@ interface CoinsContextType {
 const CoinsContext = createContext<CoinsContextType>({
   wallet: null,
   balance: 0,
+  cashBalance: 0,
   isLoading: true,
   dailyAvailable: false,
   refresh: async () => {},
@@ -174,6 +176,7 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
       value={{
         wallet,
         balance: wallet?.balance || 0,
+        cashBalance: wallet?.cash_balance || 0,
         isLoading,
         dailyAvailable,
         refresh: fetchWallet,

@@ -68,6 +68,34 @@ class CoinsService {
     return this.createWallet(email);
   }
 
+  // ─── CASH WALLET (DUELS CASH) ────────────────
+  
+  /** Convert retirable cash to virtual coins with bonus (+10%) */
+  async convertCashToCoins(email: string, amountMx: number): Promise<{ success: boolean; coinsAdded?: number; error?: string }> {
+    const { data, error } = await this.supabase.rpc('convert_cash_to_coins', {
+      p_user_email: email,
+      p_cash_amount: amountMx
+    });
+
+    if (error || !data.success) {
+      return { success: false, error: error?.message || data?.error || 'Error en la conversión' };
+    }
+
+    return { success: true, coinsAdded: data.coins_added };
+  }
+
+  /** Get cash transactions for audit */
+  async getCashHistory(email: string): Promise<CashTransaction[]> {
+    const { data, error } = await this.supabase
+      .from('cash_transactions')
+      .select('*')
+      .eq('user_email', email)
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return data;
+  }
+
   // ─── TRANSACTIONS ────────────────────────────
 
   /** Record a coin transaction and update balance securely via RPC */

@@ -23,7 +23,7 @@ const DASHBOARD_PER_PAGE = 10;
 export default function DashboardPage() {
     const { user, loading: authLoading } = useAuth();
     const { isPro, subscription } = useSubscription();
-    const { balance, dailyAvailable } = useCoins();
+    const { balance, cashBalance, dailyAvailable, refresh: refreshCoins } = useCoins();
     const { ownedTournaments, participatingTournaments, isLoading: tournamentsLoading } = useUserTournaments();
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
@@ -159,25 +159,50 @@ export default function DashboardPage() {
                   </Button>
                 </div>
 
-                {/* Duels Coins Card */}
-                <div className="mb-6 p-4 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-500/10 rounded-full">
-                      <Coins className="h-5 w-5 text-amber-400" />
+                {/* Wallet Strategy: Dual Balance Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* Duels Cash (Saldo Retirable) */}
+                  <div className="p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-500/10 rounded-full">
+                        <CreditCard className="h-5 w-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">Duels Cash (Retirable)</p>
+                        <p className="text-2xl font-bold text-emerald-400">
+                          ${cashBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-amber-400">{balance.toLocaleString()} Duels Coins</p>
-                      <p className="text-sm text-muted-foreground">
-                        {dailyAvailable ? '¡Coins del Día disponibles!' : 'Gana más jugando y organizando'}
-                      </p>
+                    <div className="flex flex-col gap-2">
+                      <Button variant="outline" size="sm" className="h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs shadow-none">
+                        Retirar
+                      </Button>
+                      <Button variant="default" size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs border-none shadow-none">
+                        Reinvertir (+10%)
+                      </Button>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10" asChild>
-                    <Link href="/coins">
-                      <Coins className="mr-2 h-4 w-4" />
-                      Ver Tienda
-                    </Link>
-                  </Button>
+
+                  {/* Duels Coins (Saldo de Uso) */}
+                  <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-500/10 rounded-full">
+                        <Coins className="h-5 w-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">Duels Coins (Favoritos)</p>
+                        <p className="text-2xl font-bold text-amber-400">
+                          {balance.toLocaleString()} 
+                        </p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 text-xs h-8 shadow-none" asChild>
+                      <Link href="/coins">
+                        Tienda
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex border-b border-border mb-6 overflow-x-auto">
