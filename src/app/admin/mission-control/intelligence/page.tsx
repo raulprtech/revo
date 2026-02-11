@@ -13,41 +13,178 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from "@/components/ui/select";
+import { 
+    Calendar as CalendarIcon, 
+    Filter,
+    Gamepad2,
+    CalendarDays,
+    UserCircle,
+    Building2,
+    Activity,
+    Trophy as TrophyIcon
+} from "lucide-react";
 
 export default function PlatformIntelligence() {
     const [heartbeatData, setHeartbeatData] = useState<any[]>([]);
     const [velocityStats, setVelocityStats] = useState<any[]>([]);
     const [gameDist, setGameDist] = useState<any[]>([]);
+    const [filters, setFilters] = useState({
+        timeRange: "7d",
+        game: "all",
+        playerType: "all",
+        organizer: "all",
+        tournament: "all"
+    });
+    const [isLoading, setIsLoading] = useState(false);
+    
     const supabase = createClient();
 
     useEffect(() => {
-        // Mocking real data structure for visualization pre-migration execution
-        const mockHeartbeat = Array.from({ length: 24 }, (_, i) => ({
-            time: `${i}:00`,
-            users: Math.floor(Math.random() * 500) + 200,
-            matches: Math.floor(Math.random() * 50) + 10,
-        }));
-        setHeartbeatData(mockHeartbeat);
+        // En una implementación real, aquí haríamos fetch filtrando por 'filters'
+        const fetchData = async () => {
+            setIsLoading(true);
+            // Simulación de carga basada en filtros
+            await new Promise(r => setTimeout(r, 600)); 
+            
+            const mockHeartbeat = Array.from({ length: 24 }, (_, i) => {
+                const global = Math.floor(Math.random() * 500) + 200;
+                const isFiltered = filters.game !== 'all' || filters.organizer !== 'all' || filters.tournament !== 'all';
+                return {
+                    time: `${i}:00`,
+                    users: global,
+                    segment: isFiltered ? Math.floor(global * (Math.random() * 0.4 + 0.1)) : null,
+                    matches: Math.floor(Math.random() * 50) + 10,
+                };
+            });
+            setHeartbeatData(mockHeartbeat);
 
-        const mockVelocity = [
-            { name: 'FIFA', fillTime: 120, conversions: 85, fillRate: 98 },
-            { name: 'KOF', fillTime: 450, conversions: 40, fillRate: 65 },
-            { name: 'Smash', fillTime: 180, conversions: 75, fillRate: 92 },
-            { name: 'M. Kart', fillTime: 300, conversions: 55, fillRate: 78 },
-        ];
-        setVelocityStats(mockVelocity);
+            const mockVelocity = [
+                { name: 'FIFA', fillTime: 120, conversions: 85, fillRate: 98 },
+                { name: 'KOF', fillTime: 450, conversions: 40, fillRate: 65 },
+                { name: 'Smash', fillTime: 180, conversions: 75, fillRate: 92 },
+                { name: 'M. Kart', fillTime: 300, conversions: 55, fillRate: 78 },
+            ];
+            setVelocityStats(mockVelocity);
 
-        const mockGames = [
-            { name: 'FIFA', value: 400, color: '#0ea5e9' },
-            { name: 'Street Fighter', value: 300, color: '#f43f5e' },
-            { name: 'KOF', value: 200, color: '#8b5cf6' },
-            { name: 'Otros', value: 100, color: '#64748b' },
-        ];
-        setGameDist(mockGames);
-    }, []);
+            const mockGames = [
+                { name: 'FIFA', value: 400, color: '#0ea5e9' },
+                { name: 'Street Fighter', value: 300, color: '#f43f5e' },
+                { name: 'KOF', value: 200, color: '#8b5cf6' },
+                { name: 'Otros', value: 100, color: '#64748b' },
+            ];
+            setGameDist(mockGames);
+            setIsLoading(false);
+        };
+
+        fetchData();
+    }, [filters]);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Filter Bar */}
+            <Card className="bg-slate-950 border-indigo-500/10 backdrop-blur-md sticky top-0 z-10">
+                <CardContent className="py-4">
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-2 text-xs font-black uppercase text-indigo-400 mr-2">
+                            <Filter className="h-4 w-4" /> FILTROS AI
+                        </div>
+                        
+                        {/* Time Range */}
+                        <div className="space-y-1">
+                            <Select value={filters.timeRange} onValueChange={(v) => setFilters({...filters, timeRange: v})}>
+                                <SelectTrigger className="w-[140px] h-8 text-[10px] font-bold bg-white/5 border-white/10 uppercase">
+                                    <CalendarDays className="h-3 w-3 mr-2 opacity-50" />
+                                    <SelectValue placeholder="Periodo" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-[10px] font-bold">
+                                    <SelectItem value="24h">Últimas 24h</SelectItem>
+                                    <SelectItem value="7d">Últimos 7 días</SelectItem>
+                                    <SelectItem value="30d">Últimos 30 días</SelectItem>
+                                    <SelectItem value="all">Todo el tiempo</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Game Filter */}
+                        <div className="space-y-1">
+                            <Select value={filters.game} onValueChange={(v) => setFilters({...filters, game: v})}>
+                                <SelectTrigger className="w-[140px] h-8 text-[10px] font-bold bg-white/5 border-white/10 uppercase">
+                                    <Gamepad2 className="h-3 w-3 mr-2 opacity-50" />
+                                    <SelectValue placeholder="Juego" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-[10px] font-bold">
+                                    <SelectItem value="all">Todos los juegos</SelectItem>
+                                    <SelectItem value="fifa">FIFA / FC 25</SelectItem>
+                                    <SelectItem value="kof">King of Fighters</SelectItem>
+                                    <SelectItem value="sf6">Street Fighter 6</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Player Type */}
+                        <div className="space-y-1">
+                            <Select value={filters.playerType} onValueChange={(v) => setFilters({...filters, playerType: v})}>
+                                <SelectTrigger className="w-[140px] h-8 text-[10px] font-bold bg-white/5 border-white/10 uppercase">
+                                    <UserCircle className="h-3 w-3 mr-2 opacity-50" />
+                                    <SelectValue placeholder="Tipo Jugador" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-[10px] font-bold">
+                                    <SelectItem value="all">Todos los perfiles</SelectItem>
+                                    <SelectItem value="plus">Sólo PLUS</SelectItem>
+                                    <SelectItem value="community">Comunidad (Free)</SelectItem>
+                                    <SelectItem value="pro">Participantes Pro</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Organizer Filter */}
+                        <div className="space-y-1">
+                            <Select value={filters.organizer} onValueChange={(v) => setFilters({...filters, organizer: v})}>
+                                <SelectTrigger className="w-[150px] h-8 text-[10px] font-bold bg-white/5 border-white/10 uppercase">
+                                    <Building2 className="h-3 w-3 mr-2 opacity-50" />
+                                    <SelectValue placeholder="Organizador" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-[10px] font-bold">
+                                    <SelectItem value="all">Todos los Orgs</SelectItem>
+                                    <SelectItem value="duels">Duels Logistics</SelectItem>
+                                    <SelectItem value="brand_a">Influencer Partners</SelectItem>
+                                    <SelectItem value="external">Externos (Comunidad)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Tournament Filter */}
+                        <div className="space-y-1">
+                            <Select value={filters.tournament} onValueChange={(v) => setFilters({...filters, tournament: v})}>
+                                <SelectTrigger className="w-[180px] h-8 text-[10px] font-bold bg-white/5 border-white/10 uppercase">
+                                    <TrophyIcon className="h-3 w-3 mr-2 opacity-50" />
+                                    <SelectValue placeholder="Torneo Específico" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-[10px] font-bold">
+                                    <SelectItem value="all">Todos los Torneos</SelectItem>
+                                    <SelectItem value="t1">Copa Duels Pro #12</SelectItem>
+                                    <SelectItem value="t2">King of Fighters Invitational</SelectItem>
+                                    <SelectItem value="t3">FIFA 25 Weekly Grind</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {isLoading && (
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-400 animate-pulse">
+                                <Activity className="h-3 w-3 animate-spin" /> PROCESANDO DATA...
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* KPI Header */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="bg-slate-950 border-indigo-500/20">
@@ -136,12 +273,19 @@ export default function PlatformIntelligence() {
                                         <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
                                         <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                                     </linearGradient>
+                                    <linearGradient id="colorSegment" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                                 <XAxis dataKey="time" stroke="#ffffff30" fontSize={10} axisLine={false} tickLine={false} />
                                 <YAxis stroke="#ffffff30" fontSize={10} axisLine={false} tickLine={false} />
                                 <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid #1e293b' }} />
-                                <Area type="monotone" dataKey="users" stroke="#6366f1" fillOpacity={1} fill="url(#colorUsers)" strokeWidth={3} />
+                                <Area type="monotone" dataKey="users" stroke="#6366f1" fillOpacity={1} fill="url(#colorUsers)" strokeWidth={3} name="Total Platform" />
+                                {heartbeatData[0]?.segment !== null && (
+                                    <Area type="monotone" dataKey="segment" stroke="#10b981" fillOpacity={1} fill="url(#colorSegment)" strokeWidth={3} name="Filtered Segment" />
+                                )}
                             </AreaChart>
                         </ResponsiveContainer>
                     </CardContent>

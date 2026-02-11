@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import AILabPage from "./ai-lab/page";
 import PlatformIntelligence from "./intelligence/page";
+import RetentionEngine from "./retention/page";
 import { 
     LineChart, 
     Line, 
@@ -432,6 +433,9 @@ export default function MissionControl() {
                     </TabsTrigger>
                     <TabsTrigger value="intelligence" className="gap-2 font-bold px-6">
                         <BarChartIcon className="h-4 w-4" /> INTELLIGENCE
+                    </TabsTrigger>
+                    <TabsTrigger value="retention" className="gap-2 font-bold px-6">
+                        <Users className="h-4 w-4" /> RETENTION
                     </TabsTrigger>
                 </TabsList>
 
@@ -987,6 +991,11 @@ export default function MissionControl() {
                 {/* --- 2.6 INTELLIGENCE LAB --- */}
                 <TabsContent value="intelligence">
                     <PlatformIntelligence />
+                </TabsContent>
+
+                {/* --- 2.7 RETENTION ENGINE --- */}
+                <TabsContent value="retention">
+                    <RetentionEngine />
                 </TabsContent>
 
                 {/* --- 4. GHOST ACCOUNTS --- */}
