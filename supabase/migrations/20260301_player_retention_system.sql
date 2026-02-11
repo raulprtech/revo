@@ -17,6 +17,12 @@ BEGIN
 END $$;
 
 -- 2. Player Intelligence Profiles
+-- Ensure profiles has is_admin column (Fixing ERROR: 42703)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
+
+-- Update known admins
+UPDATE public.profiles SET is_admin = true WHERE email IN ('raul_vrm_2134@hotmail.com', 'admin@duels.pro');
+
 CREATE TABLE IF NOT EXISTS public.player_intelligence_profiles (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     persona_type public.player_persona_type DEFAULT 'NEWBIE',
@@ -51,25 +57,28 @@ DECLARE
     v_last_login TIMESTAMPTZ;
     v_freq_30d INTEGER;
     v_total_spend_coins INTEGER;
+    v_user_email TEXT;
     v_result JSONB;
 BEGIN
+    -- Get user email first
+    SELECT email INTO v_user_email FROM auth.users WHERE id = p_user_id;
+
     -- Recency
     SELECT last_sign_in_at INTO v_last_login FROM auth.users WHERE id = p_user_id;
     
     -- Frequency (last 30 days matches)
     SELECT COUNT(*) INTO v_freq_30d FROM public.match_rooms 
-    WHERE (player_1_email = (SELECT email FROM auth.users WHERE id = p_user_id) 
-       OR player_2_email = (SELECT email FROM auth.users WHERE id = p_user_id))
+    WHERE (player_1_email = v_user_email OR player_2_email = v_user_email)
     AND created_at > NOW() - INTERVAL '30 days';
 
     -- Monetary (Coins spent)
-    -- Assuming a coins_transactions table exists from previous phases
-    SELECT COALESCE(SUM(amount), 0) INTO v_total_spend_coins 
+    -- Summing absolute value of negative transactions
+    SELECT COALESCE(ABS(SUM(amount)), 0) INTO v_total_spend_coins 
     FROM public.coin_transactions 
-    WHERE user_id = p_user_id AND type = 'burn';
+    WHERE user_email = v_user_email AND amount < 0;
 
     v_result := jsonb_build_object(
-        'days_since_last_login', EXTRACT(DAY FROM (NOW() - v_last_login)),
+        'days_since_last_login', COALESCE(EXTRACT(DAY FROM (NOW() - v_last_login)), 99),
         'matches_30d', v_freq_30d,
         'coins_spent_total', v_total_spend_coins
     );
