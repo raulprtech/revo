@@ -9,6 +9,7 @@ const PROTECTED_ROUTES = [
   '/coins',
   '/tournaments/create',
   '/events/create',
+  '/admin',
 ]
 
 // Routes that minors without verified parental consent can access
@@ -93,6 +94,24 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
+  }
+
+  // Admin access control
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('redirectTo', request.nextUrl.pathname)
+      return NextResponse.redirect(url)
+    }
+
+    // Role-based check (assuming custom claim or metadata)
+    const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'admin@duels.pro' // Fallback for dev
+    if (!isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
