@@ -30,18 +30,42 @@ import {
     Activity,
     Trophy as TrophyIcon
 } from "lucide-react";
-import { getIntelligenceMetrics } from "./actions";
+import { getIntelligenceMetrics, triggerBurnMaster } from "./actions";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PlatformIntelligence() {
     const [heartbeatData, setHeartbeatData] = useState<any[]>([]);
     const [velocityStats, setVelocityStats] = useState<any[]>([]);
     const [gameDist, setGameDist] = useState<any[]>([]);
     const [sponsorEngagement, setSponsorEngagement] = useState<any[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const { toast } = useToast();
     const [platformStats, setPlatformStats] = useState<any>({
         sponsorValue: 0,
         platformHype: "LOADING",
         concurrentEvents: 0
     });
+
+    const handleInvokeBurnMaster = async (intensity: "normal" | "aggressive" | "crisis" = "normal") => {
+        setIsGenerating(true);
+        try {
+            const res = await triggerBurnMaster(intensity);
+            if (res.success) {
+                const name = res.strategy.type === "single_tournament" 
+                    ? res.strategy.tournament_config.name 
+                    : res.strategy.event_name;
+
+                toast({ 
+                    title: intensity === "normal" ? "Torneo Smart Activo" : "¡Campaña Masiva Iniciada!", 
+                    description: `IA generó: ${name}. Motivo: ${res.strategy.reasoning.substring(0, 100)}...`
+                });
+            }
+        } catch (err) {
+            toast({ title: "Error", description: "No se pudo invocar el Burn Master.", variant: "destructive" });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
     const [filters, setFilters] = useState({
         timeRange: "7d",
         game: "all",
@@ -161,10 +185,36 @@ export default function PlatformIntelligence() {
                             </Select>
                         </div>
 
-                        {isLoading && (
+                        {isLoading ? (
                             <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-400 animate-pulse">
                                 <Activity className="h-3 w-3 animate-spin" /> PROCESANDO DATA...
                             </div>
+                        ) : (
+                            <>
+                                <div className="h-8 w-[1px] bg-white/10 mx-2 hidden lg:block" />
+                                <div className="flex items-center gap-2">
+                                    <Button 
+                                        size="sm" 
+                                        className="h-8 bg-indigo-600 hover:bg-indigo-700 text-[10px] font-black italic gap-2"
+                                        onClick={() => handleInvokeBurnMaster("normal")}
+                                        disabled={isGenerating}
+                                    >
+                                        <Zap className="h-3 w-3 fill-current" />
+                                        {isGenerating ? "ANALIZANDO..." : "INVOCAR BURN MASTER"}
+                                    </Button>
+
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        className="h-8 border-orange-500/50 text-orange-500 hover:bg-orange-500/10 text-[10px] font-black italic gap-2"
+                                        onClick={() => handleInvokeBurnMaster("aggressive")}
+                                        disabled={isGenerating}
+                                    >
+                                        <TrophyIcon className="h-3 w-3" />
+                                        LANZAR EVENTO MASIVO
+                                    </Button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </CardContent>

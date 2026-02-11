@@ -158,6 +158,9 @@ export default function AILabPage() {
           <TabsTrigger value="retention" className="gap-2 text-[10px] font-black uppercase">
             <Users className="h-3.5 w-3.5" /> Retention
           </TabsTrigger>
+          <TabsTrigger value="burn_master" className="gap-2 text-[10px] font-black uppercase text-orange-500">
+            <RefreshCcw className="h-3.5 w-3.5" /> Burn Master
+          </TabsTrigger>
         </TabsList>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[700px]">

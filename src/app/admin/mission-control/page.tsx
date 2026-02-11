@@ -1047,7 +1047,31 @@ export default function MissionControl() {
                                     )}
                                 </div>
 
-                                <Button size="sm" variant="outline" className="w-full text-[10px] font-black uppercase text-amber-500 border-amber-500/20 hover:bg-amber-500/10">
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="w-full text-[10px] font-black uppercase text-amber-500 border-amber-500/20 hover:bg-amber-500/10"
+                                    onClick={async () => {
+                                        setIsUpdating(true);
+                                        try {
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            const { data, error } = await supabase.rpc('admin_force_burn_cycle', {
+                                                p_admin_email: user?.email
+                                            });
+                                            if (error) throw error;
+                                            toast({ 
+                                                title: "Ciclo Deflacionario", 
+                                                description: `Se han retirado ${data.burned_amount} DC de circulación. Reserve Ratio: ${data.new_reserve_ratio}` 
+                                            });
+                                            await fetchEconStats();
+                                        } catch (err: any) {
+                                            toast({ title: "Error", description: err.message, variant: "destructive" });
+                                        } finally {
+                                            setIsUpdating(false);
+                                        }
+                                    }}
+                                    disabled={isUpdating}
+                                >
                                     <Zap className="h-3 w-3 mr-2" /> Forzar Ciclo de Quema
                                 </Button>
                             </CardContent>

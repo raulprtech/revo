@@ -72,3 +72,8 @@ export async function getIntelligenceMetrics(filters: any) {
         }
     };
 }
+
+export async function triggerBurnMaster(intensity: "normal" | "aggressive" | "crisis" = "normal") {
+    const { generateAutomatedBurnAction } = await import("@/ai/burn-master");
+    return await generateAutomatedBurnAction(intensity);
+}
