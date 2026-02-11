@@ -106,7 +106,10 @@ export async function middleware(request: NextRequest) {
     }
 
     // Role-based check (assuming custom claim or metadata)
-    const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'admin@duels.pro' // Fallback for dev
+    const isAdmin = user.user_metadata?.role === 'admin' || 
+                    user.email === 'raul_vrm_2134@hotmail.com' || 
+                    user.email === 'admin@duels.pro'
+    
     if (!isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'

@@ -18,6 +18,7 @@ import TournamentStats from "@/components/tournaments/tournament-stats";
 import { PrizeDisplay } from "@/components/tournaments/prize-manager";
 import { OrganizerManager } from "@/components/shared/organizer-manager";
 import { MatchRoomComponent } from "@/components/tournaments/match-room";
+import { DisputeManager } from "@/components/tournaments/dispute-manager";
 import Image from "next/image";
 import {
   AlertDialog,
@@ -131,6 +132,35 @@ export default function TournamentPage() {
   const isOwner = user?.email === tournament?.owner_email || 
     (tournament?.organizers?.includes(user?.email ?? '') ?? false);
   const isMainOwner = user?.email === tournament?.owner_email;
+
+  // Real-time updates for disputes
+  useEffect(() => {
+    if (!isOwner || !id) return;
+
+    const supabase = db.supabase;
+    const channel = supabase
+      .channel(`dispute-alerts-${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'match_rooms',
+        filter: `tournament_id=eq.${id}`
+      }, (payload) => {
+        const newData = payload.new as any;
+        if (newData.status === 'dispute') {
+          toast({
+            title: "⚠️ ¡Conflicto Detectado!",
+            description: `Se requiere arbitraje en el match #${newData.match_id}.`,
+            variant: "destructive"
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, isOwner, toast]);
 
   const loadBracketData = useCallback(() => {
     if (!id || !tournament) return;
@@ -782,6 +812,13 @@ export default function TournamentPage() {
           </div>
         </div>
       </div>
+
+      {/* Arbitration Center for Organizers */}
+      {isOwner && (
+        <div className="mb-8">
+          <DisputeManager tournamentId={id} />
+        </div>
+      )}
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
