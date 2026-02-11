@@ -100,7 +100,7 @@ export default function CosmeticsManager() {
                     <CardContent>
                         <div className="flex items-center gap-4">
                             <div className="flex-1">
-                                <p className="text-[10px] text-muted-foreground mb-1 uppercase font-bold">Umbral de Intervención (Reserve Ratio < X)</p>
+                                <p className="text-[10px] text-muted-foreground mb-1 uppercase font-bold">Umbral de Intervención (Reserve Ratio &lt; X)</p>
                                 <Input 
                                     type="number" 
                                     step="0.05"
