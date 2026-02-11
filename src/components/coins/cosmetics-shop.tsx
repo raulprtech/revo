@@ -270,81 +270,111 @@ export function CosmeticsShop() {
         </div>
 
         {/* Items Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayItems.map(item => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayItems.map((item) => {
             const isOwned = ownedIds.has(item.id);
             const isEquipped = equippedIds.has(item.id);
             const canAfford = balance >= item.price;
             const rarityStyle = RARITY_COLORS[item.rarity as CosmeticRarity];
+            
+            // Border and glow colors based on rarity
+            const colorMap: Record<string, string> = {
+              common: 'zinc',
+              rare: 'blue',
+              epic: 'purple',
+              legendary: 'amber'
+            };
+            const activeColor = colorMap[item.rarity] || 'zinc';
 
             return (
-              <Card
+              <div
                 key={item.id}
-                className={`group cursor-pointer transition-all hover:shadow-lg ${
-                  isEquipped ? 'ring-2 ring-primary' : ''
-                } ${rarityStyle.border ? `border-${item.rarity === 'legendary' ? 'amber' : item.rarity === 'epic' ? 'purple' : item.rarity === 'rare' ? 'blue' : 'zinc'}-500/30` : ''}`}
+                className="group relative"
                 onClick={() => setSelectedItem(item)}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{item.name}</CardTitle>
-                      <CardDescription className="text-xs">
-                        {CATEGORY_LABELS[item.category as CosmeticCategory]}
-                      </CardDescription>
+                {/* Rarity Glow Effect */}
+                <div className={`absolute -inset-0.5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-md ${
+                  item.rarity === 'legendary' ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500' :
+                  item.rarity === 'epic' ? 'bg-purple-500' :
+                  item.rarity === 'rare' ? 'bg-blue-500' : 'bg-zinc-500'
+                }`} />
+
+                <Card
+                  className={`relative flex flex-col h-full overflow-hidden border-border bg-card/80 backdrop-blur-sm transition-transform duration-300 group-hover:-translate-y-1 ${
+                    isEquipped ? 'ring-2 ring-primary border-transparent' : ''
+                  }`}
+                >
+                  <CardHeader className="pb-3 space-y-1">
+                    <div className="flex items-start justify-between">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 border-none ${rarityStyle.bg} ${rarityStyle.text}`}
+                      >
+                        {RARITY_LABELS[item.rarity as CosmeticRarity]}
+                      </Badge>
+                      <span className="flex items-center gap-1 text-sm font-black text-amber-400">
+                        <Coins className="h-3.5 w-3.5" />
+                        {item.price}
+                      </span>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] ${rarityStyle.bg} ${rarityStyle.text}`}
-                    >
-                      {RARITY_LABELS[item.rarity as CosmeticRarity]}
-                    </Badge>
-                  </div>
-                </CardHeader>
+                    <CardTitle className="text-base truncate">{item.name}</CardTitle>
+                    <CardDescription className="text-xs flex items-center gap-1.5 uppercase font-medium">
+                      <span className="opacity-70">{CATEGORY_ICONS[item.category as CosmeticCategory]}</span>
+                      {CATEGORY_LABELS[item.category as CosmeticCategory]}
+                    </CardDescription>
+                  </CardHeader>
 
-                <CardContent className="pb-3">
-                  {/* Preview */}
-                  <ItemPreview item={item} />
-                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{item.description}</p>
-                </CardContent>
-
-                <CardFooter className="flex items-center justify-between pt-0">
-                  <span className="flex items-center gap-1 text-sm font-bold text-amber-400">
-                    <Coins className="h-3.5 w-3.5" />
-                    {item.price}
-                  </span>
-
-                  {isOwned ? (
-                    isEquipped ? (
-                      <Badge className="bg-primary text-primary-foreground text-xs">
-                        <Check className="h-3 w-3 mr-1" /> Equipado
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs text-green-400 border-green-500/30">
-                        <Check className="h-3 w-3 mr-1" /> Adquirido
-                      </Badge>
-                    )
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant={canAfford ? "default" : "outline"}
-                      className={`text-xs h-7 px-3 ${!canAfford ? 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePurchase(item);
-                      }}
-                      disabled={purchasingId === item.id}
-                    >
-                      {purchasingId === item.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      ) : (
-                        <ShoppingBag className="h-3 w-3 mr-1" />
+                  <CardContent className="flex-grow pb-4 px-4">
+                    <div className="relative aspect-video flex items-center justify-center rounded-lg bg-muted/30 border border-border/50 overflow-hidden mb-3">
+                      <ItemPreview item={item} fill />
+                      {isOwned && (
+                        <div className="absolute top-2 right-2">
+                           <div className="bg-emerald-500 text-white rounded-full p-1 shadow-lg shadow-emerald-500/20">
+                             <Check className="h-3 w-3" />
+                           </div>
+                        </div>
                       )}
-                      Comprar
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed italic">
+                      "{item.description}"
+                    </p>
+                  </CardContent>
+
+                  <CardFooter className="pt-0 pb-4 px-4 flex gap-2">
+                    {isOwned ? (
+                      <Button
+                        size="sm"
+                        variant={isEquipped ? "outline" : "default"}
+                        className={`w-full text-xs h-8 ${isEquipped ? 'border-primary text-primary' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEquip(item, !isEquipped);
+                        }}
+                      >
+                        {isEquipped ? "Desequipar" : "Equipar"}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant={canAfford ? "default" : "outline"}
+                        className={`w-full text-xs h-8 ${!canAfford ? 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10' : 'bg-primary hover:bg-primary/90'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePurchase(item);
+                        }}
+                        disabled={purchasingId === item.id}
+                      >
+                        {purchasingId === item.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                        ) : (
+                          <ShoppingBag className="h-3.5 w-3.5 mr-2" />
+                        )}
+                        Comprar ahora
+                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              </div>
             );
           })}
         </div>
@@ -419,9 +449,9 @@ export function CosmeticsShop() {
 
 // ─── Preview Component ──────────────────────────
 
-function ItemPreview({ item, large = false }: { item: CosmeticItem; large?: boolean }) {
+function ItemPreview({ item, large = false, fill = false }: { item: CosmeticItem; large?: boolean; fill?: boolean }) {
   const metadata = item.metadata || {};
-  const size = large ? 'h-32' : 'h-20';
+  const size = fill ? 'w-full h-full' : (large ? 'h-32 w-full' : 'h-20 w-full');
 
   switch (item.category) {
     case 'avatar_collection': {
@@ -433,7 +463,7 @@ function ItemPreview({ item, large = false }: { item: CosmeticItem; large?: bool
       // If the item has an image_preview URL, show it directly
       if (item.image_preview) {
         return (
-          <div className={`flex justify-center ${large ? 'py-4' : 'py-1'}`}>
+          <div className={`flex items-center justify-center ${fill ? 'h-full w-full' : (large ? 'py-4' : 'py-1')}`}>
             <Avatar className={large ? 'h-24 w-24' : 'h-16 w-16'}>
               <AvatarImage src={item.image_preview} alt={item.name} />
               <AvatarFallback>{item.name[0]?.toUpperCase()}</AvatarFallback>
@@ -443,7 +473,7 @@ function ItemPreview({ item, large = false }: { item: CosmeticItem; large?: bool
       }
 
       return (
-        <div className={`flex flex-wrap gap-2 justify-center ${large ? 'py-4' : 'py-1'}`}>
+        <div className={`flex flex-wrap gap-2 items-center justify-center ${fill ? 'h-full w-full' : (large ? 'py-4' : 'py-1')}`}>
           {displaySeeds.map((seed) => (
             <Avatar key={seed} className={isSingle ? (large ? 'h-24 w-24' : 'h-16 w-16') : (large ? 'h-14 w-14' : 'h-10 w-10')}>
               <AvatarImage
@@ -494,14 +524,14 @@ function ItemPreview({ item, large = false }: { item: CosmeticItem; large?: bool
 
       return (
         <div
-          className={`${size} rounded-lg overflow-hidden relative`}
+          className={`${size} rounded-lg overflow-hidden relative shadow-inner`}
           style={{
             background: `linear-gradient(135deg, ${gradient.join(', ')})`,
           }}
         >
           {pattern === 'stars' && (
             <div className="absolute inset-0 opacity-50">
-              {[...Array(12)].map((_, i) => (
+              {[...Array(15)].map((_, i) => (
                 <div
                   key={i}
                   className={`absolute w-1 h-1 bg-white rounded-full ${isAnimated ? 'animate-pulse' : ''}`}
