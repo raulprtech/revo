@@ -39,21 +39,33 @@ export default function CosmeticsManager() {
     };
 
     const handleSave = async (item: any) => {
-        const res = await upsertCosmetic(item);
-        if (res.success) {
-            toast({ title: "Éxito", description: "Artículo guardado correctamente." });
-            setEditingId(null);
-            setNewItem(null);
-            loadData();
+        try {
+            const res = await upsertCosmetic(item);
+            if (res.success) {
+                toast({ title: "Éxito", description: "Artículo guardado correctamente." });
+                setEditingId(null);
+                setNewItem(null);
+                loadData();
+            } else {
+                toast({ title: "Error", description: res.error || "No se pudo guardar el artículo.", variant: "destructive" });
+            }
+        } catch {
+            toast({ title: "Error de red", description: "No se pudo conectar con el servidor.", variant: "destructive" });
         }
     };
 
     const handleDelete = async (id: string) => {
         if (!confirm("¿Seguro que quieres eliminar este artículo?")) return;
-        const res = await deleteCosmetic(id);
-        if (res.success) {
-            toast({ title: "Eliminado", description: "El artículo ha sido removido." });
-            loadData();
+        try {
+            const res = await deleteCosmetic(id);
+            if (res.success) {
+                toast({ title: "Eliminado", description: "El artículo ha sido removido." });
+                loadData();
+            } else {
+                toast({ title: "Error", description: res.error || "No se pudo eliminar.", variant: "destructive" });
+            }
+        } catch {
+            toast({ title: "Error de red", description: "No se pudo conectar con el servidor.", variant: "destructive" });
         }
     };
 
@@ -90,7 +102,7 @@ export default function CosmeticsManager() {
                         <div>
                             <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Total Burn Potential</p>
                             <p className="text-lg font-black italic text-indigo-300">
-                                {items.reduce((acc, item) => acc + (item.price_coins * (item.stock === -1 ? 0 : item.stock)), 0).toLocaleString()} 
+                                {items.reduce((acc, item) => acc + ((item.price || 0) * (item.stock === -1 ? 0 : item.stock)), 0).toLocaleString()} 
                                 <span className="text-[10px] ml-1">DC</span>
                             </p>
                         </div>
@@ -129,7 +141,7 @@ export default function CosmeticsManager() {
                     </div>
                     <Button 
                         size="sm" 
-                        onClick={() => setNewItem({ name: '', slug: '', price_coins: 100, rarity: 'common', stock: -1 })}
+                        onClick={() => setNewItem({ name: '', slug: '', price: 100, rarity: 'common', stock: -1 })}
                         className="bg-indigo-600 hover:bg-indigo-700 text-[10px] font-black uppercase"
                     >
                         <Plus className="h-3 w-3 mr-1" /> Nuevo Artículo
@@ -155,7 +167,7 @@ export default function CosmeticsManager() {
                                             <Input className="h-7 text-[10px] bg-black mt-1" placeholder="Slug" value={newItem.slug} onChange={e => setNewItem({...newItem, slug: e.target.value})} />
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Input type="number" className="h-7 text-[10px] bg-black" value={newItem.price_coins} onChange={e => setNewItem({...newItem, price_coins: parseInt(e.target.value)})} />
+                                            <Input type="number" className="h-7 text-[10px] bg-black" value={newItem.price} onChange={e => setNewItem({...newItem, price: parseInt(e.target.value) || 0})} />
                                         </td>
                                         <td className="px-4 py-3">
                                             <select className="bg-black border border-white/10 rounded h-7 w-full p-1" value={newItem.rarity} onChange={e => setNewItem({...newItem, rarity: e.target.value})}>
@@ -183,7 +195,7 @@ export default function CosmeticsManager() {
                                             <div className="text-[9px] opacity-40 font-mono italic">{item.slug}</div>
                                         </td>
                                         <td className="px-4 py-3 font-mono text-indigo-400 font-bold">
-                                            {item.price_coins} 
+                                            {item.price} 
                                         </td>
                                         <td className="px-4 py-3">
                                             <Badge variant="outline" className={cn(
