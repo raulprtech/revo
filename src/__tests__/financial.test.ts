@@ -12,12 +12,13 @@ describe('Financial Utils', () => {
     it('formats MXN correctly', () => {
       // Note: Intl symbols can vary by env but we check the core structure
       const result = formatCurrency(1234.56, 'MXN');
-      expect(result).toMatch(/\$1,234.56/);
+      expect(result).toMatch(/(\$|MXN).?1,234\.56/);
     });
 
     it('formats USD correctly', () => {
       const result = formatCurrency(50, 'USD');
-      expect(result).toMatch(/\$50.00/);
+      // Some environments use $50.00 and others USD 50.00
+      expect(result).toMatch(/(\$|USD).?50\.00/);
     });
   });
 

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { formatCurrency } from './utils';
 
 // =============================================
 // TRANSACTIONAL EMAIL TEMPLATES (Stripe/Billing)
@@ -248,7 +249,7 @@ export async function sendEntryFeeConfirmationEmail(
   amount: number, 
   currency: string
 ) {
-  const formattedAmount = `$${amount.toFixed(2)} ${currency.toUpperCase()}`;
+  const formattedAmount = formatCurrency(amount, currency);
 
   const html = emailLayout(`
     <h2 style="color: #ffffff; margin: 0 0 16px; font-size: 20px;">Inscripción confirmada 🎮</h2>

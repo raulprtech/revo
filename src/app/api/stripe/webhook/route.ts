@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import {
-  sendSubscriptionWelcomeEmail,
-  sendSubscriptionCanceledEmail,
-  sendPaymentFailedEmail,
+import { 
+  sendSubscriptionWelcomeEmail, 
+  sendSubscriptionCanceledEmail, 
+  sendPaymentFailedEmail, 
   sendPaymentSuccessEmail,
-  sendEntryFeeConfirmationEmail,
   sendLegacyProPurchaseEmail,
+  sendEntryFeeConfirmationEmail
 } from '@/lib/email-templates';
+import { calculatePlatformFee, calculateNetRevenue } from '@/lib/utils';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
@@ -84,9 +85,8 @@ export async function POST(request: Request) {
               .maybeSingle();
 
             if (!existingPayment) {
-              const platformFeePercentage = 0.10; // 10% flat platform fee (covers Stripe + maintenance)
-              const platformFee = amountTotal * platformFeePercentage;
-              const netAmount = amountTotal - platformFee;
+              const platformFee = calculatePlatformFee(amountTotal);
+              const netAmount = calculateNetRevenue(amountTotal);
 
               // Record payment with fee breakdown
               await supabase.from('tournament_payments').insert({
