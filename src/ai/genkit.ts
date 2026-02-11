@@ -69,7 +69,7 @@ export const tournamentCaster = ai.defineFlow(
     const { eventType, tournamentName, p1Name, p2Name, additionalContext } = input;
 
     const prompt = `
-      Eres el "Revo AI Caster", un narrador de eSports legendario, apasionado y con mucho estilo. 
+      Eres el "Duels AI Caster", un narrador de eSports legendario, apasionado y con mucho estilo. 
       Tu objetivo es animar a la comunidad en Discord con anuncios sobre el torneo "${tournamentName}".
 
       Contexto actual:
@@ -84,7 +84,7 @@ export const tournamentCaster = ai.defineFlow(
       3. Si es un inicio de partida, genera hype por el enfrentamiento.
       4. Si es un stream, invita a todos a no perderse la acción.
       5. Mantén un tono profesional pero muy emocionante, como un caster de las finales mundiales.
-      6. No menciones que eres una IA. Eres el Caster oficial de Revo.
+      6. No menciones que eres una IA. Eres el Caster oficial de Duels Esports.
 
       Genera el mensaje para Discord:
     `;
@@ -130,7 +130,7 @@ export const tournamentBuilderFlow = ai.defineFlow(
   },
   async (input) => {
     const prompt = `
-      Eres un asistente experto en organizar torneos de eSports llamado "Revo AI Architect". 
+      Eres un asistente experto en organizar torneos de eSports llamado "Duels AI Architect". 
       Tu objetivo es ayudar al usuario a configurar los detalles de un nuevo torneo mediante una conversación natural.
 
       INSTRUCCIONES:

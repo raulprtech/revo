@@ -212,7 +212,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
   // AI Builder State
   const [aiChatMode, setAiChatMode] = useState(false);
   const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'model', content: string }[]>([
-    { role: 'model', content: '¡Hola! Soy el AI Architect de Revo. Cuéntame sobre el torneo que quieres crear. Por ejemplo: "Quiero un torneo de FIFA presencial para 16 personas este sábado"' }
+    { role: 'model', content: '¡Hola! Soy el AI Architect de Duels Esports. Cuéntame sobre el torneo que quieres crear. Por ejemplo: "Quiero un torneo de FIFA presencial para 16 personas este sábado"' }
   ]);
   const [currentAiInput, setCurrentAiInput] = useState("");
   const [isAiThinking, setIsAiThinking] = useState(false);
@@ -572,9 +572,9 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="standard" className="w-full">
+      <Tabs defaultValue="manual" className="w-full">
         <TabsList className="grid w-full grid-cols-2 bg-muted/20 mb-6 p-1 h-12">
-          <TabsTrigger value="standard" className="gap-2 font-bold transition-all data-[state=active]:bg-background">
+          <TabsTrigger value="manual" className="gap-2 font-bold transition-all data-[state=active]:bg-background">
             <Gamepad2 className="h-4 w-4" /> MANUAL
           </TabsTrigger>
           <TabsTrigger value="ai" className="gap-2 font-bold text-primary transition-all data-[state=active]:bg-primary/10">
@@ -591,7 +591,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
                     <Wand2 className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black tracking-tight leading-none uppercase">Revo AI Architect</h3>
+                    <h3 className="text-sm font-black tracking-tight leading-none uppercase">Duels AI Architect</h3>
                     <p className="text-[10px] text-muted-foreground uppercase mt-0.5 tracking-widest font-bold">Powered by Gemini Flash Lite</p>
                   </div>
                 </div>
@@ -976,7 +976,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
                             <h4 className="text-sm font-semibold text-indigo-900 dark:text-indigo-300">Integración con Discord</h4>
                             <p className="text-xs text-indigo-700 dark:text-indigo-400">Automatiza la gestión de canales y roles para este torneo.</p>
                         </div>
-                        <Badge variant="outline" className="bg-white dark:bg-slate-950">REVO Logistics</Badge>
+                        <Badge variant="outline" className="bg-white dark:bg-slate-950">DUELS Logistics</Badge>
                     </div>
                     <div className="flex items-center space-x-2">
                         <Checkbox 
@@ -1179,5 +1179,6 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
     </Form>
   </TabsContent>
 </Tabs>
+</div>
   );
 }

@@ -311,7 +311,7 @@ export function MatchRoomComponent({ room: initialRoom, currentUserEmail, tourna
                     )}
                 </CardContent>
                 <CardFooter className="justify-between border-t p-4 bg-muted/30">
-                    <span className="text-xs text-muted-foreground">Sistema Automatizado Revo Logistics v1.0</span>
+                    <span className="text-xs text-muted-foreground">Sistema Automatizado Duels Logistics v1.0</span>
                     <div className="flex gap-2">
                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
                             <ShieldAlert className="h-4 w-4 mr-1" /> Soporte / Ticket

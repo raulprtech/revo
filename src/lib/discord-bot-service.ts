@@ -101,7 +101,7 @@ export class DiscordBotService {
                     { name: "Oponente", value: vsName, inline: true },
                     { name: "Torneo", value: tournamentName }
                 ],
-                footer: { text: "Revo Platform - AI Caster Integration" },
+                footer: { text: "Duels Esports - AI Caster Integration" },
                 timestamp: new Date().toISOString()
             }]
         });
