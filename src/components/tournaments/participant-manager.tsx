@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useToast } from "@/hooks/use-toast";
 import { db, type Participant as DbParticipant } from "@/lib/database";
 import { useParticipants, useTournament, invalidateCache } from "@/hooks/use-tournaments";
+import { ProFeatureGate } from "@/lib/subscription";
 
 type Participant = DbParticipant;
 type FilterStatus = 'all' | 'pending-checkin' | 'checked-in' | 'pending' | 'accepted' | 'rejected';
@@ -481,7 +482,23 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
             p.checked_in_at ? new Date(p.checked_in_at).toLocaleString('es-ES') : 'No',
             p.created_at ? new Date(p.created_at).toLocaleString('es-ES') : ''
         ]);
+        // Add custom responses to headers and rows
+        if (tournament?.registration_fields && tournament.registration_fields.length > 0) {
+            tournament.registration_fields.forEach(field => {
+                headers.push(field.label);
+            });
 
+            participants.forEach((p, idx) => {
+                tournament.registration_fields?.forEach(field => {
+                    const response = p.custom_responses?.[field.label];
+                    let displayResponse = response !== undefined ? response : '';
+                    if (typeof displayResponse === 'boolean') {
+                        displayResponse = displayResponse ? 'Sí' : 'No';
+                    }
+                    rows[idx].push(displayResponse);
+                });
+            });
+        }
         // Create CSV content
         const csvContent = [
             headers.join(','),
@@ -628,9 +645,24 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                                 </Badge>
                             )}
                             {/* Export Button */}
-                            <Button variant="outline" size="sm" onClick={handleExportToExcel}>
-                                <Download className="mr-2 h-4 w-4" /> Exportar
-                            </Button>
+                            <ProFeatureGate 
+                                showUpgradeButton={false}
+                                fallback={
+                                    <Button variant="outline" size="sm" onClick={() => {
+                                        toast({
+                                            title: "Función Premium",
+                                            description: "La exportación de datos está disponible solo para usuarios Plus o torneos con Upgrade.",
+                                            variant: "default"
+                                        });
+                                    }}>
+                                        <Download className="mr-2 h-4 w-4" /> Exportar
+                                    </Button>
+                                }
+                            >
+                                <Button variant="outline" size="sm" onClick={handleExportToExcel}>
+                                    <Download className="mr-2 h-4 w-4" /> Exportar
+                                </Button>
+                            </ProFeatureGate>
                         </div>
                     </div>
                 </div>

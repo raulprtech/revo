@@ -95,7 +95,115 @@ export const generateRounds = (numParticipants: number, seededPlayers?: SeededPl
         return generateSwissRound(normalizedPlayers, 1);
     }
 
+    // For Round Robin
+    if (format === 'round-robin') {
+        return generateRoundRobinRounds(normalizedPlayers);
+    }
+
+    // For Free For All
+    if (format === 'free-for-all') {
+        return generateFreeForAllRounds(normalizedPlayers);
+    }
+
     return generateSingleEliminationRounds(normalizedPlayers);
+}
+
+// Round Robin generation (Circle Method)
+function generateRoundRobinRounds(players: { name: string; avatar?: string | null; email?: string | null }[]) {
+    const participants = [...players];
+    if (participants.length % 2 !== 0) {
+        participants.push({ name: "BYE", avatar: null, email: null });
+    }
+
+    const n = participants.length;
+    const numRounds = n - 1;
+    const rounds: Round[] = [];
+    let matchId = 1;
+
+    // Use a copy for rotation
+    const pool = [...participants];
+
+    for (let r = 0; r < numRounds; r++) {
+        const matches: Match[] = [];
+        for (let i = 0; i < n / 2; i++) {
+            const top = pool[i];
+            const bottom = pool[n - 1 - i];
+
+            // Skip matches where both are BYE (shouldn't happen with n/2)
+            if (top.name === "BYE" && bottom.name === "BYE") continue;
+
+            matches.push({
+                id: matchId++,
+                top: { name: top.name, score: null, avatar: top.avatar, email: top.email },
+                bottom: { name: bottom.name, score: null, avatar: bottom.avatar, email: bottom.email },
+                winner: bottom.name === "BYE" ? top.name : (top.name === "BYE" ? bottom.name : null),
+                bracket: 'round-robin',
+            });
+        }
+        rounds.push({ name: `Jornada ${r + 1}`, matches, bracket: 'round-robin' });
+
+        // Rotate pool: keep first player fixed, move others clockwise
+        const last = pool.pop()!;
+        pool.splice(1, 0, last);
+    }
+    return rounds;
+}
+
+// Free For All generation
+function generateFreeForAllRounds(players: { name: string; avatar?: string | null; email?: string | null }[], playersPerMatch = 8) {
+    const rounds: Round[] = [];
+    let currentPlayers = [...players];
+    let matchId = 1;
+    let roundIndex = 1;
+
+    // Limit phases to prevent infinite loops if playersPerMatch < 2
+    const safePlayersPerMatch = Math.max(2, playersPerMatch);
+
+    while (currentPlayers.length > 0) {
+        const matches: Match[] = [];
+        const nextRoundPlayers: typeof currentPlayers = [];
+        
+        for (let i = 0; i < currentPlayers.length; i += safePlayersPerMatch) {
+            const group = currentPlayers.slice(i, i + safePlayersPerMatch);
+            const matchPlayers = group.map(p => ({
+                name: p.name,
+                score: null,
+                avatar: p.avatar,
+                email: p.email
+            }));
+
+            // For FFA matches, we use the players array
+            matches.push({
+                id: matchId++,
+                top: matchPlayers[0],
+                bottom: matchPlayers[1] || { name: 'TBD', score: null },
+                players: matchPlayers,
+                winner: null,
+                bracket: 'ffa',
+            });
+
+            // Advancement is manual in FFA, but we seed TBDs for next rounds
+            if (currentPlayers.length > safePlayersPerMatch) {
+                // Rule: Top 2 advance (simplification for auto-bracket)
+                nextRoundPlayers.push({ name: `Ganador M${matchId-1} #1` });
+                nextRoundPlayers.push({ name: `Ganador M${matchId-1} #2` });
+            }
+        }
+
+        const isFinal = currentPlayers.length <= safePlayersPerMatch;
+        rounds.push({ 
+            name: isFinal ? "Final" : `Fase ${roundIndex}`, 
+            matches, 
+            bracket: 'ffa' 
+        });
+
+        if (isFinal) break;
+        
+        currentPlayers = nextRoundPlayers;
+        roundIndex++;
+        if (roundIndex > 10) break; // Safety break
+    }
+    return rounds;
 }
 
 // Single Elimination bracket generation
@@ -321,8 +429,10 @@ export type Match = {
     id: number;
     top: MatchPlayer;
     bottom: MatchPlayer;
+    players?: MatchPlayer[]; // For Free For All modes
     winner: string | null;
-    bracket?: 'winners' | 'losers' | 'finals' | 'swiss';
+    winners?: string[]; // Multiple winners for FFA
+    bracket?: 'winners' | 'losers' | 'finals' | 'swiss' | 'round-robin' | 'ffa';
     station?: {
         id: string;
         name: string;
@@ -359,6 +469,7 @@ interface MatchCardProps {
 const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStationAssigned, cosmeticsMap }: MatchCardProps) => {
     const isTopWinner = match.winner === match.top.name;
     const isBottomWinner = match.winner === match.bottom.name;
+    const isFFA = match.bracket === 'ffa' && match.players && match.players.length > 2;
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const modeConfig = gameMode ? GAME_MODE_CONFIG[gameMode] : undefined;
@@ -477,85 +588,120 @@ const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStat
             <Card className={cn(
                 "bg-card/50 w-full",
                 match.bracket === 'losers' && "border-orange-500/30",
-                match.bracket === 'finals' && "border-yellow-500/30 bg-yellow-500/5"
+                match.bracket === 'finals' && "border-yellow-500/30 bg-yellow-500/5",
+                isFFA && "border-purple-500/30"
             )}>
                 <CardContent className="p-3 space-y-2">
-                    {/* Top player */}
-                    <div className="flex justify-between items-center gap-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Avatar
-                                className={cn(
-                                    "h-7 w-7 flex-shrink-0",
-                                    isTopWinner && !hasFrame(match.top) && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                                    getPlayerCosmetics(match.top)?.bracketFrame?.animation === 'fire' && "animate-pulse"
-                                )}
-                                style={getFrameStyle(match.top)}
-                            >
-                                <AvatarImage src={getAvatarSrc(match.top)} alt={match.top.name} />
-                                <AvatarFallback className={cn("text-xs", getAvatarColor(match.top.name))}>
-                                    {getInitials(match.top.name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <span
-                                className={cn(
-                                    "text-sm truncate",
-                                    isTopWinner && !getNicknameStyle(match.top) && "font-bold text-primary",
-                                    isTopWinner && getNicknameStyle(match.top) && "font-bold",
-                                    match.top.name === 'BYE' && "text-muted-foreground italic",
-                                    match.top.name === 'TBD' && "text-muted-foreground"
-                                )}
-                                style={match.top.name !== 'TBD' && match.top.name !== 'BYE' ? getNicknameStyle(match.top) : undefined}
-                            >
-                                {match.top.name}
-                            </span>
+                    {isFFA ? (
+                        <div className="space-y-2">
+                            {match.players?.map((player, idx) => {
+                                const isWinner = match.winners?.includes(player.name) || match.winner === player.name;
+                                return (
+                                    <div key={`${player.name}-${idx}`} className="flex justify-between items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <Avatar className="h-6 w-6 flex-shrink-0" style={getFrameStyle(player)}>
+                                                <AvatarImage src={getAvatarSrc(player)} />
+                                                <AvatarFallback className={cn("text-[10px]", getAvatarColor(player.name))}>
+                                                    {getInitials(player.name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <span className={cn(
+                                                "text-xs truncate",
+                                                isWinner && "font-bold text-primary"
+                                            )} style={getNicknameStyle(player)}>
+                                                {player.name}
+                                            </span>
+                                        </div>
+                                        <span className={cn(
+                                            "text-xs font-mono px-1.5 py-0.5 rounded min-w-[1.5rem] text-center",
+                                            isWinner ? "bg-primary/20 text-primary" : "bg-muted"
+                                        )}>
+                                            {player.score ?? '-'}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                            {getBracketBadge()}
-                            <span className={cn(
-                                "text-sm font-mono px-2 py-0.5 rounded min-w-[2rem] text-center",
-                                isTopWinner ? "bg-primary/20 text-primary" : "bg-muted"
-                            )}>
-                                {match.top.score ?? '-'}
-                            </span>
-                        </div>
-                    </div>
-                    <Separator />
-                    {/* Bottom player */}
-                    <div className="flex justify-between items-center gap-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Avatar
-                                className={cn(
-                                    "h-7 w-7 flex-shrink-0",
-                                    isBottomWinner && !hasFrame(match.bottom) && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                                    getPlayerCosmetics(match.bottom)?.bracketFrame?.animation === 'fire' && "animate-pulse"
-                                )}
-                                style={getFrameStyle(match.bottom)}
-                            >
-                                <AvatarImage src={getAvatarSrc(match.bottom)} alt={match.bottom.name} />
-                                <AvatarFallback className={cn("text-xs", getAvatarColor(match.bottom.name))}>
-                                    {getInitials(match.bottom.name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <span
-                                className={cn(
-                                    "text-sm truncate",
-                                    isBottomWinner && !getNicknameStyle(match.bottom) && "font-bold text-primary",
-                                    isBottomWinner && getNicknameStyle(match.bottom) && "font-bold",
-                                    match.bottom.name === 'BYE' && "text-muted-foreground italic",
-                                    match.bottom.name === 'TBD' && "text-muted-foreground"
-                                )}
-                                style={match.bottom.name !== 'TBD' && match.bottom.name !== 'BYE' ? getNicknameStyle(match.bottom) : undefined}
-                            >
-                                {match.bottom.name}
-                            </span>
-                        </div>
-                        <span className={cn(
-                            "text-sm font-mono px-2 py-0.5 rounded min-w-[2rem] text-center flex-shrink-0",
-                            isBottomWinner ? "bg-primary/20 text-primary" : "bg-muted"
-                        )}>
-                            {match.bottom.score ?? '-'}
-                        </span>
-                    </div>
+                    ) : (
+                        <>
+                            {/* Top player */}
+                            <div className="flex justify-between items-center gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Avatar
+                                        className={cn(
+                                            "h-7 w-7 flex-shrink-0",
+                                            isTopWinner && !hasFrame(match.top) && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                                            getPlayerCosmetics(match.top)?.bracketFrame?.animation === 'fire' && "animate-pulse"
+                                        )}
+                                        style={getFrameStyle(match.top)}
+                                    >
+                                        <AvatarImage src={getAvatarSrc(match.top)} alt={match.top.name} />
+                                        <AvatarFallback className={cn("text-xs", getAvatarColor(match.top.name))}>
+                                            {getInitials(match.top.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span
+                                        className={cn(
+                                            "text-sm truncate",
+                                            isTopWinner && !getNicknameStyle(match.top) && "font-bold text-primary",
+                                            isTopWinner && getNicknameStyle(match.top) && "font-bold",
+                                            match.top.name === 'BYE' && "text-muted-foreground italic",
+                                            match.top.name === 'TBD' && "text-muted-foreground"
+                                        )}
+                                        style={match.top.name !== 'TBD' && match.top.name !== 'BYE' ? getNicknameStyle(match.top) : undefined}
+                                    >
+                                        {match.top.name}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    {getBracketBadge()}
+                                    <span className={cn(
+                                        "text-sm font-mono px-2 py-0.5 rounded min-w-[2rem] text-center",
+                                        isTopWinner ? "bg-primary/20 text-primary" : "bg-muted"
+                                    )}>
+                                        {match.top.score ?? '-'}
+                                    </span>
+                                </div>
+                            </div>
+                            <Separator />
+                            {/* Bottom player */}
+                            <div className="flex justify-between items-center gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Avatar
+                                        className={cn(
+                                            "h-7 w-7 flex-shrink-0",
+                                            isBottomWinner && !hasFrame(match.bottom) && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                                            getPlayerCosmetics(match.bottom)?.bracketFrame?.animation === 'fire' && "animate-pulse"
+                                        )}
+                                        style={getFrameStyle(match.bottom)}
+                                    >
+                                        <AvatarImage src={getAvatarSrc(match.bottom)} alt={match.bottom.name} />
+                                        <AvatarFallback className={cn("text-xs", getAvatarColor(match.bottom.name))}>
+                                            {getInitials(match.bottom.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span
+                                        className={cn(
+                                            "text-sm truncate",
+                                            isBottomWinner && !getNicknameStyle(match.bottom) && "font-bold text-primary",
+                                            isBottomWinner && getNicknameStyle(match.bottom) && "font-bold",
+                                            match.bottom.name === 'BYE' && "text-muted-foreground italic",
+                                            match.bottom.name === 'TBD' && "text-muted-foreground"
+                                        )}
+                                        style={match.bottom.name !== 'TBD' && match.bottom.name !== 'BYE' ? getNicknameStyle(match.bottom) : undefined}
+                                    >
+                                        {match.bottom.name}
+                                    </span>
+                                </div>
+                                <span className={cn(
+                                    "text-sm font-mono px-2 py-0.5 rounded min-w-[2rem] text-center flex-shrink-0",
+                                    isBottomWinner ? "bg-primary/20 text-primary" : "bg-muted"
+                                )}>
+                                    {match.bottom.score ?? '-'}
+                                </span>
+                            </div>
+                        </>
+                    )}
                     {canReport && (
                         <Button size="sm" variant="outline" className="w-full mt-2 h-7 text-xs" onClick={() => setIsDialogOpen(true)}>
                             Reportar {scoreLabel}
@@ -622,6 +768,45 @@ const MatchCard = ({ match, onScoreReported, isOwner, gameMode, stations, onStat
     )
 }
 
+/** 
+ * LazyRound component to virtualize bracket rendering
+ * Only renders matches when the round is near the viewport
+ */
+const LazyRound = ({ round, children }: { round: Round; children: React.ReactNode }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                setIsVisible(true);
+                observer.disconnect();
+            }
+        }, { rootMargin: '600px' }); // Wide margin for smooth horizontal scrolling
+
+        if (ref.current) observer.observe(ref.current);
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={ref} className="flex flex-col space-y-4 min-w-[250px] sm:min-w-[300px]">
+            <h3 className="text-xl font-bold text-center font-headline">{round.name}</h3>
+            {isVisible ? (
+                <div className="flex flex-col justify-around flex-grow space-y-8 transition-opacity duration-300 opacity-100">
+                    {children}
+                </div>
+            ) : (
+                <div className="flex-grow flex items-center justify-center bg-muted/5 border-2 border-dashed border-muted rounded-xl min-h-[400px]">
+                    <div className="flex flex-col items-center gap-2 opacity-30">
+                        <Gamepad2 className="h-8 w-8 animate-pulse" />
+                        <span className="text-xs font-mono">Cargando {round.name}...</span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 interface BracketProps {
     tournament: Tournament;
     isOwner: boolean;
@@ -669,7 +854,9 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
     const formatDisplay = {
         'single-elimination': 'Eliminación Simple',
         'double-elimination': 'Doble Eliminación',
-        'swiss': 'Sistema Suizo'
+        'swiss': 'Sistema Suizo',
+        'round-robin': 'Round Robin (Liga)',
+        'free-for-all': 'Free For All (Masivo)'
     }[tournament.format] || tournament.format;
 
     const gameMode = tournament.game_mode;
@@ -733,28 +920,25 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
                                     Winners Bracket
                                 </h3>
                             )}
-                            <div ref={bracketRef} className="flex space-x-4 md:space-x-8 lg:space-x-12 overflow-x-auto pb-4">
+                            <div ref={bracketRef} className="flex space-x-4 md:space-x-8 lg:space-x-12 overflow-x-auto pb-4 scroll-smooth">
                                 {winnersRounds.map((round) => (
-                                    <div key={round.name} className="flex flex-col space-y-4 min-w-[250px]">
-                                        <h3 className="text-xl font-bold text-center font-headline">{round.name}</h3>
-                                        <div className="flex flex-col justify-around flex-grow space-y-8">
-                                            {round.matches.map((match) => (
-                                                <MatchCard 
-                                                    key={match.id} 
-                                                    match={match} 
-                                                    onScoreReported={onScoreReported} 
-                                                    isOwner={isOwner}
-                                                    gameMode={tournament.game_mode}
-                                                    stations={tournament.stations}
-                                                    onStationAssigned={onStationAssigned}
-                                                    cosmeticsMap={cosmeticsMap}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <LazyRound key={round.name} round={round}>
+                                        {round.matches.map((match) => (
+                                            <MatchCard 
+                                                key={match.id} 
+                                                match={match} 
+                                                onScoreReported={onScoreReported} 
+                                                isOwner={isOwner}
+                                                gameMode={tournament.game_mode}
+                                                stations={tournament.stations}
+                                                onStationAssigned={onStationAssigned}
+                                                cosmeticsMap={cosmeticsMap}
+                                            />
+                                        ))}
+                                    </LazyRound>
                                 ))}
                 
-                                {!isDoubleElimination && (
+                                {(tournament.format === 'single-elimination' || tournament.format === 'double-elimination') && (
                                     <div className="flex flex-col space-y-4 min-w-[250px] items-center justify-center">
                                         <h3 className="text-xl font-bold text-center font-headline">Campeón</h3>
                                         <Trophy className="w-24 h-24 text-yellow-400" />
@@ -770,25 +954,22 @@ export default function Bracket({ tournament, isOwner, rounds, onScoreReported, 
                                     <span className="text-xl">💀</span>
                                     Losers Bracket
                                 </h3>
-                                <div className="flex space-x-4 md:space-x-8 overflow-x-auto pb-4">
+                                <div className="flex space-x-4 md:space-x-8 overflow-x-auto pb-4 scroll-smooth">
                                     {losersRounds.map((round) => (
-                                        <div key={round.name} className="flex flex-col space-y-4 min-w-[220px]">
-                                            <h3 className="text-lg font-bold text-center">{round.name}</h3>
-                                            <div className="flex flex-col justify-around flex-grow space-y-6">
-                                                {round.matches.map((match) => (
-                                                    <MatchCard 
-                                                        key={match.id} 
-                                                        match={match} 
-                                                        onScoreReported={onScoreReported} 
-                                                        isOwner={isOwner}
-                                                        gameMode={tournament.game_mode}
-                                                        stations={tournament.stations}
-                                                        onStationAssigned={onStationAssigned}
-                                                        cosmeticsMap={cosmeticsMap}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
+                                        <LazyRound key={round.name} round={round}>
+                                            {round.matches.map((match) => (
+                                                <MatchCard 
+                                                    key={match.id} 
+                                                    match={match} 
+                                                    onScoreReported={onScoreReported} 
+                                                    isOwner={isOwner}
+                                                    gameMode={tournament.game_mode}
+                                                    stations={tournament.stations}
+                                                    onStationAssigned={onStationAssigned}
+                                                    cosmeticsMap={cosmeticsMap}
+                                                />
+                                            ))}
+                                        </LazyRound>
                                     ))}
                                 </div>
                             </div>

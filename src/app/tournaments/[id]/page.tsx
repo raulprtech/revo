@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round, type CosmeticsMap } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
 import ParticipantManager from "@/components/tournaments/participant-manager";
+import { RegistrationCustomFields } from "@/components/tournaments/registration-custom-fields";
 import { InvitationManager } from "@/components/tournaments/invitation-manager";
 import { EventLinkManager } from "@/components/tournaments/event-link-manager";
 import TournamentStats from "@/components/tournaments/tournament-stats";
@@ -65,6 +66,7 @@ export default function TournamentPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [cosmeticsMap, setCosmeticsMap] = useState<CosmeticsMap>({});
   const [legacyCheckoutLoading, setLegacyCheckoutLoading] = useState(false);
+  const [showCustomFields, setShowCustomFields] = useState(false);
 
   // Sync fetched tournament to local state
   useEffect(() => {
@@ -532,23 +534,24 @@ export default function TournamentPage() {
         return;
     }
 
+    // Si el torneo tiene campos personalizados, mostrar el diálogo primero
+    if (tournament.registration_fields && tournament.registration_fields.length > 0) {
+      setShowCustomFields(true);
+      return;
+    }
+
+    await executeJoin();
+  }
+
+  const executeJoin = async (customResponses?: Record<string, any>) => {
+    if (!tournament || !user) return;
+    
     try {
       // Build full name from user profile - concatenate firstName and lastName
       let fullName: string | undefined = undefined;
       if (user.firstName || user.lastName) {
         fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || undefined;
       }
-
-      console.log('User data for registration:', {
-        email: user.email,
-        displayName: user.displayName,
-        nickname: user.nickname,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        birthDate: user.birthDate,
-        gender: user.gender,
-        fullName: fullName
-      });
 
       await db.addParticipant({
         tournament_id: tournament.id,
@@ -558,7 +561,8 @@ export default function TournamentPage() {
         birth_date: user.birthDate || undefined,
         gender: user.gender || undefined,
         avatar: user.photoURL,
-        status: 'Pendiente'
+        status: 'Pendiente',
+        custom_responses: customResponses
       });
 
       // Refresh tournament data
@@ -569,6 +573,7 @@ export default function TournamentPage() {
       invalidateCache.publicTournaments();
 
       setIsParticipant(true);
+      setShowCustomFields(false);
       toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
       window.dispatchEvent(new CustomEvent('participantsUpdated'));
     } catch (error) {
@@ -659,6 +664,17 @@ export default function TournamentPage() {
 
   return (
     <div className="container mx-auto py-10 px-4">
+      {/* Diálogo de campos personalizados */}
+      {tournament.registration_fields && (
+        <RegistrationCustomFields
+          isOpen={showCustomFields}
+          onClose={() => setShowCustomFields(false)}
+          fields={tournament.registration_fields}
+          onComplete={(responses) => executeJoin(responses)}
+          tournamentName={tournament.name}
+        />
+      )}
+
       {/* Station Alert for Participants */}
       {participantNextMatch && (
         <div className="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-lg animate-pulse">

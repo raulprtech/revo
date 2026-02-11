@@ -63,7 +63,7 @@ export const PLANS: Plan[] = [
     badge: '🏛️',
     highlights: [
       'Torneos y jugadores ilimitados',
-      'Todos los formatos (Single, Double, Swiss)',
+      'Todos los formatos (Single, Double, Swiss, League, FFA)',
       'Páginas de evento básicas',
       'Registro público o por invitación',
       'Reporte de scores manual',

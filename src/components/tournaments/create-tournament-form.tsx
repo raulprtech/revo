@@ -40,6 +40,7 @@ import { StationManager } from "./station-manager";
 import { BadgeManager } from "./badge-manager";
 import { PrizePoolCalculator } from "./prize-pool-calculator";
 import { BracketBrandingEditor, type BracketBranding } from "./bracket-branding";
+import { RegistrationFieldsManager, type RegistrationField } from "./registration-fields-manager";
 import { ProFeatureGate } from "@/lib/subscription";
 
 // Game configurations with recommended formats and game modes
@@ -193,6 +194,9 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
     secondaryColor: '#1a1a2e',
     sponsorLogos: [],
   });
+  const [registrationFields, setRegistrationFields] = useState<RegistrationField[]>(
+    (tournamentData as any)?.registration_fields || []
+  );
   const [selectedGame, setSelectedGame] = useState<GameKey | "">(
     tournamentData?.game && tournamentData.game in GAMES_CONFIG 
       ? tournamentData.game as GameKey 
@@ -405,6 +409,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           entry_fee: entryFeeData.enabled ? entryFeeData.amount : 0,
           entry_fee_currency: entryFeeData.enabled ? entryFeeData.currency : 'MXN',
           prize_pool_percentage: prizeDistributions.length > 0 ? prizeDistributions : undefined,
+          registration_fields: registrationFields.length > 0 ? registrationFields : undefined,
         };
 
         console.log('Tournament payload:', tournamentPayload);
@@ -451,6 +456,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
           entry_fee: entryFeeData.enabled ? entryFeeData.amount : 0,
           entry_fee_currency: entryFeeData.enabled ? entryFeeData.currency : 'MXN',
           prize_pool_percentage: prizeDistributions.length > 0 ? prizeDistributions : null,
+          registration_fields: registrationFields.length > 0 ? registrationFields : null,
         };
 
         // Only add game_mode if it has a value (column may not exist in older schemas)
@@ -663,7 +669,9 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
                         <SelectContent>
                             <SelectItem value="single-elimination">Eliminación Simple</SelectItem>
                             <SelectItem value="double-elimination">Doble Eliminación</SelectItem>
-                            <SelectItem value="swiss">Suizo</SelectItem>
+                            <SelectItem value="swiss">Sistema Suizo</SelectItem>
+                            <SelectItem value="round-robin">Round Robin (Todos contra todos)</SelectItem>
+                            <SelectItem value="free-for-all">Free For All (Masivo)</SelectItem>
                         </SelectContent>
                     </Select>
                     </FormControl>
@@ -880,6 +888,14 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
               branding={branding}
               onChange={setBranding}
             />
+
+            {/* Registration Fields (Pro) */}
+            <ProFeatureGate showPreview>
+              <RegistrationFieldsManager
+                fields={registrationFields}
+                onChange={setRegistrationFields}
+              />
+            </ProFeatureGate>
 
             <FormField
                 control={form.control}

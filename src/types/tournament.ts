@@ -13,7 +13,7 @@ export interface Tournament {
   status: string;
   location?: string;
   ownerEmail?: string;
-  format?: 'single-elimination' | 'double-elimination' | 'swiss';
+  format?: 'single-elimination' | 'double-elimination' | 'swiss' | 'round-robin' | 'free-for-all';
   prizePool?: string;
   invitedUsers?: string[]; // Array of email addresses for private tournaments
 }

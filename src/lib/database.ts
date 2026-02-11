@@ -124,7 +124,7 @@ export type Tournament = {
   max_participants: number;
   start_date: string;
   start_time?: string;
-  format: 'single-elimination' | 'double-elimination' | 'swiss';
+  format: 'single-elimination' | 'double-elimination' | 'swiss' | 'round-robin' | 'free-for-all';
   status: string;
   owner_email: string;
   organizers?: string[]; // Array of co-organizer emails
@@ -154,6 +154,14 @@ export type Tournament = {
   bracket_primary_color?: string;
   bracket_secondary_color?: string;
   sponsor_logos?: { name: string; logoUrl: string; website?: string }[];
+  registration_fields?: {
+    id: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'boolean';
+    required: boolean;
+    options?: string[]; // Para selects
+    saveToProfile?: boolean;
+  }[];
   // Legacy Pro (one-time event purchase)
   is_legacy_pro?: boolean;
   legacy_pro_purchased_at?: string;
@@ -180,6 +188,7 @@ export type Participant = {
   is_minor?: boolean;
   parent_email?: string;
   data_sharing_consent?: boolean;
+  custom_responses?: Record<string, any>;
 };
 
 export type CreateTournamentData = Omit<Tournament, 'id' | 'participants' | 'created_at' | 'updated_at'>;
@@ -238,6 +247,7 @@ class DatabaseService {
     if (tournament.bracket_primary_color) insertData.bracket_primary_color = tournament.bracket_primary_color;
     if (tournament.bracket_secondary_color) insertData.bracket_secondary_color = tournament.bracket_secondary_color;
     if (tournament.sponsor_logos && tournament.sponsor_logos.length > 0) insertData.sponsor_logos = tournament.sponsor_logos;
+    if (tournament.registration_fields) insertData.registration_fields = tournament.registration_fields;
     // Note: 'organizers' is intentionally not included - add column to DB first if needed
 
     const { data, error } = await this.supabase
@@ -1498,6 +1508,36 @@ class DatabaseService {
 
     if (error) return { success: false, error: error.message };
     return { success: true };
+  }
+
+  // =============================================
+  // PROFILE OPERATIONS
+  // =============================================
+
+  async getProfileByEmail(email: string): Promise<any> {
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return null;
+    }
+    return data;
+  }
+
+  async updateProfile(email: string, updates: Record<string, any>): Promise<void> {
+    const { error } = await this.supabase
+      .from('profiles')
+      .update(updates)
+      .eq('email', email);
+
+    if (error) {
+      console.error('Error updating profile:', error);
+      throw new Error(error.message);
+    }
   }
 
   /** Get all available achievement definitions */

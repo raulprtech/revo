@@ -40,18 +40,23 @@ CREATE INDEX IF NOT EXISTS events_is_public_idx ON public.events(is_public);
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for events
+DROP POLICY IF EXISTS "Public events are viewable by everyone" ON public.events;
 CREATE POLICY "Public events are viewable by everyone" ON public.events
 FOR SELECT USING (is_public = true);
 
+DROP POLICY IF EXISTS "Private events viewable by owner" ON public.events;
 CREATE POLICY "Private events viewable by owner" ON public.events
 FOR SELECT USING (owner_email = auth.jwt() ->> 'email');
 
+DROP POLICY IF EXISTS "Event owners can update their events" ON public.events;
 CREATE POLICY "Event owners can update their events" ON public.events
 FOR UPDATE USING (owner_email = auth.jwt() ->> 'email');
 
+DROP POLICY IF EXISTS "Event owners can delete their events" ON public.events;
 CREATE POLICY "Event owners can delete their events" ON public.events
 FOR DELETE USING (owner_email = auth.jwt() ->> 'email');
 
+DROP POLICY IF EXISTS "Authenticated users can create events" ON public.events;
 CREATE POLICY "Authenticated users can create events" ON public.events
 FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IS NOT NULL);
 
@@ -80,7 +85,7 @@ CREATE TABLE IF NOT EXISTS public.tournaments (
   max_participants INTEGER NOT NULL,
   start_date TIMESTAMP WITH TIME ZONE NOT NULL,
   start_time VARCHAR(10),
-  format VARCHAR(50) NOT NULL CHECK (format IN ('single-elimination', 'double-elimination', 'swiss')),
+  format VARCHAR(50) NOT NULL CHECK (format IN ('single-elimination', 'double-elimination', 'swiss', 'round-robin', 'free-for-all')),
   status VARCHAR(50) DEFAULT 'Próximo',
   owner_email VARCHAR(255) NOT NULL,
   organizers JSONB DEFAULT '[]'::jsonb,
@@ -91,9 +96,15 @@ CREATE TABLE IF NOT EXISTS public.tournaments (
   prizes JSONB DEFAULT '[]'::jsonb,
   location VARCHAR(255),
   invited_users JSONB DEFAULT '[]'::jsonb,
+  registration_fields JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Migrations for existing tables
+ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS registration_fields JSONB DEFAULT '[]'::jsonb;
+
+COMMENT ON COLUMN public.tournaments.registration_fields IS 'Configuración de campos personalizados: [{label, type, required, options[], saveToProfile}]';
 
 -- Migration: Add event_id column to existing tournaments table
 -- ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS event_id UUID REFERENCES public.events(id) ON DELETE SET NULL;
@@ -116,9 +127,15 @@ CREATE TABLE IF NOT EXISTS public.participants (
   avatar TEXT,
   status VARCHAR(20) DEFAULT 'Pendiente' CHECK (status IN ('Aceptado', 'Pendiente', 'Rechazado')),
   checked_in_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  custom_responses JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   UNIQUE(tournament_id, email)
 );
+
+-- Migrations for existing tables
+ALTER TABLE public.participants ADD COLUMN IF NOT EXISTS custom_responses JSONB DEFAULT '{}'::jsonb;
+
+COMMENT ON COLUMN public.participants.custom_responses IS 'Respuestas a los campos personalizados del torneo: {label: value}';
 
 -- Migration: Add checked_in_at column to existing participants table
 -- ALTER TABLE public.participants ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
@@ -136,10 +153,12 @@ ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for tournaments
 -- Public tournaments are visible to everyone
+DROP POLICY IF EXISTS "Public tournaments are viewable by everyone" ON public.tournaments;
 CREATE POLICY "Public tournaments are viewable by everyone" ON public.tournaments
 FOR SELECT USING (registration_type = 'public');
 
 -- Private tournaments are only visible to owner and invited users
+DROP POLICY IF EXISTS "Private tournaments viewable by owner and invited users" ON public.tournaments;
 CREATE POLICY "Private tournaments viewable by owner and invited users" ON public.tournaments
 FOR SELECT USING (
   registration_type = 'private' AND (
@@ -149,19 +168,23 @@ FOR SELECT USING (
 );
 
 -- Tournament owners can update their own tournaments
+DROP POLICY IF EXISTS "Tournament owners can update their tournaments" ON public.tournaments;
 CREATE POLICY "Tournament owners can update their tournaments" ON public.tournaments
 FOR UPDATE USING (owner_email = auth.jwt() ->> 'email');
 
 -- Tournament owners can delete their own tournaments
+DROP POLICY IF EXISTS "Tournament owners can delete their tournaments" ON public.tournaments;
 CREATE POLICY "Tournament owners can delete their tournaments" ON public.tournaments
 FOR DELETE USING (owner_email = auth.jwt() ->> 'email');
 
 -- Anyone can create tournaments (if authenticated)
+DROP POLICY IF EXISTS "Authenticated users can create tournaments" ON public.tournaments;
 CREATE POLICY "Authenticated users can create tournaments" ON public.tournaments
 FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IS NOT NULL);
 
 -- RLS Policies for participants
 -- Participants are visible if the tournament is accessible
+DROP POLICY IF EXISTS "Participants viewable if tournament accessible" ON public.participants;
 CREATE POLICY "Participants viewable if tournament accessible" ON public.participants
 FOR SELECT USING (
   EXISTS (
@@ -175,6 +198,7 @@ FOR SELECT USING (
 );
 
 -- Tournament owners can manage participants
+DROP POLICY IF EXISTS "Tournament owners can manage participants" ON public.participants;
 CREATE POLICY "Tournament owners can manage participants" ON public.participants
 FOR ALL USING (
   EXISTS (
@@ -184,6 +208,7 @@ FOR ALL USING (
 );
 
 -- Users can join public tournaments
+DROP POLICY IF EXISTS "Users can join public tournaments" ON public.participants;
 CREATE POLICY "Users can join public tournaments" ON public.participants
 FOR INSERT WITH CHECK (
   EXISTS (
@@ -213,6 +238,54 @@ CREATE TRIGGER handle_tournaments_updated_at
 GRANT ALL ON public.tournaments TO authenticated;
 GRANT ALL ON public.participants TO authenticated;
 GRANT SELECT ON public.tournaments TO anon;  -- Allow anonymous users to see public tournaments
+
+-- =============================================
+-- PROFILES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY,
+  email VARCHAR(255) UNIQUE,
+  nickname VARCHAR(100),
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  birth_date DATE,
+  gender VARCHAR(50),
+  avatar_url TEXT,
+  location VARCHAR(255),
+  country VARCHAR(100),
+  bio TEXT,
+  saved_custom_fields JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Migration for existing profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS saved_custom_fields JSONB DEFAULT '{}'::jsonb;
+
+COMMENT ON COLUMN public.profiles.saved_custom_fields IS 'Campos personalizados guardados por el usuario para autocompletado: {label: value}';
+
+-- Enable RLS for profiles
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for profiles
+DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
+CREATE POLICY "Profiles are viewable by everyone" ON public.profiles
+FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile" ON public.profiles
+FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile" ON public.profiles
+FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Grant permissions for profiles
+GRANT ALL ON public.profiles TO authenticated;
+GRANT SELECT ON public.profiles TO anon;
+
+-- Create index for profiles
+CREATE INDEX IF NOT EXISTS profiles_email_idx ON public.profiles(email);
 
 -- =============================================
 -- DUELS COINS SYSTEM
