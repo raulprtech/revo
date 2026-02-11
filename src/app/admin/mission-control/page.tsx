@@ -350,6 +350,9 @@ export default function MissionControl() {
                     <TabsTrigger value="ai-lab" className="gap-2 font-bold px-6">
                         <Microscope className="h-4 w-4" /> AI LAB
                     </TabsTrigger>
+                    <TabsTrigger value="ghost-accounts" className="gap-2 font-bold px-6">
+                        <Users className="h-4 w-4" /> GHOSTS
+                    </TabsTrigger>
                     <TabsTrigger value="economy" className="gap-2 font-bold px-6">
                         <TrendingUp className="h-4 w-4" /> TOKENOMICS
                     </TabsTrigger>
@@ -864,6 +867,103 @@ export default function MissionControl() {
                                 </Button>
                             </CardContent>
                          </Card>
+                    </div>
+                </TabsContent>
+
+                {/* --- 4. GHOST ACCOUNTS --- */}
+                <TabsContent value="ghost-accounts" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="border-primary/20 bg-card/50">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Generador de Cuentas Fantasma</CardTitle>
+                                <CardDescription>Crea perfiles ficticios para llenar brackets y probar flujos de torneo.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase">Apodo del Fantasma</Label>
+                                    <Input 
+                                        placeholder="Ex: NoobMaster69" 
+                                        id="ghost_nickname"
+                                        className="bg-muted/30 border-border/50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase">Coins de Inicio</Label>
+                                    <Input 
+                                        type="number" 
+                                        defaultValue="1000" 
+                                        id="ghost_coins"
+                                        className="bg-muted/30 border-border/50"
+                                    />
+                                </div>
+                                <Button 
+                                    className="w-full font-bold" 
+                                    onClick={async () => {
+                                        setIsUpdating(true);
+                                        try {
+                                            const nickname = (document.getElementById('ghost_nickname') as HTMLInputElement).value;
+                                            const coins = parseInt((document.getElementById('ghost_coins') as HTMLInputElement).value);
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            
+                                            const { data, error } = await supabase.rpc('admin_create_ghost_account', {
+                                                p_admin_email: user?.email,
+                                                p_nickname: nickname,
+                                                p_initial_coins: coins
+                                            });
+
+                                            if (error) throw error;
+                                            toast({ title: "Fantasma Creado", description: `Email: ${data.email}` });
+                                        } catch (err: any) {
+                                            toast({ title: "Error", description: err.message, variant: "destructive" });
+                                        } finally {
+                                            setIsUpdating(false);
+                                        }
+                                    }}
+                                    disabled={isUpdating}
+                                >
+                                    <Users className="h-4 w-4 mr-2" /> CREAR FANTASMA
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-destructive/20 bg-destructive/5">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Zona de Limpieza</CardTitle>
+                                <CardDescription>Borra permanentemente todos los datos generados por cuentas fantasma.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex gap-4 items-start">
+                                    <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-1" />
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold text-destructive uppercase">Advertencia Crítica</p>
+                                        <p className="text-[10px] text-muted-foreground">Esta acción eliminará perfiles, carteras, participaciones en torneos y transacciones vinculadas a cuentas "@duels.pro". No se puede deshacer.</p>
+                                    </div>
+                                </div>
+                                <Button 
+                                    variant="destructive" 
+                                    className="w-full font-black uppercase text-[10px] tracking-widest"
+                                    onClick={async () => {
+                                        if (!confirm("¿ESTÁS SEGURO? Esto borrará TODA la data de prueba.")) return;
+                                        setIsUpdating(true);
+                                        try {
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            const { data, error } = await supabase.rpc('admin_wipe_ghost_data', {
+                                                p_admin_email: user?.email
+                                            });
+                                            if (error) throw error;
+                                            toast({ title: "Limpieza Completada", description: `Se eliminaron ${data.deleted_records} registros de prueba.` });
+                                        } catch (err: any) {
+                                            toast({ title: "Error", description: err.message, variant: "destructive" });
+                                        } finally {
+                                            setIsUpdating(false);
+                                        }
+                                    }}
+                                    disabled={isUpdating}
+                                >
+                                    <Ban className="h-4 w-4 mr-2" /> WIPE ALL GHOST DATA
+                                </Button>
+                            </CardContent>
+                        </Card>
                     </div>
                 </TabsContent>
             </Tabs>
