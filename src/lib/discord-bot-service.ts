@@ -6,7 +6,7 @@
  */
 
 import { Tournament } from './database';
-import { tournamentCaster } from '@/ai/genkit';
+import { getAiCasterComment } from '@/ai/actions';
 
 export class DiscordBotService {
     /**
@@ -51,13 +51,14 @@ export class DiscordBotService {
         console.log(`[DiscordBot] Generating AI comment for match: ${player1} vs ${player2}`);
         
         try {
-            const aiComment = await tournamentCaster({
+            const result = await getAiCasterComment({
                 eventType: 'match_start',
                 tournamentName,
                 p1Name: player1,
                 p2Name: player2
             });
 
+            const aiComment = result.success ? result.text : `¡Empieza la partida entre ${player1} y ${player2}!`;
             console.log(`[DiscordBot] AI Caster: "${aiComment}"`);
             // En producción: enviar aiComment al canal de #anuncios
         } catch (error) {
@@ -77,13 +78,14 @@ export class DiscordBotService {
 
         let aiComment = `¡${playerName} está transmitiendo su enfrentamiento contra ${vsName} en el torneo ${tournamentName}!`;
         try {
-            aiComment = await tournamentCaster({
+            const result = await getAiCasterComment({
                 eventType: 'stream_start',
                 tournamentName,
                 p1Name: playerName,
                 p2Name: vsName,
                 additionalContext: `Stream link: ${streamUrl}`
             });
+            if (result.success) aiComment = result.text as string;
         } catch (error) {
             console.error('Error in AI Caster for stream:', error);
         }
