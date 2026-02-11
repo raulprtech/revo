@@ -9,7 +9,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Users, Search, Loader2, Plus, Trophy, CalendarDays, Zap, CreditCard, Coins } from "lucide-react";
+import { 
+  ChevronDown, Users, Search, Loader2, Plus, Trophy, CalendarDays, Zap, CreditCard, Coins,
+  ArrowRightLeft, AlertCircle, Banknote
+} from "lucide-react";
 import Link from 'next/link';
 import { useState } from "react";
 import { useAuth } from "@/lib/supabase/auth-context";
@@ -17,6 +20,17 @@ import { useSubscription } from "@/lib/subscription";
 import { useCoins } from "@/hooks/use-coins";
 import { useUserTournaments } from "@/hooks/use-tournaments";
 import { Pagination, paginateArray } from "@/components/ui/pagination";
+import { useToast } from "@/hooks/use-toast";
+import { coinsService } from "@/lib/coins";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 const DASHBOARD_PER_PAGE = 10;
 
@@ -24,11 +38,94 @@ export default function DashboardPage() {
     const { user, loading: authLoading } = useAuth();
     const { isPro, subscription } = useSubscription();
     const { balance, cashBalance, dailyAvailable, refresh: refreshCoins } = useCoins();
+    const { toast } = useToast();
+    
+    // Reinversion State
+    const [isConvertOpen, setIsConvertOpen] = useState(false);
+    const [convertAmount, setConvertAmount] = useState<string>("");
+    const [isConverting, setIsConverting] = useState(false);
+
+    // Withdrawal State (Payout)
+    const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+    const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+    const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+    const handleWithdraw = async () => {
+      const amount = parseFloat(withdrawAmount);
+      if (isNaN(amount) || amount <= 0) {
+        toast({ title: "Monto inválido", variant: "destructive" });
+        return;
+      }
+      if (amount > cashBalance) {
+        toast({ title: "Saldo insuficiente", variant: "destructive" });
+        return;
+      }
+
+      setIsWithdrawing(true);
+      try {
+        const result = await coinsService.requestPayout(user!.email!, amount);
+        if (result.success) {
+          toast({ 
+            title: "Retiro solicitado", 
+            description: `Se han retenido $${amount} MXN. Recibirás $${result.netAmount} MXN en tu cuenta vinculada.` 
+          });
+          setIsWithdrawOpen(false);
+          setWithdrawAmount("");
+          refreshCoins();
+        } else {
+          toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Error", description: "Ocurrió un error inesperado", variant: "destructive" });
+      } finally {
+        setIsWithdrawing(false);
+      }
+    };
+
+    const handleConvert = async () => {
+      const amount = parseFloat(convertAmount);
+      if (isNaN(amount) || amount <= 0) {
+        toast({ title: "Monto inválido", variant: "destructive" });
+        return;
+      }
+      if (amount > cashBalance) {
+        toast({ title: "Saldo insuficiente", variant: "destructive" });
+        return;
+      }
+
+      setIsConverting(true);
+      try {
+        const result = await coinsService.convertCashToCoins(user!.email!, amount);
+        if (result.success) {
+          toast({ 
+            title: "¡Conversión exitosa!", 
+            description: `Has recibido ${result.coinsAdded} coins (incluyendo el bono del 10%).` 
+          });
+          setIsConvertOpen(false);
+          setConvertAmount("");
+          refreshCoins();
+        } else {
+          toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Error", description: "Ocurrió un error inesperado", variant: "destructive" });
+      } finally {
+        setIsConverting(false);
+      }
+    };
+
     const { ownedTournaments, participatingTournaments, isLoading: tournamentsLoading } = useUserTournaments();
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'completed' | 'finances'>('all');
     const [ownedPage, setOwnedPage] = useState(1);
     const [participatingPage, setParticipatingPage] = useState(1);
+    const [cashTransactions, setCashTransactions] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (activeTab === 'finances' && user?.email) {
+            coinsService.getCashHistory(user.email).then(setCashTransactions);
+        }
+    }, [activeTab, user?.email]);
     // Note: Route protection is handled by middleware.
     // The useAuth() hook is used here only for user data display.
 
@@ -175,10 +272,20 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Button variant="outline" size="sm" className="h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs shadow-none">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs shadow-none"
+                        onClick={() => setIsWithdrawOpen(true)}
+                      >
                         Retirar
                       </Button>
-                      <Button variant="default" size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs border-none shadow-none">
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs border-none shadow-none"
+                        onClick={() => setIsConvertOpen(true)}
+                      >
                         Reinvertir (+10%)
                       </Button>
                     </div>
@@ -229,8 +336,12 @@ export default function DashboardPage() {
                         className={`py-2 px-4 text-sm font-semibold whitespace-nowrap ${activeTab === 'completed' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         COMPLETO {completedCount}
-                    </button>
-                </div>
+                    </button>                    <button 
+                        onClick={() => handleTabChange('finances')}
+                        className={`py-2 px-4 text-sm font-semibold whitespace-nowrap ${activeTab === 'finances' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        FINANZAS
+                    </button>                </div>
 
                 <div className="relative mb-8">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -264,7 +375,7 @@ export default function DashboardPage() {
                 )}
 
                 {/* Participating Tournaments Section */}
-                {filteredParticipating.length > 0 && (
+                {activeTab !== 'finances' && filteredParticipating.length > 0 && (
                     <div className="mb-8">
                         <h2 className="text-lg font-semibold mb-4 text-muted-foreground">
                             Torneos en los que participas
@@ -281,6 +392,76 @@ export default function DashboardPage() {
                             onPageChange={setParticipatingPage}
                             className="mt-4"
                         />
+                    </div>
+                )}
+
+                {/* Finances Tab Content */}
+                {activeTab === 'finances' && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <Card className="bg-card">
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Ganado (Lifetime)</CardDescription>
+                                    <CardTitle className="text-2xl text-emerald-400">
+                                        ${wallet?.lifetime_cash_earned?.toLocaleString() || '0.00'}
+                                    </CardTitle>
+                                </CardHeader>
+                            </Card>
+                            <Card className="bg-card">
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Retirado</CardDescription>
+                                    <CardTitle className="text-2xl text-muted-foreground">
+                                        ${wallet?.lifetime_cash_withdrawn?.toLocaleString() || '0.00'}
+                                    </CardTitle>
+                                </CardHeader>
+                            </Card>
+                            <Card className="bg-card">
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Disponible</CardDescription>
+                                    <CardTitle className="text-2xl text-primary">
+                                        ${cashBalance.toLocaleString()}
+                                    </CardTitle>
+                                </CardHeader>
+                            </Card>
+                        </div>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Historial de Transacciones (Cash)</CardTitle>
+                                <CardDescription>Registro auditado de tus movimientos de dinero real</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-1">
+                                    {cashTransactions.length === 0 ? (
+                                        <div className="text-center py-12 text-muted-foreground">
+                                            No hay movimientos registrados.
+                                        </div>
+                                    ) : (
+                                        cashTransactions.map(tx => (
+                                            <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors border-b border-border last:border-0">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-full ${
+                                                        tx.amount > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                                                    }`}>
+                                                        {tx.amount > 0 ? <Plus className="h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium">{tx.description || tx.type}</p>
+                                                        <p className="text-[10px] text-muted-foreground">{new Date(tx.created_at).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`text-sm font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-foreground'}`}>
+                                                        {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()} MXN
+                                                    </p>
+                                                    <Badge variant="outline" className="text-[10px] py-0 h-4 uppercase">{tx.status}</Badge>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
 
@@ -308,6 +489,128 @@ export default function DashboardPage() {
                         )}
                     </div>
                 )}
+
+                <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Banknote className="h-5 w-5 text-emerald-400" />
+                        Retirar Fondos
+                      </DialogTitle>
+                      <DialogDescription>
+                        Envía tus ganancias directamente a tu cuenta bancaria vía Stripe Connect.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50 border border-border">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold">Saldo Retirable</span>
+                          <span className="font-bold text-emerald-400 text-xl">${cashBalance.toLocaleString()} MXN</span>
+                        </div>
+                        <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5">Verificado</Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Monto a retirar (MXN)</label>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="p-3 rounded-md bg-muted/30 border border-dashed border-border text-xs space-y-2 text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Comisión de retiro (Fija):</span>
+                          <span className="text-foreground">$15.00 MXN</span>
+                        </div>
+                        <div className="flex justify-between font-bold pt-1 border-t border-border/50">
+                          <span>Recibirás en tu banco:</span>
+                          <span className="text-emerald-400">${(Math.max(0, (parseFloat(withdrawAmount) || 0) - 15)).toLocaleString()} MXN</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-200/80">
+                        <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+                        <p>Los retiros suelen procesarse en 2-3 días hábiles. Asegúrate de tener tu cuenta de Stripe Connect vinculada en Ajustes.</p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsWithdrawOpen(false)}>Cancelar</Button>
+                      <Button 
+                        onClick={handleWithdraw} 
+                        disabled={isWithdrawing || !withdrawAmount || parseFloat(withdrawAmount) <= 15}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {isWithdrawing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Procesando...
+                          </>
+                        ) : (
+                          "Confirmar Retiro"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isConvertOpen} onOpenChange={setIsConvertOpen}>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <ArrowRightLeft className="h-5 w-5 text-emerald-400" />
+                        Reinvertir en Duels
+                      </DialogTitle>
+                      <DialogDescription>
+                        Convierte tu saldo de Cash a Duels Coins y obtén un <strong>10% EXTRA</strong> de regalo. 
+                        Este proceso no es reversible.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                        <span className="text-sm">Saldo Disponible:</span>
+                        <span className="font-bold text-emerald-400">${cashBalance.toLocaleString()} MXN</span>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Monto a convertir (MXN)</label>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={convertAmount}
+                          onChange={(e) => setConvertAmount(e.target.value)}
+                        />
+                      </div>
+                      {convertAmount && !isNaN(parseFloat(convertAmount)) && (
+                        <div className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-center">
+                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Recibirás aproximadamente</p>
+                          <p className="text-2xl font-black text-emerald-400">
+                            {(parseFloat(convertAmount) * 11).toLocaleString()} Coins
+                          </p>
+                          <p className="text-[10px] text-emerald-500/70 mt-1">Incluye bono de {(parseFloat(convertAmount) * 1).toLocaleString()} Coins</p>
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsConvertOpen(false)}>Cancelar</Button>
+                      <Button 
+                        onClick={handleConvert} 
+                        disabled={isConverting || !convertAmount}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {isConverting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Convirtiendo...
+                          </>
+                        ) : (
+                          "Confirmar Reinversión"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

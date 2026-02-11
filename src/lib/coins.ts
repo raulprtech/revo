@@ -84,6 +84,20 @@ class CoinsService {
     return { success: true, coinsAdded: data.coins_added };
   }
 
+  /** Request a withdrawal to bank account (Fixed fee $15 MXN) */
+  async requestPayout(email: string, amountMx: number): Promise<{ success: boolean; payoutId?: string; netAmount?: number; error?: string }> {
+    const { data, error } = await this.supabase.rpc('request_cash_payout', {
+      p_user_email: email,
+      p_amount: amountMx
+    });
+
+    if (error || !data.success) {
+      return { success: false, error: error?.message || data?.error || 'Error al procesar el retiro' };
+    }
+
+    return { success: true, payoutId: data.payout_id, netAmount: data.net_amount };
+  }
+
   /** Get cash transactions for audit */
   async getCashHistory(email: string): Promise<CashTransaction[]> {
     const { data, error } = await this.supabase
