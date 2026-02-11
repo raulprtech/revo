@@ -61,10 +61,10 @@ export default function MissionControl() {
 
     // --- AI Lab State ---
     const [aiStats, setAiStats] = useState({ 
-        predictionError: 0.12, 
-        confidenceAvg: 0.94,
-        totalSamples: 1240,
-        labeledToday: 42
+        predictionError: 0, 
+        confidenceAvg: 0,
+        totalSamples: 0,
+        labeledToday: 0
     });
     const [shadowLogs, setShadowLogs] = useState<any[]>([]);
 
@@ -83,10 +83,10 @@ export default function MissionControl() {
 
     // --- Economics State ---
     const [econStats, setEconStats] = useState({
-        minted: 1250000,
-        burned: 845000,
-        circulating: 405000,
-        fiatInReserve: 85000
+        minted: 0,
+        burned: 0,
+        circulating: 0,
+        fiatInReserve: 0
     });
     const [configs, setConfigs] = useState<any[]>([]);
 
@@ -192,17 +192,60 @@ export default function MissionControl() {
         try {
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('*, coin_wallets(*)')
+                .select('*, coin_wallets(*), subscriptions(*)')
                 .eq('email', searchEmail)
                 .single();
             
             if (profile) {
-                setTargetUser(profile);
+                // Subscription is an array from the join, get the active one
+                const activeSub = profile.subscriptions?.find((s: any) => s.status === 'active' || s.status === 'trialing');
+                setTargetUser({
+                    ...profile,
+                    plan: activeSub?.plan || 'community'
+                });
             } else {
                 toast({ title: "Usuario no encontrado", variant: "destructive" });
             }
         } catch (err) {
             toast({ title: "Error en la búsqueda", variant: "destructive" });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleToggleUserPlus = async (targetEmail: string, isPlus: boolean) => {
+        setIsUpdating(true);
+        try {
+            const { data: { user: adminUser } } = await supabase.auth.getUser();
+            const { error } = await supabase.rpc('admin_set_user_plus', {
+                p_admin_email: adminUser?.email,
+                p_target_email: targetEmail,
+                p_is_plus: isPlus
+            });
+            if (error) throw error;
+            toast({ title: `Usuario actualizado`, description: `Plan cambiado a ${isPlus ? 'PLUS' : 'COMMUNITY'}` });
+            if (targetUser?.email === targetEmail) handleUserSearch();
+        } catch (err: any) {
+            toast({ title: "Error", description: err.message, variant: "destructive" });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleFeatureOverride = async (targetEmail: string, features: string[]) => {
+        setIsUpdating(true);
+        try {
+            const { data: { user: adminUser } } = await supabase.auth.getUser();
+            const { error } = await supabase.rpc('admin_set_feature_override', {
+                p_admin_email: adminUser?.email,
+                p_target_email: targetEmail,
+                p_features: features
+            });
+            if (error) throw error;
+            toast({ title: "Acceso actualizado", description: "Las funciones alfa/beta han sido asignadas." });
+            if (targetUser?.email === targetEmail) handleUserSearch();
+        } catch (err: any) {
+            toast({ title: "Error", description: err.message, variant: "destructive" });
         } finally {
             setIsUpdating(false);
         }
@@ -414,10 +457,35 @@ export default function MissionControl() {
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <Badge variant={targetUser.is_pro ? "default" : "outline"} className="text-[10px]">
-                                                {targetUser.is_pro ? 'PRO MEMBER' : 'COMMUNITY'}
+                                            <Badge variant={targetUser.plan === 'plus' ? "default" : "outline"} className="text-[10px]">
+                                                {targetUser.plan === 'plus' ? 'PLUS MEMBER' : 'COMMUNITY'}
                                             </Badge>
                                             {targetUser.is_admin && <Badge className="bg-destructive text-[10px]">ADMIN</Badge>}
+                                        </div>
+                                        <div className="pt-4 space-y-3">
+                                            <p className="text-[10px] font-black uppercase text-primary/60">Alfa/Beta Testing Access</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {['ai_arbitration', 'custom_branding', 'advanced_analytics', 'early_access'].map(feature => {
+                                                    const isEnabled = targetUser.feature_overrides?.includes(feature);
+                                                    return (
+                                                        <Button 
+                                                            key={feature}
+                                                            size="sm" 
+                                                            variant={isEnabled ? "default" : "outline"}
+                                                            className="text-[9px] h-7 font-bold uppercase"
+                                                            onClick={async () => {
+                                                                const current = targetUser.feature_overrides || [];
+                                                                const next = isEnabled 
+                                                                    ? current.filter((f: string) => f !== feature)
+                                                                    : [...current, feature];
+                                                                await handleFeatureOverride(targetUser.email, next);
+                                                            }}
+                                                        >
+                                                            {feature.replace(/_/g, ' ')}
+                                                        </Button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -426,8 +494,8 @@ export default function MissionControl() {
 
                         <Card className="lg:col-span-2 border-border/50 bg-card/30">
                             <CardHeader>
-                                <CardTitle className="text-sm uppercase font-black tracking-widest text-primary/80">Wallet Doctor</CardTitle>
-                                <CardDescription>Ajustes manuales de saldo con auditoría forzada</CardDescription>
+                                <CardTitle className="text-sm uppercase font-black tracking-widest text-primary/80">Entitlement Manager & Wallet</CardTitle>
+                                <CardDescription>Ajustes de nivel de cuenta y saldo auditado</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {!targetUser ? (
@@ -444,8 +512,16 @@ export default function MissionControl() {
                                                 </div>
                                                 <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-center">
                                                     <p className="text-[10px] text-muted-foreground font-black uppercase">Cash (MXN)</p>
-                                                    <p className="text-xl font-black text-emerald-500">\${targetUser.coin_wallets?.cash_balance?.toLocaleString() || 0}</p>
+                                                    <p className="text-xl font-black text-emerald-500">${targetUser.coin_wallets?.cash_balance?.toLocaleString() || 0}</p>
                                                 </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-[10px] font-bold"
+                                                    onClick={() => handleToggleUserPlus(targetUser.email, targetUser.plan !== 'plus')}
+                                                >
+                                                    <Zap className="h-3 w-3 mr-2" /> {targetUser.plan === 'plus' ? 'REVOKE PLUS' : 'UPGRADE TO PLUS'}
+                                                </Button>
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-xs font-bold uppercase opacity-70">Ajustar Saldo</label>
@@ -474,7 +550,6 @@ export default function MissionControl() {
                                             </div>
                                             <div className="flex gap-2">
                                                 <Button className="flex-1 bg-destructive hover:bg-destructive/80 text-xs font-bold"><Ban className="h-3 w-3 mr-2" /> BAN</Button>
-                                                <Button className="flex-1 bg-primary text-xs font-bold"><Zap className="h-3 w-3 mr-2" /> FORZAR PRO</Button>
                                             </div>
                                         </div>
                                     </div>
@@ -1032,6 +1107,31 @@ export default function MissionControl() {
                                             }
                                         }}
                                     >JOIN ALL GHOSTS</Button>
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        className="w-full text-[10px] font-bold"
+                                        onClick={async () => {
+                                            const tId = (document.getElementById('sim_tournament') as HTMLSelectElement).value;
+                                            if (!tId) return;
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                const { error } = await supabase.rpc('admin_set_tournament_plus', {
+                                                    p_admin_email: user?.email,
+                                                    p_tournament_id: tId,
+                                                    p_is_plus: true
+                                                });
+                                                if (error) throw error;
+                                                toast({ title: "Torneo Elevado", description: "El torneo ahora es PLUS." });
+                                                fetchTournaments();
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                    >UPGRADE TOURNEY TO PLUS</Button>
                                 </div>
 
                                 <div className="p-4 rounded-lg bg-muted/20 border border-border space-y-3">
@@ -1061,30 +1161,58 @@ export default function MissionControl() {
                                             }
                                         }}
                                     >SHOPPING SPREE</Button>
-                                    <Button 
-                                        size="sm" 
-                                        variant="ghost"
-                                        className="w-full text-[9px] font-bold h-7"
-                                        onClick={async () => {
-                                            setIsUpdating(true);
-                                            try {
-                                                const { data: { user } } = await supabase.auth.getUser();
-                                                let equipped = 0;
-                                                for (const g of ghosts) {
-                                                    const { data } = await supabase.rpc('admin_ghost_equip_item', {
-                                                        p_admin_email: user?.email,
-                                                        p_ghost_email: g.email
-                                                    });
-                                                    if (data?.success) equipped++;
+                                    <div className="flex gap-2">
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost"
+                                            className="flex-1 text-[9px] font-bold h-7"
+                                            onClick={async () => {
+                                                setIsUpdating(true);
+                                                try {
+                                                    const { data: { user } } = await supabase.auth.getUser();
+                                                    let equipped = 0;
+                                                    for (const g of ghosts) {
+                                                        const { data } = await supabase.rpc('admin_ghost_equip_item', {
+                                                            p_admin_email: user?.email,
+                                                            p_ghost_email: g.email
+                                                        });
+                                                        if (data?.success) equipped++;
+                                                    }
+                                                    toast({ title: "Cosméticos Equipados", description: `${equipped} fantasmas han actualizado su equipo.` });
+                                                } catch (err: any) {
+                                                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                                                } finally {
+                                                    setIsUpdating(false);
                                                 }
-                                                toast({ title: "Cosméticos Equipados", description: `${equipped} fantasmas han actualizado su equipo.` });
-                                            } catch (err: any) {
-                                                toast({ title: "Error", description: err.message, variant: "destructive" });
-                                            } finally {
-                                                setIsUpdating(false);
-                                            }
-                                        }}
-                                    >EQUIP NEWEST ITEM</Button>
+                                            }}
+                                        >EQUIP ITEMS</Button>
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost"
+                                            className="flex-1 text-[9px] font-bold h-7 text-indigo-400"
+                                            onClick={async () => {
+                                                setIsUpdating(true);
+                                                try {
+                                                    const { data: { user } } = await supabase.auth.getUser();
+                                                    let plusCount = 0;
+                                                    for (const g of ghosts) {
+                                                        await supabase.rpc('admin_set_user_plus', {
+                                                            p_admin_email: user?.email,
+                                                            p_target_email: g.email,
+                                                            p_is_plus: true
+                                                        });
+                                                        plusCount++;
+                                                    }
+                                                    toast({ title: "Ghosts Upgraded", description: `${plusCount} fantasmas ahora son PLUS.` });
+                                                    fetchGhosts();
+                                                } catch (err: any) {
+                                                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                                                } finally {
+                                                    setIsUpdating(false);
+                                                }
+                                            }}
+                                        >GHOSTS -> PLUS</Button>
+                                    </div>
                                 </div>
 
                                 <div className="p-4 rounded-lg bg-muted/20 border border-border space-y-3">
