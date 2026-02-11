@@ -204,7 +204,7 @@ export default function MissionControl() {
                 throw new Error(error?.message || data?.error || 'Error al aplicar el ajuste');
             }
 
-            toast({ title: "Ajuste aplicado", description: \`Se han modificado \${adjustAmount} \${type.toUpperCase()} correctamente.\` });
+            toast({ title: "Ajuste aplicado", description: `Se han modificado ${adjustAmount} ${type.toUpperCase()} correctamente.` });
             setAdjustAmount("");
             setAdjustReason("");
             await handleUserSearch();
@@ -230,7 +230,7 @@ export default function MissionControl() {
 
             if (error) throw error;
             
-            toast({ title: "Conflicto Resuelto", description: \`Se ha marcado al Jugador \${winner} como ganador.\` });
+            toast({ title: "Conflicto Resuelto", description: `Se ha marcado al Jugador ${winner} como ganador.` });
             fetchDisputes();
         } catch (err: any) {
             toast({ title: "Error", description: err.message, variant: "destructive" });
