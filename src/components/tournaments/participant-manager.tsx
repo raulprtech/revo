@@ -9,6 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Checkbox } from "../ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { db, type Participant as DbParticipant } from "@/lib/database";
@@ -59,8 +61,32 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
+    // Export state
+    const [showExportDialog, setShowExportDialog] = useState(false);
+    const [exportSelections, setExportSelections] = useState<Record<string, boolean>>({
+        'Nickname': true,
+        'Nombre Completo': true,
+        'Email': true,
+        'Edad': true,
+        'Género': true,
+        'Estado': true,
+        'Check-in': true,
+        'Fecha de Inscripción': true,
+    });
+
     const loading = loadingParticipants || loadingTournament;
     
+    // Initialize custom fields selections
+    useEffect(() => {
+        if (tournament?.registration_fields) {
+            const extraSelections: Record<string, boolean> = {};
+            tournament.registration_fields.forEach(f => {
+                extraSelections[f.label] = true;
+            });
+            setExportSelections(prev => ({ ...prev, ...extraSelections }));
+        }
+    }, [tournament?.registration_fields]);
+
     // Determine if tournament is in-person (has location)
     const isInPersonTournament = Boolean(tournament?.location);
 
@@ -460,48 +486,46 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
             return;
         }
 
-        // Prepare CSV data
-        const headers = [
-            'Nickname',
-            'Nombre Completo',
-            'Email',
-            'Edad',
-            'Género',
-            'Estado',
-            'Check-in',
-            'Fecha de Inscripción'
-        ];
+        const selectedFields = Object.entries(exportSelections).filter(([_, selected]) => selected).map(([name]) => name);
 
-        const rows = participants.map(p => [
-            p.name,
-            p.full_name || 'No disponible',
-            p.email,
-            calculateAge(p.birth_date)?.toString() || 'No disponible',
-            p.gender ? formatGender(p.gender) : 'No disponible',
-            p.status,
-            p.checked_in_at ? new Date(p.checked_in_at).toLocaleString('es-ES') : 'No',
-            p.created_at ? new Date(p.created_at).toLocaleString('es-ES') : ''
-        ]);
-        // Add custom responses to headers and rows
-        if (tournament?.registration_fields && tournament.registration_fields.length > 0) {
-            tournament.registration_fields.forEach(field => {
-                headers.push(field.label);
+        if (selectedFields.length === 0) {
+            toast({
+                title: "Selecciona campos",
+                description: "Debes seleccionar al menos un campo para exportar.",
+                variant: "destructive"
             });
-
-            participants.forEach((p, idx) => {
-                tournament.registration_fields?.forEach(field => {
-                    const response = p.custom_responses?.[field.label];
-                    let displayResponse = response !== undefined ? response : '';
-                    if (typeof displayResponse === 'boolean') {
-                        displayResponse = displayResponse ? 'Sí' : 'No';
-                    }
-                    rows[idx].push(displayResponse);
-                });
-            });
+            return;
         }
+
+        // Prepare rows based on selected fields
+        const rows = participants.map(p => {
+            const row: string[] = [];
+            
+            selectedFields.forEach(field => {
+                let value = '';
+                switch (field) {
+                    case 'Nickname': value = p.name; break;
+                    case 'Nombre Completo': value = p.full_name || 'No disponible'; break;
+                    case 'Email': value = p.email; break;
+                    case 'Edad': value = calculateAge(p.birth_date)?.toString() || 'No disponible'; break;
+                    case 'Género': value = p.gender ? formatGender(p.gender) : 'No disponible'; break;
+                    case 'Estado': value = p.status; break;
+                    case 'Check-in': value = p.checked_in_at ? new Date(p.checked_in_at).toLocaleString('es-ES') : 'No'; break;
+                    case 'Fecha de Inscripción': value = p.created_at ? new Date(p.created_at).toLocaleString('es-ES') : ''; break;
+                    default:
+                        // Check custom responses
+                        const response = p.custom_responses?.[field];
+                        value = response !== undefined ? response : '';
+                        if (typeof value === 'boolean') value = value ? 'Sí' : 'No';
+                }
+                row.push(String(value));
+            });
+            return row;
+        });
+
         // Create CSV content
         const csvContent = [
-            headers.join(','),
+            selectedFields.join(','),
             ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         ].join('\n');
 
@@ -519,6 +543,7 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
+        setShowExportDialog(false);
         toast({
             title: "Exportación completada",
             description: `Se han exportado ${participants.length} participantes.`
@@ -659,7 +684,7 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                                     </Button>
                                 }
                             >
-                                <Button variant="outline" size="sm" onClick={handleExportToExcel}>
+                                <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
                                     <Download className="mr-2 h-4 w-4" /> Exportar
                                 </Button>
                             </ProFeatureGate>
@@ -717,6 +742,10 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                             <TableHead>Nombre Completo</TableHead>
                             <TableHead>Edad</TableHead>
                             <TableHead>Género</TableHead>
+                            {/* Custom Fields Headers */}
+                            {tournament?.registration_fields?.map(field => (
+                                <TableHead key={field.label}>{field.label}</TableHead>
+                            ))}
                             <TableHead>Estado</TableHead>
                             {isInPersonTournament && <TableHead>Check-in</TableHead>}
                             <TableHead className="text-right">Acciones</TableHead>
@@ -725,7 +754,7 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={isInPersonTournament ? 7 : 6} className="text-center h-24">Cargando participantes...</TableCell>
+                                <TableCell colSpan={(isInPersonTournament ? 7 : 6) + (tournament?.registration_fields?.length || 0)} className="text-center h-24">Cargando participantes...</TableCell>
                             </TableRow>
                         ) : filteredParticipants.length > 0 ? (
                             filteredParticipants.map((p) => (
@@ -763,6 +792,17 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                                             <span className="text-xs text-muted-foreground italic">-</span>
                                         )}
                                     </TableCell>
+                                    {/* Custom Fields Values */}
+                                    {tournament?.registration_fields?.map(field => {
+                                        const response = p.custom_responses?.[field.label];
+                                        return (
+                                            <TableCell key={field.label}>
+                                                <span className="text-sm">
+                                                    {response === undefined ? '-' : (typeof response === 'boolean' ? (response ? 'Sí' : 'No') : String(response))}
+                                                </span>
+                                            </TableCell>
+                                        );
+                                    })}
                                     <TableCell>
                                         {getParticipantStatusBadge(p)}
                                     </TableCell>
@@ -863,7 +903,10 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={isInPersonTournament ? 5 : 4} className="text-center h-24">
+                                <TableCell 
+                                    colSpan={(isInPersonTournament ? 7 : 6) + (tournament?.registration_fields?.length || 0)} 
+                                    className="text-center h-24"
+                                >
                                     {participants.length === 0 
                                         ? "No hay participantes aún."
                                         : "No se encontraron participantes con los filtros aplicados."
@@ -873,6 +916,73 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                         )}
                     </TableBody>
                 </Table>
+
+                {/* Export Dialog */}
+                <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Exportar Participantes</DialogTitle>
+                            <DialogDescription>
+                                Selecciona los campos que deseas incluir en el archivo CSV.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-medium leading-none">Campos Estándar</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {Object.entries(exportSelections)
+                                        .filter(([name]) => !tournament?.registration_fields?.some(f => f.label === name))
+                                        .map(([name, selected]) => (
+                                            <div key={name} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`export-${name}`} 
+                                                    checked={selected}
+                                                    onCheckedChange={(checked) => {
+                                                        setExportSelections(prev => ({ ...prev, [name]: !!checked }));
+                                                    }}
+                                                />
+                                                <label
+                                                    htmlFor={`export-${name}`}
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    {name}
+                                                </label>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+
+                            {tournament?.registration_fields && tournament.registration_fields.length > 0 && (
+                                <div className="space-y-4 pt-2 border-t text-foreground">
+                                    <h4 className="text-sm font-medium leading-none">Campos del Torneo</h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {tournament.registration_fields.map(field => (
+                                            <div key={field.label} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`export-custom-${field.label}`} 
+                                                    checked={exportSelections[field.label] || false}
+                                                    onCheckedChange={(checked) => {
+                                                        setExportSelections(prev => ({ ...prev, [field.label]: !!checked }));
+                                                    }}
+                                                />
+                                                <label
+                                                    htmlFor={`export-custom-${field.label}`}
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    {field.label}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowExportDialog(false)}>Cancelar</Button>
+                            <Button onClick={handleExportToExcel}>Descargar CSV</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </CardContent>
         </Card>
     );
