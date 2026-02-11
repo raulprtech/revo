@@ -973,7 +973,7 @@ export default function MissionControl() {
                     </Card>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                         <Card className="border-border/50 bg-card">
+                        <Card className="border-border/50 bg-card">
                             <CardHeader>
                                 <CardTitle className="text-sm font-bold flex items-center gap-2">
                                     <Database className="h-4 w-4 text-primary" /> Parámetros del Protocolo
@@ -1004,9 +1004,9 @@ export default function MissionControl() {
                                     </div>
                                 ))}
                             </CardContent>
-                         </Card>
+                        </Card>
 
-                         <div className="space-y-6">
+                        <div className="space-y-6">
                             <BurnMasterPilotCard />
 
                             <Card className="border-border/50 bg-card">
@@ -1016,75 +1016,76 @@ export default function MissionControl() {
                                     </CardTitle>
                                     <CardDescription className="text-[10px]">Estado de emisión y quema de Duel Coins.</CardDescription>
                                 </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-[10px] font-bold uppercase opacity-50">
-                                        <span>Reserve Ratio</span>
-                                        <span>{(econStats.fiatInReserve > 0 ? (econStats.fiatInReserve / (econStats.circulating || 1) * 100).toFixed(0) : 0)}%</span>
+                                <CardContent className="space-y-6">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[10px] font-bold uppercase opacity-50">
+                                            <span>Reserve Ratio</span>
+                                            <span>{(econStats.fiatInReserve > 0 ? (econStats.fiatInReserve / (econStats.circulating || 1) * 100).toFixed(0) : 0)}%</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-emerald-500 transition-all duration-1000" 
+                                                style={{ width: `${Math.min(100, (econStats.fiatInReserve / (econStats.circulating || 1)) * 100)}%` }} 
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-emerald-500 transition-all duration-1000" 
-                                            style={{ width: `${Math.min(100, (econStats.fiatInReserve / (econStats.circulating || 1)) * 100)}%` }} 
-                                        />
-                                    </div>
-                                </div>
 
-                                <div className="space-y-3">
-                                    {econStats.recentTransactions.length === 0 ? (
-                                        <p className="text-[10px] text-center italic opacity-50 py-4">No recent activity</p>
-                                    ) : (
-                                        econStats.recentTransactions.map((tx: any) => (
-                                            <div key={tx.id} className="flex justify-between items-center text-[10px] border-b border-border/20 pb-2">
-                                                <div className="flex gap-2 items-center">
-                                                    <Badge className={cn(
-                                                        "border-none h-4 px-1",
-                                                        tx.amount > 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                    <div className="space-y-3">
+                                        {econStats.recentTransactions.length === 0 ? (
+                                            <p className="text-[10px] text-center italic opacity-50 py-4">No recent activity</p>
+                                        ) : (
+                                            econStats.recentTransactions.map((tx: any) => (
+                                                <div key={tx.id} className="flex justify-between items-center text-[10px] border-b border-border/20 pb-2">
+                                                    <div className="flex gap-2 items-center">
+                                                        <Badge className={cn(
+                                                            "border-none h-4 px-1",
+                                                            tx.amount > 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                                        )}>
+                                                            {tx.amount > 0 ? "MINT" : "BURN"}
+                                                        </Badge>
+                                                        <span className="font-mono truncate max-w-[120px]">{tx.reason || 'No reason'}</span>
+                                                    </div>
+                                                    <span className={cn(
+                                                        "font-bold",
+                                                        tx.amount > 0 ? "text-emerald-400" : "text-rose-400"
                                                     )}>
-                                                        {tx.amount > 0 ? "MINT" : "BURN"}
-                                                    </Badge>
-                                                    <span className="font-mono truncate max-w-[120px]">{tx.reason || 'No reason'}</span>
+                                                        {tx.amount > 0 ? `+${tx.amount}` : tx.amount} DC
+                                                    </span>
                                                 </div>
-                                                <span className={cn(
-                                                    "font-bold",
-                                                    tx.amount > 0 ? "text-emerald-400" : "text-rose-400"
-                                                )}>
-                                                    {tx.amount > 0 ? `+${tx.amount}` : tx.amount} DC
-                                                </span>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="w-full text-[10px] font-black uppercase text-amber-500 border-amber-500/20 hover:bg-amber-500/10"
-                                    onClick={async () => {
-                                        setIsUpdating(true);
-                                        try {
-                                            const { data: { user } } = await supabase.auth.getUser();
-                                            const { data, error } = await supabase.rpc('admin_force_burn_cycle', {
-                                                p_admin_email: user?.email
-                                            });
-                                            if (error) throw error;
-                                            toast({ 
-                                                title: "Ciclo Deflacionario", 
-                                                description: `Se han retirado ${data.burned_amount} DC de circulación. Reserve Ratio: ${data.new_reserve_ratio}` 
-                                            });
-                                            await fetchEconStats();
-                                        } catch (err: any) {
-                                            toast({ title: "Error", description: err.message, variant: "destructive" });
-                                        } finally {
-                                            setIsUpdating(false);
-                                        }
-                                    }}
-                                    disabled={isUpdating}
-                                >
-                                    <Zap className="h-3 w-3 mr-2" /> Forzar Ciclo de Quema
-                                </Button>
-                            </CardContent>
-                         </Card>
+                                            ))
+                                        )}
+                                    </div>
+                                    
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        className="w-full text-[10px] font-black uppercase text-amber-500 border-amber-500/20 hover:bg-amber-500/10"
+                                        onClick={async () => {
+                                            setIsUpdating(true);
+                                            try {
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                const { data, error } = await supabase.rpc('admin_force_burn_cycle', {
+                                                    p_admin_email: user?.email
+                                                });
+                                                if (error) throw error;
+                                                toast({ 
+                                                    title: "Ciclo Deflacionario", 
+                                                    description: `Se han retirado ${data.burned_amount} DC de circulación. Reserve Ratio: ${data.new_reserve_ratio}` 
+                                                });
+                                                await fetchEconStats();
+                                            } catch (err: any) {
+                                                toast({ title: "Error", description: err.message, variant: "destructive" });
+                                            } finally {
+                                                setIsUpdating(false);
+                                            }
+                                        }}
+                                        disabled={isUpdating}
+                                    >
+                                        <Zap className="h-3 w-3 mr-2" /> Forzar Ciclo de Quema
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
                 </TabsContent>
 
