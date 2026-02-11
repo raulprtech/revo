@@ -39,6 +39,7 @@ import AILabPage from "./ai-lab/page";
 import PlatformIntelligence from "./intelligence/page";
 import RetentionEngine from "./retention/page";
 import CosmeticsManager from "./cosmetics/page";
+import { BurnMasterPilotCard } from "./economy/pilot-mode-card";
 import { 
     LineChart, 
     Line, 
@@ -1005,13 +1006,16 @@ export default function MissionControl() {
                             </CardContent>
                          </Card>
 
-                         <Card className="border-border/50 bg-card">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                    <History className="h-4 w-4 text-amber-500" /> Mint/Burn Lifecycle
-                                </CardTitle>
-                                <CardDescription className="text-[10px]">Estado de emisión y quema de Duel Coins.</CardDescription>
-                            </CardHeader>
+                         <div className="space-y-6">
+                            <BurnMasterPilotCard />
+
+                            <Card className="border-border/50 bg-card">
+                                <CardHeader>
+                                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                        <History className="h-4 w-4 text-amber-500" /> Mint/Burn Lifecycle
+                                    </CardTitle>
+                                    <CardDescription className="text-[10px]">Estado de emisión y quema de Duel Coins.</CardDescription>
+                                </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-[10px] font-bold uppercase opacity-50">

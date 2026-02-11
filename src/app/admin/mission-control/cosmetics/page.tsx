@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCosmetics, upsertCosmetic, deleteCosmetic, getPilotMode, updatePilotMode } from "./actions";
+import { getCosmetics, upsertCosmetic, deleteCosmetic } from "./actions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,18 +15,13 @@ import {
     X, 
     ShoppingBag, 
     Sparkles, 
-    ShieldCheck, 
-    BrainCircuit,
-    Settings2,
-    ToggleLeft,
-    ToggleRight
+    ShieldCheck
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 export default function CosmeticsManager() {
     const [items, setItems] = useState<any[]>([]);
-    const [pilotMode, setPilotMode] = useState({ enabled: false, threshold: 0.30 });
     const [editingId, setEditingId] = useState<string | null>(null);
     const [newItem, setNewItem] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -38,9 +33,8 @@ export default function CosmeticsManager() {
 
     const loadData = async () => {
         setIsLoading(true);
-        const [cosmetics, settings] = await Promise.all([getCosmetics(), getPilotMode()]);
+        const cosmetics = await getCosmetics();
         setItems(cosmetics);
-        setPilotMode(settings);
         setIsLoading(false);
     };
 
@@ -63,60 +57,11 @@ export default function CosmeticsManager() {
         }
     };
 
-    const handlePilotToggle = async () => {
-        const newSettings = { ...pilotMode, enabled: !pilotMode.enabled };
-        const res = await updatePilotMode(newSettings);
-        if (res.success) {
-            setPilotMode(newSettings);
-            toast({ 
-                title: newSettings.enabled ? "Modo Piloto Activado" : "Modo Piloto Desactivado", 
-                description: newSettings.enabled ? "El Burn Master actuará autónomamente." : "Control manual restaurado."
-            });
-        }
-    };
-
     return (
         <div className="space-y-6 animate-in fade-in duration-700">
-            {/* AI Control Center */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="bg-slate-950 border-indigo-500/20">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                                <BrainCircuit className="h-4 w-4 text-indigo-400" /> Burn Master Pilot Mode
-                            </CardTitle>
-                            <Button variant="ghost" size="sm" onClick={handlePilotToggle}>
-                                {pilotMode.enabled ? (
-                                    <ToggleRight className="h-6 w-6 text-emerald-500" />
-                                ) : (
-                                    <ToggleLeft className="h-6 w-6 text-muted-foreground" />
-                                )}
-                            </Button>
-                        </div>
-                        <CardDescription className="text-[10px] uppercase font-bold tracking-widest">
-                            Automatización económica basada en Reserve Ratio
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                                <p className="text-[10px] text-muted-foreground mb-1 uppercase font-bold">Umbral de Intervención (Reserve Ratio &lt; X)</p>
-                                <Input 
-                                    type="number" 
-                                    step="0.05"
-                                    value={pilotMode.threshold}
-                                    onChange={(e) => setPilotMode({...pilotMode, threshold: parseFloat(e.target.value)})}
-                                    className="bg-white/5 border-white/10 h-8 text-xs font-bold"
-                                />
-                            </div>
-                            <Button size="sm" onClick={() => updatePilotMode(pilotMode)} className="h-8 bg-indigo-600 text-[10px] font-black uppercase">
-                                <Settings2 className="h-3 w-3 mr-1" /> Guardar Umbral
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-slate-950 border-emerald-500/20">
+            {/* Inventory Status */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-slate-950 border-emerald-500/20 col-span-1">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-emerald-400">
                             <ShieldCheck className="h-4 w-4" /> Estatus del Inventario
@@ -129,7 +74,46 @@ export default function CosmeticsManager() {
                             </div>
                             <div>
                                 <h4 className="text-xl font-black italic">{items.length}</h4>
-                                <p className="text-[10px] uppercase font-bold text-muted-foreground">Productos Activos en Tienda</p>
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground">Productos Activos</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-slate-950 border-indigo-500/20 col-span-2">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-indigo-400">
+                            <Sparkles className="h-4 w-4" /> Economía de Cosméticos
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center gap-8">
+                        <div>
+                            <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Total Burn Potential</p>
+                            <p className="text-lg font-black italic text-indigo-300">
+                                {items.reduce((acc, item) => acc + (item.price_coins * (item.stock === -1 ? 0 : item.stock)), 0).toLocaleString()} 
+                                <span className="text-[10px] ml-1">DC</span>
+                            </p>
+                        </div>
+                        <div className="h-10 w-px bg-white/5" />
+                        <div className="flex-1">
+                            <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Distribución de Rareza</p>
+                            <div className="flex gap-1 h-3 rounded-full overflow-hidden">
+                                {['common', 'rare', 'epic', 'legendary'].map(r => {
+                                    const count = items.filter(i => i.rarity === r).length;
+                                    const pct = items.length > 0 ? (count / items.length) * 100 : 0;
+                                    return (
+                                        <div 
+                                            key={r}
+                                            className={cn(
+                                                "h-full transition-all",
+                                                r === 'common' ? "bg-slate-500" :
+                                                r === 'rare' ? "bg-indigo-500" :
+                                                r === 'epic' ? "bg-purple-500" : "bg-amber-500"
+                                            )}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    );
+                                })}
                             </div>
                         </div>
                     </CardContent>
