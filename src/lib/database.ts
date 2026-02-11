@@ -162,6 +162,13 @@ export type Tournament = {
     options?: string[]; // Para selects
     saveToProfile?: boolean;
   }[];
+  // Discord integration fields
+  discord_category_id?: string;
+  discord_role_id?: string;
+  discord_settings?: {
+    auto_create: boolean;
+    sync_roles: boolean;
+  };
   // Legacy Pro (one-time event purchase)
   is_legacy_pro?: boolean;
   legacy_pro_purchased_at?: string;
@@ -189,6 +196,51 @@ export type Participant = {
   parent_email?: string;
   data_sharing_consent?: boolean;
   custom_responses?: Record<string, any>;
+};
+
+export type Profile = {
+  id: string;
+  email: string;
+  nickname?: string;
+  first_name?: string;
+  last_name?: string;
+  birth_date?: string;
+  gender?: string;
+  avatar_url?: string;
+  location?: string;
+  country?: string;
+  bio?: string;
+  saved_custom_fields?: Record<string, any>;
+  discord_id?: string;
+  discord_username?: string;
+  discord_linked?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type MatchRoomStatus = 'pending' | 'ongoing' | 'dispute' | 'finished';
+
+export type MatchRoom = {
+  id: string;
+  tournament_id: string;
+  match_id: string; // From bracket data
+  player_1_email: string;
+  player_2_email: string;
+  p1_ready: boolean;
+  p2_ready: boolean;
+  host_email?: string;
+  match_code?: string;
+  p1_score?: number;
+  p2_score?: number;
+  p1_evidence_url?: string;
+  p2_evidence_url?: string;
+  recorded_match_url?: string;
+  stream_url?: string;
+  stream_announced_at?: string;
+  status: MatchRoomStatus;
+  conflict_resolved_by?: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type CreateTournamentData = Omit<Tournament, 'id' | 'participants' | 'created_at' | 'updated_at'>;
@@ -1605,6 +1657,68 @@ class DatabaseService {
       rarity: (titleData.rarity || 'common') as BadgeRarity,
       source_type: 'achievement',
     });
+  }
+
+  // =============================================
+  // MATCH ROOM OPERATIONS
+  // =============================================
+
+  async getOrCreateMatchRoom(tournamentId: string, matchId: string, p1Email: string, p2Email: string): Promise<MatchRoom> {
+    const { data: existing, error: findError } = await this.supabase
+      .from('match_rooms')
+      .select('*')
+      .eq('tournament_id', tournamentId)
+      .eq('match_id', matchId)
+      .maybeSingle();
+
+    if (existing) return existing;
+
+    const { data, error } = await this.supabase
+      .from('match_rooms')
+      .insert({
+        tournament_id: tournamentId,
+        match_id: matchId,
+        player_1_email: p1Email,
+        player_2_email: p2Email,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating match room:', error);
+      throw error;
+    }
+
+    return data;
+  }
+
+  async updateMatchRoom(roomId: string, updates: Partial<MatchRoom>): Promise<MatchRoom> {
+    const { data, error } = await this.supabase
+      .from('match_rooms')
+      .update(updates)
+      .eq('id', roomId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating match room:', error);
+      throw error;
+    }
+
+    return data;
+  }
+
+  async listenToMatchRoom(roomId: string, callback: (payload: any) => void) {
+    return this.supabase
+      .channel(`match_room_${roomId}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'match_rooms',
+        filter: `id=eq.${roomId}`
+      }, callback)
+      .subscribe();
   }
 }
 

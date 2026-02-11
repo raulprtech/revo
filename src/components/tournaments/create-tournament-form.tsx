@@ -24,6 +24,7 @@ import { CalendarIcon, Loader2, Upload, X, Gamepad2, Trophy, Plus } from "lucide
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { db, type CreateTournamentData, type Event, type Prize, type GameStation, type BadgeTemplate } from "@/lib/database";
 import { createClient } from "@/lib/supabase/client";
+import { DiscordBotService } from "@/lib/discord-bot-service";
 import { PrizeManager } from "./prize-manager";
 import { StationManager } from "./station-manager";
 import { BadgeManager } from "./badge-manager";
@@ -414,6 +416,25 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
 
         console.log('Tournament payload:', tournamentPayload);
         const newTournament = await db.createTournament(tournamentPayload);
+
+        // Setup Discord if Online and requested
+        if (values.tournamentMode === 'online') {
+            try {
+                const discordData = await DiscordBotService.setupTournamentDiscord(newTournament);
+                await db.updateTournament(newTournament.id, {
+                    discord_category_id: discordData.categoryId,
+                    discord_role_id: discordData.roleId,
+                    discord_settings: { auto_create: true, sync_roles: true }
+                });
+            } catch (discordErr) {
+                console.error('Error setting up Discord:', discordErr);
+                toast({
+                    title: "Aviso",
+                    description: "El torneo se creó pero la integración con Discord falló.",
+                    variant: "default"
+                });
+            }
+        }
 
         toast({
           title: "¡Torneo Creado!",
@@ -809,6 +830,32 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
                 </FormItem>
                 )}
             />
+
+            {/* Discord Automation Toggle for Online Tournaments */}
+            {form.watch("tournamentMode") === "online" && (
+                <div className="p-4 border rounded-lg bg-indigo-50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/30 space-y-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-semibold text-indigo-900 dark:text-indigo-300">Integración con Discord</h4>
+                            <p className="text-xs text-indigo-700 dark:text-indigo-400">Automatiza la gestión de canales y roles para este torneo.</p>
+                        </div>
+                        <Badge variant="outline" className="bg-white dark:bg-slate-950">REVO Logistics</Badge>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="discord-auto-create" 
+                            defaultChecked={true}
+                        />
+                        <label htmlFor="discord-auto-create" className="text-xs font-medium cursor-pointer">
+                            Crear categoría, canales (#anuncios, #chat, #soporte) y roles automáticamente.
+                        </label>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground italic">
+                        * Los jugadores recibirán su rol al inscribirse si vinculan su Discord.
+                    </p>
+                </div>
+            )}
+
             {form.watch("tournamentMode") === "presencial" && (
              <FormField
                 control={form.control}

@@ -17,6 +17,7 @@ import { EventLinkManager } from "@/components/tournaments/event-link-manager";
 import TournamentStats from "@/components/tournaments/tournament-stats";
 import { PrizeDisplay } from "@/components/tournaments/prize-manager";
 import { OrganizerManager } from "@/components/shared/organizer-manager";
+import { MatchRoomComponent } from "@/components/tournaments/match-room";
 import Image from "next/image";
 import {
   AlertDialog,
@@ -32,6 +33,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { db, type Tournament, type Participant, type Event } from "@/lib/database";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { DiscordBotService } from "@/lib/discord-bot-service";
 import { useTournament, useIsParticipating, useParticipants, invalidateCache } from "@/hooks/use-tournaments";
 import { useTournamentRealtime, type TournamentRealtimeEvent } from "@/hooks/use-realtime";
 import { calculateStandings } from "@/components/tournaments/standings-table";
@@ -67,6 +69,7 @@ export default function TournamentPage() {
   const [cosmeticsMap, setCosmeticsMap] = useState<CosmeticsMap>({});
   const [legacyCheckoutLoading, setLegacyCheckoutLoading] = useState(false);
   const [showCustomFields, setShowCustomFields] = useState(false);
+  const [currentMatchRoom, setCurrentMatchRoom] = useState<any | null>(null);
 
   // Sync fetched tournament to local state
   useEffect(() => {
@@ -74,6 +77,37 @@ export default function TournamentPage() {
       setTournament(fetchedTournament);
     }
   }, [fetchedTournament]);
+
+  // Load linked match room if user is participant
+  useEffect(() => {
+    const fetchMatchRoom = async () => {
+        if (!user || (!isParticipant && !isOwner) || !id) return;
+        
+        const { data } = await db.supabase
+          .from('match_rooms')
+          .select('*')
+          .eq('tournament_id', id)
+          .or(`player_1_email.eq.${user.email},player_2_email.eq.${user.email}`)
+          .neq('status', 'finished')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) setCurrentMatchRoom(data);
+        else {
+            // Find participant names for common lookup
+            const me = participants?.find(p => p.email === user.email);
+            if (!me) return;
+
+            // Optional: Auto-create match room if bracket is live
+            // (For now we'll rely on the user navigating or an admin action)
+        }
+      };
+      
+      if (id && user && (isParticipant || isOwner) && participants) {
+        fetchMatchRoom();
+      }
+  }, [id, user, isParticipant, isOwner, participants]);
 
   // Load linked event when tournament has event_id
   useEffect(() => {
@@ -572,6 +606,11 @@ export default function TournamentPage() {
       invalidateCache.participants(tournament.id);
       invalidateCache.publicTournaments();
 
+      // Trigger Discord Onboarding if available
+      if (tournament.discord_role_id && user.discord_id) {
+          DiscordBotService.onboardParticipant(user.discord_id, tournament.discord_role_id);
+      }
+
       setIsParticipant(true);
       setShowCustomFields(false);
       toast({ title: "¡Inscripción Enviada!", description: "Tu solicitud para unirte al torneo ha sido enviada." });
@@ -605,6 +644,11 @@ export default function TournamentPage() {
             if (success) {
               toast({ title: "Fondos procesados", description: message });
             }
+          }
+
+          // 3. Discord Teardown
+          if (tournament.discord_category_id && tournament.discord_role_id) {
+              DiscordBotService.teardownTournament(tournament.id, tournament.discord_category_id, tournament.discord_role_id);
           }
         }
     }
@@ -744,6 +788,7 @@ export default function TournamentPage() {
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="bracket">Bracket</TabsTrigger>
           <TabsTrigger value="standings">Posiciones</TabsTrigger>
+          {(isParticipant || isOwner) && <TabsTrigger value="match-room">Sala de Partida</TabsTrigger>}
           {isOwner && <TabsTrigger value="stats">Estadísticas</TabsTrigger>}
           {isOwner && <TabsTrigger value="manage">Gestionar</TabsTrigger>}
           {isOwner && tournament.registration_type === 'private' && <TabsTrigger value="invitations">Invitaciones</TabsTrigger>}
@@ -1020,6 +1065,27 @@ export default function TournamentPage() {
             format={tournament.format}
             gameMode={tournament.game_mode}
           />
+        </TabsContent>
+        <TabsContent value="match-room" className="mt-6">
+            {currentMatchRoom ? (
+                <MatchRoomComponent 
+                    room={currentMatchRoom} 
+                    currentUserEmail={user?.email || ''} 
+                    tournament={tournament}
+                    p1={participants.find(p => p.email === currentMatchRoom.player_1_email) || { name: 'Player 1', email: currentMatchRoom.player_1_email, status: 'Aceptado', tournament_id: id }}
+                    p2={participants.find(p => p.email === currentMatchRoom.player_2_email) || { name: 'Player 2', email: currentMatchRoom.player_2_email, status: 'Aceptado', tournament_id: id }}
+                />
+            ) : (
+                <Card>
+                    <CardContent className="h-64 flex flex-col items-center justify-center text-center space-y-4">
+                        <Swords className="h-12 w-12 text-muted-foreground opacity-20" />
+                        <div>
+                            <p className="text-xl font-semibold">No tienes partidas activas</p>
+                            <p className="text-muted-foreground">Vuelve aquí cuando el organizador inicie tu próxima partida.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </TabsContent>
         {isOwner && (
           <TabsContent value="stats" className="mt-6">
