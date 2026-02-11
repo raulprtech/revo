@@ -490,12 +490,12 @@ ON CONFLICT (slug) DO NOTHING;
 -- =============================================
 
 INSERT INTO public.coin_packages (slug, name, description, coin_amount, bonus_amount, price_mxn, is_featured) VALUES
-  ('handful', 'Puñado', 'Unas monedas para empezar', 100, 0, 19.00, false),
-  ('pouch', 'Bolsa Pequeña', 'Para un capricho rápido', 500, 25, 89.00, false),
-  ('chest', 'Cofre', 'El favorito de la comunidad', 1200, 200, 179.00, true),
-  ('treasure', 'Tesoro', 'Para jugadores serios', 2500, 500, 349.00, false),
-  ('dragon_hoard', 'Tesoro del Dragón', 'La mejor relación calidad-precio', 5500, 1500, 699.00, true),
-  ('legendary_vault', 'Bóveda Legendaria', 'Para los verdaderos legends', 12000, 4000, 1399.00, false)
+  ('handful', 'Puñado', 'Unas monedas para empezar', 100, 0, 20.00, false),
+  ('pouch', 'Bolsa Pequeña', 'Para un capricho rápido', 500, 25, 100.00, false),
+  ('chest', 'Cofre', 'El favorito de la comunidad', 1200, 200, 240.00, true),
+  ('treasure', 'Tesoro', 'Para jugadores serios', 2500, 500, 500.00, false),
+  ('dragon_hoard', 'Tesoro del Dragón', 'La mejor relación calidad-precio', 5500, 1500, 1100.00, true),
+  ('legendary_vault', 'Bóveda Legendaria', 'Para los verdaderos legends', 12000, 4000, 2400.00, false)
 ON CONFLICT (slug) DO NOTHING;
 
 -- =============================================
