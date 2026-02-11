@@ -30,11 +30,18 @@ import {
     Activity,
     Trophy as TrophyIcon
 } from "lucide-react";
+import { getIntelligenceMetrics } from "./actions";
 
 export default function PlatformIntelligence() {
     const [heartbeatData, setHeartbeatData] = useState<any[]>([]);
     const [velocityStats, setVelocityStats] = useState<any[]>([]);
     const [gameDist, setGameDist] = useState<any[]>([]);
+    const [sponsorEngagement, setSponsorEngagement] = useState<any[]>([]);
+    const [platformStats, setPlatformStats] = useState<any>({
+        sponsorValue: 0,
+        platformHype: "LOADING",
+        concurrentEvents: 0
+    });
     const [filters, setFilters] = useState({
         timeRange: "7d",
         game: "all",
@@ -42,45 +49,23 @@ export default function PlatformIntelligence() {
         organizer: "all",
         tournament: "all"
     });
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     
-    const supabase = createClient();
-
     useEffect(() => {
-        // En una implementación real, aquí haríamos fetch filtrando por 'filters'
         const fetchData = async () => {
             setIsLoading(true);
-            // Simulación de carga basada en filtros
-            await new Promise(r => setTimeout(r, 600)); 
-            
-            const mockHeartbeat = Array.from({ length: 24 }, (_, i) => {
-                const global = Math.floor(Math.random() * 500) + 200;
-                const isFiltered = filters.game !== 'all' || filters.organizer !== 'all' || filters.tournament !== 'all';
-                return {
-                    time: `${i}:00`,
-                    users: global,
-                    segment: isFiltered ? Math.floor(global * (Math.random() * 0.4 + 0.1)) : null,
-                    matches: Math.floor(Math.random() * 50) + 10,
-                };
-            });
-            setHeartbeatData(mockHeartbeat);
-
-            const mockVelocity = [
-                { name: 'FIFA', fillTime: 120, conversions: 85, fillRate: 98 },
-                { name: 'KOF', fillTime: 450, conversions: 40, fillRate: 65 },
-                { name: 'Smash', fillTime: 180, conversions: 75, fillRate: 92 },
-                { name: 'M. Kart', fillTime: 300, conversions: 55, fillRate: 78 },
-            ];
-            setVelocityStats(mockVelocity);
-
-            const mockGames = [
-                { name: 'FIFA', value: 400, color: '#0ea5e9' },
-                { name: 'Street Fighter', value: 300, color: '#f43f5e' },
-                { name: 'KOF', value: 200, color: '#8b5cf6' },
-                { name: 'Otros', value: 100, color: '#64748b' },
-            ];
-            setGameDist(mockGames);
-            setIsLoading(false);
+            try {
+                const metrics = await getIntelligenceMetrics(filters);
+                setHeartbeatData(metrics.heartbeatData);
+                setVelocityStats(metrics.velocityStats);
+                setGameDist(metrics.gameDistribution);
+                setSponsorEngagement(metrics.sponsorEngagement);
+                setPlatformStats(metrics.platformStats);
+            } catch (error) {
+                console.error("Error fetching intelligence metrics:", error);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         fetchData();
@@ -226,7 +211,7 @@ export default function PlatformIntelligence() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Sponsor Value</p>
-                                <h3 className="text-2xl font-black text-white italic">$8.4k</h3>
+                                <h3 className="text-2xl font-black text-white italic">${(platformStats.sponsorValue / 1000).toFixed(1)}k</h3>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
                                 <DollarSign className="h-5 w-5" />
@@ -243,14 +228,14 @@ export default function PlatformIntelligence() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Platform Hype</p>
-                                <h3 className="text-2xl font-black text-white italic">HIGH</h3>
+                                <h3 className="text-2xl font-black text-white italic">{platformStats.platformHype}</h3>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500">
                                 <Zap className="h-5 w-5" />
                             </div>
                         </div>
                         <div className="mt-2 text-[10px] text-rose-400 font-bold uppercase">
-                            9 Concurrent Events
+                            {platformStats.concurrentEvents} Concurrent Tournaments
                         </div>
                     </CardContent>
                 </Card>
@@ -360,17 +345,13 @@ export default function PlatformIntelligence() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {[
-                                { sponsor: 'Red Bull', clicks: 4202, ctr: '8.4%', trend: 'up' },
-                                { sponsor: 'Logitech G', clicks: 2840, ctr: '6.2%', trend: 'up' },
-                                { sponsor: 'Monster', clicks: 1205, ctr: '3.1%', trend: 'down' }
-                            ].map((s, i) => (
+                            {sponsorEngagement.map((s, i) => (
                                 <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 transition-hover hover:border-white/10">
                                     <span className="text-xs font-black italic tracking-tighter">{s.sponsor}</span>
                                     <div className="flex items-center gap-4">
                                         <div className="text-right">
                                             <p className="text-[10px] text-muted-foreground font-black uppercase">Clicks</p>
-                                            <p className="text-xs font-bold">{s.clicks.toLocaleString()}</p>
+                                            <p className="text-xs font-bold">{s.clicks?.toLocaleString() || 0}</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] text-muted-foreground font-black uppercase">CTR</p>

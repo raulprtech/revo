@@ -75,6 +75,23 @@ export async function analyzePlayerRetention(userId: string, rfmData: any, recen
 
         if (error) throw error;
 
+        // Log the AI Interaction for Refinement Lab
+        await supabaseAdmin
+            .from('ai_conversations')
+            .insert({
+                feature_name: 'retention',
+                user_email: (await supabaseAdmin.from('profiles').select('email').eq('id', userId).single()).data?.email || userId,
+                interaction_type: 'automatic',
+                model_name: 'gemini-1.5-flash',
+                messages: [
+                    { role: 'system', content: 'Retention Profiler Prompt' },
+                    { role: 'user', content: `RFM: ${JSON.stringify(rfmData)}` }
+                ],
+                raw_response: rawText,
+                extracted_data: profile,
+                metadata: { rfm: rfmData }
+            });
+
         return profile;
     } catch (error) {
         console.error("Retention Analysis Error:", error);

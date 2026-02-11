@@ -131,6 +131,9 @@ export default function AILabPage() {
           <TabsTrigger value="arbiter" className="gap-2 text-[10px] font-black uppercase">
             <Database className="h-3.5 w-3.5" /> Arbiter
           </TabsTrigger>
+          <TabsTrigger value="retention" className="gap-2 text-[10px] font-black uppercase">
+            <Users className="h-3.5 w-3.5" /> Retention
+          </TabsTrigger>
         </TabsList>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[700px]">

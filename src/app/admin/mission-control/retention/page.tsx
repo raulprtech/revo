@@ -55,7 +55,6 @@ export default function RetentionEngine() {
 
     const fetchRetentionData = async () => {
         setIsLoading(true);
-        // In a real scenario, we join with profiles to get display names
         const { data: profileData } = await supabase
             .from('player_intelligence_profiles')
             .select('*, user:profiles(display_name, email)')
@@ -66,7 +65,14 @@ export default function RetentionEngine() {
             .select('*');
 
         if (profileData) setProfiles(profileData);
-        if (aggStats) setStats(aggStats);
+        if (aggStats) {
+            // Transform array to lookup object
+            const statsMap = aggStats.reduce((acc: any, curr: any) => {
+                acc[curr.persona_type] = curr;
+                return acc;
+            }, {});
+            setStats(statsMap);
+        }
         setIsLoading(false);
     };
 
@@ -113,15 +119,15 @@ export default function RetentionEngine() {
                     <CardContent className="flex gap-2 flex-wrap">
                         <div className="text-center px-4 py-1 bg-white/5 rounded border border-white/10">
                             <p className="text-[9px] font-black opacity-50">WHALES</p>
-                            <p className="text-xl font-black">{profiles.filter(p => p.persona_type === 'WHALE').length}</p>
+                            <p className="text-xl font-black">{stats?.WHALE?.count || 0}</p>
                         </div>
                         <div className="text-center px-4 py-1 bg-white/5 rounded border border-white/10">
                             <p className="text-[9px] font-black opacity-50">GRINDERS</p>
-                            <p className="text-xl font-black">{profiles.filter(p => p.persona_type === 'GRINDER').length}</p>
+                            <p className="text-xl font-black">{stats?.GRINDER?.count || 0}</p>
                         </div>
                         <div className="text-center px-4 py-1 bg-white/5 rounded border border-white/10">
                             <p className="text-[9px] font-black opacity-50">PROS</p>
-                            <p className="text-xl font-black">{profiles.filter(p => p.persona_type === 'PRO').length}</p>
+                            <p className="text-xl font-black">{stats?.PRO?.count || 0}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -133,8 +139,12 @@ export default function RetentionEngine() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <h3 className="text-3xl font-black italic text-emerald-500">84.2%</h3>
-                        <p className="text-[10px] text-emerald-500/70 font-bold uppercase mt-1">+2.1% vs last month</p>
+                        <h3 className="text-3xl font-black italic text-emerald-500">
+                            {profiles.length > 0 
+                                ? (100 - (profiles.reduce((acc, p) => acc + p.churn_risk_score, 0) / profiles.length)).toFixed(1)
+                                : "100"}%
+                        </h3>
+                        <p className="text-[10px] text-emerald-500/70 font-bold uppercase mt-1">Salud general de la comunidad</p>
                     </CardContent>
                 </Card>
             </div>
@@ -234,12 +244,14 @@ export default function RetentionEngine() {
                         <CardTitle className="text-sm font-black uppercase">AI Retention Suggestions</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                         <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg flex items-center justify-between">
+                        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <TrendingDown className="h-5 w-5 text-indigo-400" />
                                 <div>
                                     <p className="text-xs font-bold">Incentive Batch Candidate</p>
-                                    <p className="text-[10px] text-muted-foreground">8 players matching "At-Risk Whale" persona found.</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {profiles.filter(p => p.persona_type === 'AT_RISK').length} players matching "At-Risk" persona found.
+                                    </p>
                                 </div>
                             </div>
                             <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-[10px] font-bold">SEND COUPON</Button>
@@ -249,7 +261,9 @@ export default function RetentionEngine() {
                                 <Zap className="h-5 w-5 text-emerald-400" />
                                 <div>
                                     <p className="text-xs font-bold">Upsell Opportunity</p>
-                                    <p className="text-[10px] text-muted-foreground">12 "Grinders" active on FIFA ready for PRO tier.</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {profiles.filter(p => p.persona_type === 'GRINDER').length} "Grinders" identified for PRO tier upgrade.
+                                    </p>
                                 </div>
                             </div>
                             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-[10px] font-bold">TARGET PRO OFFER</Button>
@@ -268,12 +282,12 @@ export default function RetentionEngine() {
                             </p>
                              <div className="grid grid-cols-2 gap-4">
                                 <div className="p-3 bg-muted/20 rounded border border-white/5">
-                                    <p className="text-[9px] font-black uppercase opacity-50">Avg LTV Impact</p>
-                                    <p className="text-lg font-black text-indigo-400">+18.5%</p>
+                                    <p className="text-[9px] font-black uppercase opacity-50">Profiles Synced</p>
+                                    <p className="text-lg font-black text-indigo-400">{profiles.length}</p>
                                 </div>
                                 <div className="p-3 bg-muted/20 rounded border border-white/5">
-                                    <p className="text-[9px] font-black uppercase opacity-50">Churn Precision</p>
-                                    <p className="text-lg font-black text-indigo-400">92%</p>
+                                    <p className="text-[9px] font-black uppercase opacity-50">Risk Matches</p>
+                                    <p className="text-lg font-black text-indigo-400">{profiles.filter(p => p.churn_risk_score > 50).length}</p>
                                 </div>
                              </div>
                         </div>

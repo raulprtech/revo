@@ -91,7 +91,8 @@ export default function MissionControl() {
         minted: 0,
         burned: 0,
         circulating: 0,
-        fiatInReserve: 0
+        fiatInReserve: 0,
+        recentTransactions: [] as any[]
     });
     const [configs, setConfigs] = useState<any[]>([]);
 
@@ -103,7 +104,72 @@ export default function MissionControl() {
         fetchConfigs();
         fetchGhosts();
         fetchTournaments();
+        fetchAiStats();
+        fetchEconStats();
     }, []);
+
+    const fetchAiStats = async () => {
+        const { data: shadowLogs } = await supabase
+            .from('ai_shadow_logs')
+            .select('confidence_score, error_delta');
+        
+        const { data: labeling } = await supabase
+            .from('ai_labeling_samples')
+            .select('status, created_at');
+
+        if (shadowLogs && shadowLogs.length > 0) {
+            const avgConf = shadowLogs.reduce((acc, curr) => acc + parseFloat(curr.confidence_score), 0) / shadowLogs.length;
+            const avgErr = shadowLogs.reduce((acc, curr) => acc + parseFloat(curr.error_delta), 0) / shadowLogs.length;
+            
+            const today = new Date().toISOString().split('T')[0];
+            const labeledToday = labeling?.filter(l => l.status === 'labeled' && l.created_at.startsWith(today)).length || 0;
+
+            setAiStats({
+                predictionError: parseFloat(avgErr.toFixed(2)),
+                confidenceAvg: avgConf,
+                totalSamples: shadowLogs.length,
+                labeledToday
+            });
+        }
+    };
+
+    const fetchEconStats = async () => {
+        const { data: wallets } = await supabase
+            .from('coin_wallets')
+            .select('balance, cash_balance');
+        
+        const { data: txs } = await supabase
+            .from('coin_transactions')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(10);
+        
+        const { data: totalMinted } = await supabase
+            .from('coin_transactions')
+            .select('amount')
+            .gt('amount', 0);
+
+        const { data: totalBurned } = await supabase
+            .from('coin_transactions')
+            .select('amount')
+            .lt('amount', 0);
+        
+        if (wallets) {
+            const circulating = wallets.reduce((acc, curr) => acc + (curr.balance || 0), 0);
+            const reserve = wallets.reduce((acc, curr) => acc + (curr.cash_balance || 0), 0);
+            const minted = totalMinted?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
+            const burned = Math.abs(totalBurned?.reduce((acc, curr) => acc + curr.amount, 0) || 0);
+            
+            setEconStats(prev => ({
+                ...prev,
+                circulating,
+                fiatInReserve: reserve,
+                minted,
+                burned,
+                recentTransactions: txs || []
+            }));
+        }
+    };
 
     const fetchGhosts = async () => {
         const { data } = await supabase
@@ -943,36 +1009,41 @@ export default function MissionControl() {
                             <CardContent className="space-y-6">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-[10px] font-bold uppercase opacity-50">
-                                        <span>Total Velocity</span>
-                                        <span>+12.4% / mo</span>
+                                        <span>Reserve Ratio</span>
+                                        <span>{(econStats.fiatInReserve > 0 ? (econStats.fiatInReserve / (econStats.circulating || 1) * 100).toFixed(0) : 0)}%</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                                        <div className="h-full bg-primary w-[65%]" />
+                                        <div 
+                                            className="h-full bg-emerald-500 transition-all duration-1000" 
+                                            style={{ width: `${Math.min(100, (econStats.fiatInReserve / (econStats.circulating || 1)) * 100)}%` }} 
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="flex justify-between items-center text-[10px] border-b border-border/20 pb-2">
-                                        <div className="flex gap-2 items-center">
-                                            <Badge className="bg-emerald-500/10 text-emerald-500 border-none h-4 px-1">MINT</Badge>
-                                            <span className="font-mono">Stripe_Purchase_X29</span>
-                                        </div>
-                                        <span className="font-bold text-emerald-400">+500 DC</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-[10px] border-b border-border/20 pb-2">
-                                        <div className="flex gap-2 items-center">
-                                            <Badge className="bg-rose-500/10 text-rose-500 border-none h-4 px-1">BURN</Badge>
-                                            <span className="font-mono">Duel_Rake_A44</span>
-                                        </div>
-                                        <span className="font-bold text-rose-400">-50 DC</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-[10px]">
-                                        <div className="flex gap-2 items-center">
-                                            <Badge className="bg-rose-500/10 text-rose-500 border-none h-4 px-1">BURN</Badge>
-                                            <span className="font-mono">Banner_Purchase_S01</span>
-                                        </div>
-                                        <span className="font-bold text-rose-400">-250 DC</span>
-                                    </div>
+                                    {econStats.recentTransactions.length === 0 ? (
+                                        <p className="text-[10px] text-center italic opacity-50 py-4">No recent activity</p>
+                                    ) : (
+                                        econStats.recentTransactions.map((tx: any) => (
+                                            <div key={tx.id} className="flex justify-between items-center text-[10px] border-b border-border/20 pb-2">
+                                                <div className="flex gap-2 items-center">
+                                                    <Badge className={cn(
+                                                        "border-none h-4 px-1",
+                                                        tx.amount > 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                                    )}>
+                                                        {tx.amount > 0 ? "MINT" : "BURN"}
+                                                    </Badge>
+                                                    <span className="font-mono truncate max-w-[120px]">{tx.reason || 'No reason'}</span>
+                                                </div>
+                                                <span className={cn(
+                                                    "font-bold",
+                                                    tx.amount > 0 ? "text-emerald-400" : "text-rose-400"
+                                                )}>
+                                                    {tx.amount > 0 ? `+${tx.amount}` : tx.amount} DC
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
 
                                 <Button size="sm" variant="outline" className="w-full text-[10px] font-black uppercase text-amber-500 border-amber-500/20 hover:bg-amber-500/10">

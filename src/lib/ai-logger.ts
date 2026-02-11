@@ -3,7 +3,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 
-export type AIInteractionType = 'architect' | 'caster' | 'arbiter';
+export type AIInteractionType = 'architect' | 'caster' | 'arbiter' | 'retention';
 
 export async function logAIConversation(data: {
   feature_name: AIInteractionType;
