@@ -22,7 +22,9 @@ import {
   Twitter,
   Instagram,
   Youtube,
-  Zap
+  Zap,
+  ShoppingBag,
+  Sparkles
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,9 +38,10 @@ import { useSubscription } from "@/lib/subscription";
 import { useUserTournaments } from "@/hooks/use-tournaments";
 import { db, type Tournament, type Participant, type AwardedBadge } from "@/lib/database";
 import useSWR from "swr";
-import { getDefaultTournamentImage } from "@/lib/utils";
+import { getDefaultTournamentImage, cn } from "@/lib/utils";
 import { coinsService } from "@/lib/coins";
-import type { CosmeticItem } from "@/types/coins";
+import type { CosmeticItem, CosmeticCategory } from "@/types/coins";
+import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/types/coins";
 
 interface ParticipatingTournament extends Tournament {
     participantStatus: ParticipantStatus;
@@ -584,20 +587,75 @@ export default function ProfilePage() {
             </Card>
 
             {/* Logros y Colección */}
-            <Card className="mb-8">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <span className="text-xl">🏆</span>
-                        Logros y Colección
-                    </CardTitle>
-                    <CardDescription>
-                        Tus medallas, logros y premios. Equipa cualquiera para mostrarlo en tu perfil.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <AchievementsManager onUpdate={refreshEquipped} />
-                </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <span className="text-xl">🏆</span>
+                            Logros y Medallas
+                        </CardTitle>
+                        <CardDescription>
+                            Tus medallas ganadas en torneos. Equípala para mostrarla en tu perfil.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <AchievementsManager onUpdate={refreshEquipped} />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                                <Sparkles className="h-5 w-5 text-amber-400" />
+                                Mi Inventario
+                            </CardTitle>
+                            <CardDescription>
+                                Estética y personalización premium
+                            </CardDescription>
+                        </div>
+                        <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary hover:bg-primary/10">
+                            <Link href="/coins">
+                                <ShoppingBag className="h-4 w-4 mr-2" />
+                                Tienda
+                            </Link>
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                {(['avatar_collection', 'bracket_frame', 'profile_banner', 'nickname_color'] as CosmeticCategory[]).map((cat) => (
+                                    <div 
+                                        key={cat}
+                                        className={cn(
+                                            "flex flex-col items-center justify-center p-4 rounded-xl border transition-all hover:bg-muted/50 group cursor-pointer",
+                                            equippedCosmetics[cat] ? "border-primary/40 bg-primary/5" : "border-border bg-card"
+                                        )}
+                                        onClick={() => window.location.href = '/coins?inventory=true'}
+                                    >
+                                        <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">
+                                            {CATEGORY_ICONS[cat]}
+                                        </span>
+                                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground group-hover:text-foreground">
+                                            {CATEGORY_LABELS[cat]}
+                                        </span>
+                                        {equippedCosmetics[cat] ? (
+                                            <Badge variant="secondary" className="mt-2 h-4 px-1.5 text-[8px] bg-emerald-500/10 text-emerald-400 border-none">ACTIVO</Badge>
+                                        ) : (
+                                            <span className="mt-2 text-[8px] text-muted-foreground italic font-medium">No equipado</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <Button variant="outline" className="w-full text-xs h-9" asChild>
+                                <Link href="/coins?inventory=true">
+                                    Ver Inventario Completo
+                                </Link>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* Competitive Profile & Match History */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

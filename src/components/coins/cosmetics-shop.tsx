@@ -51,6 +51,15 @@ export function CosmeticsShop() {
   const [equippingId, setEquippingId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<CosmeticItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'shop' | 'inventory'>('shop');
+
+  useEffect(() => {
+    // Sync viewMode with URL search params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('inventory') === 'true') {
+      setViewMode('inventory');
+    }
+  }, []);
 
   const fetchShop = async () => {
     try {
@@ -225,9 +234,14 @@ export function CosmeticsShop() {
   }, [shopItems]);
 
   const displayItems = useMemo(() => {
-    if (activeCategory === 'all') return shopItems;
-    return shopItems.filter(i => i.category === activeCategory);
-  }, [shopItems, activeCategory]);
+    let base = shopItems;
+    if (viewMode === 'inventory') {
+      base = shopItems.filter(i => ownedIds.has(i.id));
+    }
+    
+    if (activeCategory === 'all') return base;
+    return base.filter(i => i.category === activeCategory);
+  }, [shopItems, activeCategory, viewMode, ownedIds]);
 
   if (isLoading) {
     return (
@@ -242,32 +256,75 @@ export function CosmeticsShop() {
   return (
     <>
       <div className="space-y-6">
-        {/* Category filters */}
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setActiveCategory('all')}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              activeCategory === 'all'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-            }`}
-          >
-            Todo
-          </button>
-          {availableCategories.map(cat => (
+        {/* Toggle Mode & Category filters */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-6">
+           <div className="flex bg-muted p-1 rounded-lg">
+              <button
+                onClick={() => setViewMode('shop')}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'shop' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ShoppingBag className="h-4 w-4" />
+                Mercado
+              </button>
+              <button
+                onClick={() => setViewMode('inventory')}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'inventory' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Sparkles className="h-4 w-4" />
+                Mi Colección
+              </button>
+           </div>
+
+          <div className="flex flex-wrap gap-1.5">
             <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => setActiveCategory('all')}
               className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                activeCategory === cat
+                activeCategory === 'all'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted hover:bg-muted/80 text-muted-foreground'
               }`}
             >
-              {CATEGORY_ICONS[cat as CosmeticCategory]} {CATEGORY_LABELS[cat as CosmeticCategory]}
+              Todo
             </button>
-          ))}
+            {availableCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  activeCategory === cat
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                }`}
+              >
+                {CATEGORY_ICONS[cat as CosmeticCategory]} {CATEGORY_LABELS[cat as CosmeticCategory]}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Empty State Inventory */}
+        {viewMode === 'inventory' && displayItems.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-card/40 rounded-xl border border-dashed border-border">
+             <div className="p-4 bg-muted rounded-full mb-4">
+                <ShoppingBag className="h-8 w-8 text-muted-foreground" />
+             </div>
+             <h3 className="text-lg font-bold">Tu colección está vacía</h3>
+             <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-2">
+               Aún no has adquirido cosméticos de esta categoría. ¡Visita el mercado para personalizar tu perfil!
+             </p>
+             <Button 
+                variant="outline" 
+                className="mt-6"
+                onClick={() => setViewMode('shop')}
+             >
+               Ir al Mercado
+             </Button>
+          </div>
+        )}
 
         {/* Items Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -313,8 +370,14 @@ export function CosmeticsShop() {
                         {RARITY_LABELS[item.rarity as CosmeticRarity]}
                       </Badge>
                       <span className="flex items-center gap-1 text-sm font-black text-amber-400">
-                        <Coins className="h-3.5 w-3.5" />
-                        {item.price}
+                        {isOwned ? (
+                          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-400 border-none text-[10px] uppercase">Poseído</Badge>
+                        ) : (
+                          <>
+                            <Coins className="h-3.5 w-3.5" />
+                            {item.price}
+                          </>
+                        )}
                       </span>
                     </div>
                     <CardTitle className="text-base truncate">{item.name}</CardTitle>
