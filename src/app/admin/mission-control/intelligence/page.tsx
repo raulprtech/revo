@@ -7,9 +7,11 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
     TrendingUp, Users, Zap, Trophy, Timer, 
-    UsersRound, DollarSign, Target, MousePointer2 
+    UsersRound, DollarSign, Target, MousePointer2,
+    RefreshCcw
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -362,33 +364,6 @@ export default function PlatformIntelligence() {
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
-                    </CardContent>
-                </Card>
-            </div>                        <CardDescription className="text-[10px]">Tráfico de usuarios activos en tiempo real (últimas 24h)</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={heartbeatData}>
-                                <defs>
-                                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                    </linearGradient>
-                                    <linearGradient id="colorSegment" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                                <XAxis dataKey="time" stroke="#ffffff30" fontSize={10} axisLine={false} tickLine={false} />
-                                <YAxis stroke="#ffffff30" fontSize={10} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid #1e293b' }} />
-                                <Area type="monotone" dataKey="users" stroke="#6366f1" fillOpacity={1} fill="url(#colorUsers)" strokeWidth={3} name="Total Platform" />
-                                {heartbeatData[0]?.segment !== null && (
-                                    <Area type="monotone" dataKey="segment" stroke="#10b981" fillOpacity={1} fill="url(#colorSegment)" strokeWidth={3} name="Filtered Segment" />
-                                )}
-                            </AreaChart>
-                        </ResponsiveContainer>
                     </CardContent>
                 </Card>
 
