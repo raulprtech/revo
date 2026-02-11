@@ -57,6 +57,7 @@ export default function MissionControl() {
     const [adjustAmount, setAdjustAmount] = useState<string>("");
     const [adjustReason, setAdjustReason] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
     // --- AI Lab State ---
     const [aiStats, setAiStats] = useState({ 
@@ -86,6 +87,7 @@ export default function MissionControl() {
     const [configs, setConfigs] = useState<any[]>([]);
 
     useEffect(() => {
+        setMounted(true);
         fetchAiLogs();
         fetchDisputes();
         fetchLabelingSamples();
@@ -321,12 +323,16 @@ export default function MissionControl() {
                    <div className="flex bg-muted p-1 rounded-lg border border-border/50">
                        <div className="px-3 py-1 flex flex-col items-center">
                            <span className="text-[10px] font-black opacity-50">CIRCULATING</span>
-                           <span className="text-sm font-bold text-amber-500">{econStats.circulating.toLocaleString()} DC</span>
+                           <span className="text-sm font-bold text-amber-500">
+                               {mounted ? econStats.circulating.toLocaleString() : '---'} DC
+                           </span>
                        </div>
                        <div className="w-[1px] bg-border mx-1" />
                        <div className="px-3 py-1 flex flex-col items-center">
                            <span className="text-[10px] font-black opacity-50">CASH RESERVE</span>
-                           <span className="text-sm font-bold text-emerald-500">\${econStats.fiatInReserve.toLocaleString()}</span>
+                           <span className="text-sm font-bold text-emerald-500">
+                               {mounted ? `$${econStats.fiatInReserve.toLocaleString()}` : '---'}
+                           </span>
                        </div>
                    </div>
                 </div>
@@ -588,8 +594,8 @@ export default function MissionControl() {
                                                             <img src={sample.screenshot_url} alt="Sample" className="w-full h-full object-cover" />
                                                         </div>
                                                         <div>
-                                                            <p className="text-xs font-bold">Match #{sample.match_id.slice(0, 6)}</p>
-                                                            <p className="text-[9px] text-muted-foreground">Conf: {(sample.confidence_score * 100).toFixed(0)}% • Pred: {sample.predicted_p1_score}-{sample.predicted_p2_score}</p>
+                                                            <p className="text-xs font-bold">Match #{sample.match_id?.slice(0, 6) || 'N/A'}</p>
+                                                            <p className="text-[9px] text-muted-foreground">Conf: {((sample.confidence_score || 0) * 100).toFixed(0)}% • Pred: {sample.predicted_p1_score || 0}-{sample.predicted_p2_score || 0}</p>
                                                         </div>
                                                     </div>
                                                     <Button 
@@ -623,9 +629,9 @@ export default function MissionControl() {
                                     </DialogHeader>
                                     
                                     {currentSample && (
-                                        <div className="space-y-6 pt-4">
+                                        <div key={sample.id} className="space-y-6 pt-4">
                                             <div className="aspect-video w-full rounded-lg border border-border/50 overflow-hidden bg-black">
-                                                <img src={currentSample.screenshot_url} alt="Full Match Screenshot" className="w-full h-full object-contain" />
+                                                <img src={sample.screenshot_url} alt="Full Match Screenshot" className="w-full h-full object-contain" />
                                             </div>
                                             
                                             <div className="grid grid-cols-2 gap-4">
@@ -729,25 +735,33 @@ export default function MissionControl() {
                         <Card className="bg-card">
                             <CardHeader className="pb-2">
                                 <CardDescription className="text-[10px] font-black uppercase tracking-tighter">Total Minted</CardDescription>
-                                <CardTitle className="text-2xl font-black text-amber-500">{econStats.minted.toLocaleString()}</CardTitle>
+                                <CardTitle className="text-2xl font-black text-amber-500">
+                                    {mounted ? econStats.minted.toLocaleString() : '---'}
+                                </CardTitle>
                             </CardHeader>
                         </Card>
                         <Card className="bg-card">
                             <CardHeader className="pb-2">
                                 <CardDescription className="text-[10px] font-black uppercase tracking-tighter">Total Burned</CardDescription>
-                                <CardTitle className="text-2xl font-black text-rose-500">{econStats.burned.toLocaleString()}</CardTitle>
+                                <CardTitle className="text-2xl font-black text-rose-500">
+                                    {mounted ? econStats.burned.toLocaleString() : '---'}
+                                </CardTitle>
                             </CardHeader>
                         </Card>
                         <Card className="bg-card">
                             <CardHeader className="pb-2">
                                 <CardDescription className="text-[10px] font-black uppercase tracking-tighter">Circulating Supply</CardDescription>
-                                <CardTitle className="text-2xl font-black text-primary">{econStats.circulating.toLocaleString()}</CardTitle>
+                                <CardTitle className="text-2xl font-black text-primary">
+                                    {mounted ? econStats.circulating.toLocaleString() : '---'}
+                                </CardTitle>
                             </CardHeader>
                         </Card>
                         <Card className="bg-primary/10 border-primary/20">
                             <CardHeader className="pb-2">
                                 <CardDescription className="text-[10px] font-black uppercase tracking-tighter text-primary">Fiat Reserve</CardDescription>
-                                <CardTitle className="text-2xl font-black text-primary">\${econStats.fiatInReserve.toLocaleString()}</CardTitle>
+                                <CardTitle className="text-2xl font-black text-primary">
+                                    {mounted ? `$${econStats.fiatInReserve.toLocaleString()}` : '---'}
+                                </CardTitle>
                             </CardHeader>
                         </Card>
                     </div>
