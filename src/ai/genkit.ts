@@ -99,3 +99,78 @@ export const tournamentCaster = ai.defineFlow(
     return response.text();
   }
 );
+
+export const tournamentBuilderFlow = ai.defineFlow(
+  {
+    name: 'tournamentBuilder',
+    inputSchema: z.object({
+      message: z.string(),
+      history: z.array(z.object({
+        role: z.enum(['user', 'model']),
+        content: z.string(),
+      })).optional(),
+    }),
+    outputSchema: z.object({
+      reply: z.string(),
+      tournamentData: z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+        game: z.string().optional(),
+        gameMode: z.string().optional(),
+        format: z.enum(["single-elimination", "double-elimination", "swiss"]).optional(),
+        startDate: z.string().optional(),
+        startTime: z.string().optional(),
+        maxParticipants: z.number().optional(),
+        registrationType: z.enum(["public", "private"]).optional(),
+        tournamentMode: z.enum(["online", "presencial"]).optional(),
+        location: z.string().optional(),
+        prizePool: z.string().optional(),
+      }).optional(),
+    }),
+  },
+  async (input) => {
+    const prompt = `
+      Eres un asistente experto en organizar torneos de eSports llamado "Revo AI Architect". 
+      Tu objetivo es ayudar al usuario a configurar los detalles de un nuevo torneo mediante una conversación natural.
+
+      INSTRUCCIONES:
+      1. Extrae los datos del torneo si el usuario los menciona.
+      2. Si faltan datos críticos, pregunta por ellos amablemente uno por uno o en pequeños grupos.
+      3. Importante: Devuelve SIEMPRE un JSON que incluya "reply" (tu respuesta al usuario) y opcionalmente "tournamentData" con los campos que hayas logrado identificar hasta ahora.
+      4. Los juegos soportados son: FIFA, The King of Fighters, Super Smash Bros, Mario Kart, Street Fighter, Clash Royale. Si el usuario elige otro, menciónalo pero intenta mapearlo o dejar el campo 'game' con el valor del usuario.
+      5. Formatos válidos: single-elimination, double-elimination, swiss.
+      6. Modos válidos: online, presencial.
+
+      ESTRUCTURA DE RESPUESTA:
+      {
+        "reply": "Tu mensaje aquí",
+        "tournamentData": {
+          "name": "...",
+          "game": "...",
+          ...
+        }
+      }
+
+      Mensaje del usuario: ${input.message}
+    `;
+
+    const response = await ai.generate({
+      prompt,
+      model: 'googleai/gemini-1.5-flash-latest', // Usando Flash para velocidad y menor costo en chat lite
+      config: {
+        temperature: 0.7,
+      },
+    });
+
+    try {
+      // Intentar limpiar la respuesta si Gemini devuelve markdown
+      const text = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(text);
+    } catch (e) {
+      return { 
+        reply: response.text(),
+        tournamentData: {}
+      };
+    }
+  }
+);

@@ -20,11 +20,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, Loader2, Upload, X, Gamepad2, Trophy, Plus } from "lucide-react";
+import { CalendarIcon, Loader2, Upload, X, Gamepad2, Trophy, Plus, Layout } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -33,10 +34,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { db, type CreateTournamentData, type Event, type Prize, type GameStation, type BadgeTemplate } from "@/lib/database";
 import { createClient } from "@/lib/supabase/client";
 import { DiscordBotService } from "@/lib/discord-bot-service";
+import { chatWithTournamentBuilder } from "@/ai/tournament-builder-actions";
 import { PrizeManager } from "./prize-manager";
 import { StationManager } from "./station-manager";
 import { BadgeManager } from "./badge-manager";
@@ -44,6 +47,7 @@ import { PrizePoolCalculator } from "./prize-pool-calculator";
 import { BracketBrandingEditor, type BracketBranding } from "./bracket-branding";
 import { RegistrationFieldsManager, type RegistrationField } from "./registration-fields-manager";
 import { ProFeatureGate } from "@/lib/subscription";
+import { Stars, Send, Sparkles, Wand2 } from "lucide-react";
 
 // Game configurations with recommended formats and game modes
 const GAMES_CONFIG = {
@@ -204,9 +208,67 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
       ? tournamentData.game as GameKey 
       : ""
   );
+  
+  // AI Builder State
+  const [aiChatMode, setAiChatMode] = useState(false);
+  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'model', content: string }[]>([
+    { role: 'model', content: '¡Hola! Soy el AI Architect de Revo. Cuéntame sobre el torneo que quieres crear. Por ejemplo: "Quiero un torneo de FIFA presencial para 16 personas este sábado"' }
+  ]);
+  const [currentAiInput, setCurrentAiInput] = useState("");
+  const [isAiThinking, setIsAiThinking] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { toast } = useToast();
+
+  const handleAiChat = async () => {
+    if (!currentAiInput.trim() || isAiThinking) return;
+    
+    const userMsg = currentAiInput;
+    setCurrentAiInput("");
+    setAiMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setIsAiThinking(true);
+
+    try {
+      const response = await chatWithTournamentBuilder({
+        message: userMsg,
+        history: aiMessages
+      });
+
+      if (response.success && response.data) {
+        const { reply, tournamentData: aiData } = response.data;
+        setAiMessages(prev => [...prev, { role: 'model', content: reply }]);
+        
+        // Sync AI data with form
+        if (aiData) {
+          if (aiData.name) form.setValue("name", aiData.name);
+          if (aiData.description) form.setValue("description", aiData.description);
+          if (aiData.game) {
+            // Find valid game mapping if possible
+            const mappedGame = Object.keys(GAMES_CONFIG).find(
+              g => g.toLowerCase().includes(aiData.game!.toLowerCase())
+            );
+            if (mappedGame) handleGameChange(mappedGame);
+          }
+          if (aiData.format) form.setValue("format", aiData.format);
+          if (aiData.maxParticipants) form.setValue("maxParticipants", aiData.maxParticipants);
+          if (aiData.tournamentMode) form.setValue("tournamentMode", aiData.tournamentMode);
+          if (aiData.location) form.setValue("location", aiData.location);
+          if (aiData.prizePool) form.setValue("prizePool", aiData.prizePool);
+          
+          toast({
+            title: "Planos de Torneo actualizados",
+            description: "El AI Architect ha rellenado algunos campos por ti.",
+            variant: "default"
+          });
+        }
+      }
+    } catch (err) {
+      toast({ title: "Error en AI Architect", variant: "destructive" });
+    } finally {
+      setIsAiThinking(false);
+    }
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -509,9 +571,84 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="space-y-6">
+    <div className="space-y-6">
+      <Tabs defaultValue="standard" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-muted/20 mb-6 p-1 h-12">
+          <TabsTrigger value="standard" className="gap-2 font-bold transition-all data-[state=active]:bg-background">
+            <Gamepad2 className="h-4 w-4" /> MANUAL
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="gap-2 font-bold text-primary transition-all data-[state=active]:bg-primary/10">
+            <Sparkles className="h-4 w-4" /> AI ARCHITECT
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ai" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-1 overflow-hidden">
+            <div className="bg-background/80 backdrop-blur-sm rounded-lg flex flex-col h-[500px]">
+              <div className="p-4 border-b border-border flex items-center justify-between bg-primary/5">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                    <Wand2 className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black tracking-tight leading-none uppercase">Revo AI Architect</h3>
+                    <p className="text-[10px] text-muted-foreground uppercase mt-0.5 tracking-widest font-bold">Powered by Gemini Flash Lite</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[9px] font-black uppercase">Alpha Access</Badge>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans custom-scrollbar">
+                {aiMessages.map((msg, i) => (
+                  <div key={i} className={cn(
+                    "flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-2.5 text-sm",
+                    msg.role === 'user' 
+                      ? "ml-auto bg-primary text-primary-foreground font-medium" 
+                      : "mr-auto bg-muted/50 border border-border/50 text-foreground"
+                  )}>
+                    {msg.content}
+                  </div>
+                ))}
+                {isAiThinking && (
+                  <div className="mr-auto bg-muted/50 border border-border/50 rounded-2xl px-4 py-3 flex gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" />
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-border bg-muted/5">
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Di algo como: 'Torneo de KOF para 16 personas este domingo en Campeche'..."
+                    value={currentAiInput}
+                    onChange={(e) => setCurrentAiInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAiChat()}
+                    className="bg-background"
+                  />
+                  <Button size="icon" onClick={handleAiChat} disabled={isAiThinking || !currentAiInput.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-3">
+             <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+               <Stars className="h-4 w-4" />
+             </div>
+             <p className="text-xs text-muted-foreground">
+               <span className="font-bold text-emerald-600 uppercase text-[10px] block">Tip de Pro:</span>
+               ¡No te preocupes por el formato! Solo habla con la IA y ella rellenará automáticamente la pestaña MANUAL por ti.
+             </p>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="manual" className="animate-in fade-in duration-300">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="space-y-6">
             {/* Event Selector */}
             <div className="space-y-3">
               <label className="text-sm font-medium">Vincular a Evento (Opcional)</label>
@@ -1040,5 +1177,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
         </div>
       </form>
     </Form>
+  </TabsContent>
+</Tabs>
   );
 }
