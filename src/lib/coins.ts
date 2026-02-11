@@ -41,36 +41,24 @@ class CoinsService {
     return data;
   }
 
-  /** Create wallet for a new user (called on first sign-in) — grants welcome bonus */
+  /** Create wallet for a new user (called on first sign-in) — grants welcome bonus securely via RPC */
   async createWallet(email: string): Promise<CoinWallet | null> {
     const welcomeBonus = COIN_REWARDS.WELCOME_BONUS;
-    const { data, error } = await this.supabase
-      .from('coin_wallets')
-      .insert({ user_email: email, balance: welcomeBonus, lifetime_earned: welcomeBonus })
-      .select()
-      .single();
+    
+    const { data, error } = await this.supabase.rpc('process_coin_transaction', {
+      p_user_email: email,
+      p_amount: welcomeBonus,
+      p_type: 'welcome_bonus',
+      p_description: `¡Bienvenido! +${welcomeBonus} Duels Coins de regalo`,
+    });
 
-    if (error) {
-      // Wallet might already exist
-      if (error.code === '23505') {
-        return this.getWallet(email);
-      }
-      console.error('Error creating wallet:', error);
+    if (error || !data.success) {
+      if (error?.code === '23505') return this.getWallet(email);
+      console.error('Error creating wallet via RPC:', error || data.error);
       return null;
     }
 
-    // Record welcome bonus transaction
-    if (data) {
-      await this.supabase.from('coin_transactions').insert({
-        user_email: email,
-        amount: welcomeBonus,
-        balance_after: welcomeBonus,
-        type: 'welcome_bonus',
-        description: `¡Bienvenido! +${welcomeBonus} Duels Coins de regalo`,
-      });
-    }
-
-    return data;
+    return this.getWallet(email);
   }
 
   /** Get or create wallet — safe for any context */
@@ -82,7 +70,7 @@ class CoinsService {
 
   // ─── TRANSACTIONS ────────────────────────────
 
-  /** Record a coin transaction and update balance */
+  /** Record a coin transaction and update balance securely via RPC */
   async recordTransaction(
     email: string,
     amount: number,
@@ -91,52 +79,30 @@ class CoinsService {
     referenceId?: string,
     referenceType?: string
   ): Promise<{ transaction: CoinTransaction | null; wallet: CoinWallet | null; error?: string }> {
-    const wallet = await this.getOrCreateWallet(email);
-    if (!wallet) return { transaction: null, wallet: null, error: 'No se pudo obtener la billetera' };
+    const { data, error } = await this.supabase.rpc('process_coin_transaction', {
+      p_user_email: email,
+      p_amount: amount,
+      p_type: type,
+      p_description: description || null,
+      p_reference_id: referenceId || null,
+      p_reference_type: referenceType || null,
+    });
 
-    const newBalance = wallet.balance + amount;
-    if (newBalance < 0) {
-      return { transaction: null, wallet, error: 'Saldo insuficiente' };
+    if (error || !data.success) {
+      console.error('Error processing transaction:', error || data.error);
+      return { 
+        transaction: null, 
+        wallet: null, 
+        error: error?.message || data?.error || 'Error al procesar la transacción' 
+      };
     }
 
-    // Update wallet balance
-    const isCredit = amount > 0;
-    const { error: walletError } = await this.supabase
-      .from('coin_wallets')
-      .update({
-        balance: newBalance,
-        ...(isCredit ? { lifetime_earned: wallet.lifetime_earned + amount } : {}),
-        ...(!isCredit ? { lifetime_spent: wallet.lifetime_spent + Math.abs(amount) } : {}),
-      })
-      .eq('user_email', email);
-
-    if (walletError) {
-      console.error('Error updating wallet:', walletError);
-      return { transaction: null, wallet, error: 'Error al actualizar saldo' };
-    }
-
-    // Record transaction
-    const { data: tx, error: txError } = await this.supabase
-      .from('coin_transactions')
-      .insert({
-        user_email: email,
-        amount,
-        balance_after: newBalance,
-        type,
-        description: description || null,
-        reference_id: referenceId || null,
-        reference_type: referenceType || null,
-      })
-      .select()
-      .single();
-
-    if (txError) {
-      console.error('Error recording transaction:', txError);
-    }
-
+    // Return the updated state
+    const wallet = await this.getWallet(email);
     return {
-      transaction: tx || null,
-      wallet: { ...wallet, balance: newBalance },
+      transaction: null, // we don't return the full tx object here unless needed, 
+                        // but we could fetch it if absolutely necessary
+      wallet,
     };
   }
 

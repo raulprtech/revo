@@ -30,7 +30,8 @@ export function UserNav({ user }: { user: AppUser }) {
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/');
+    // Use window.location instead of router to force a full clean state
+    window.location.href = '/';
   };
 
   return (

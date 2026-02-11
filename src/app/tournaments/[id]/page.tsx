@@ -369,7 +369,11 @@ export default function TournamentPage() {
                   const match = round.matches[matchIndex];
                   match.top.score = scores.top;
                   match.bottom.score = scores.bottom;
-                  match.winner = scores.top > scores.bottom ? match.top.name : match.bottom.name;
+                  
+                  // Determine winner and winner object for metadata propagation
+                  const isTopWinner = scores.top > scores.bottom;
+                  match.winner = isTopWinner ? match.top.name : match.bottom.name;
+                  const winnerData = isTopWinner ? match.top : match.bottom;
                   
                   // Propagate winner to next round
                   if (i + 1 < newRounds.length) {
@@ -380,8 +384,12 @@ export default function TournamentPage() {
                       if (nextMatch) {
                           if (matchIndex % 2 === 0) { // Top slot of next match
                               nextMatch.top.name = match.winner;
+                              nextMatch.top.avatar = winnerData.avatar;
+                              nextMatch.top.email = winnerData.email;
                           } else { // Bottom slot of next match
                               nextMatch.bottom.name = match.winner;
+                              nextMatch.bottom.avatar = winnerData.avatar;
+                              nextMatch.bottom.email = winnerData.email;
                           }
 
                           if(nextMatch.top.name !== 'TBD' && nextMatch.bottom.name !== 'TBD') {
@@ -410,9 +418,14 @@ export default function TournamentPage() {
                             const nextMatch = nextRound.matches[nextMatchIndex];
                             if (nextMatch) {
                                 const isTopSlot = j % 2 === 0;
+                                const winnerData = match.top.name === match.winner ? match.top : match.bottom;
+                                
                                 if(isTopSlot) {
                                     if (nextMatch.top.name === "TBD") {
                                         nextMatch.top.name = match.winner;
+                                        nextMatch.top.avatar = winnerData.avatar;
+                                        nextMatch.top.email = winnerData.email;
+                                        
                                         if(nextMatch.bottom.name === 'BYE') {
                                             nextMatch.winner = match.winner;
                                         }
@@ -420,11 +433,14 @@ export default function TournamentPage() {
                                     }
                                 } else {
                                     if (nextMatch.bottom.name === "TBD") {
-                                    nextMatch.bottom.name = match.winner;
+                                        nextMatch.bottom.name = match.winner;
+                                        nextMatch.bottom.avatar = winnerData.avatar;
+                                        nextMatch.bottom.email = winnerData.email;
+                                        
                                         if(nextMatch.top.name === 'BYE') {
                                             nextMatch.winner = match.winner;
                                         }
-                                    roundsUpdated = true;
+                                        roundsUpdated = true;
                                     }
                                 }
                             }

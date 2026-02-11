@@ -62,14 +62,27 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
       }
 
       if (!walletData) {
-        // Create wallet for new user — with welcome bonus
+        // Use the secure RPC instead of direct insert
         const welcomeBonus = 50;
-        const { data: newWallet } = await supabase
+        const { data, error: rpcError } = await supabase.rpc('process_coin_transaction', {
+          p_user_email: user.email,
+          p_amount: welcomeBonus,
+          p_type: 'welcome_bonus',
+          p_description: '¡Bienvenido! Bono inicial seguro',
+        });
+
+        if (rpcError || !data.success) {
+          console.error('Failed to create secure wallet:', rpcError || data.error);
+          return;
+        }
+
+        // Refetch after creation to get the full object
+        const { data: createdWallet } = await supabase
           .from('coin_wallets')
-          .insert({ user_email: user.email, balance: welcomeBonus, lifetime_earned: welcomeBonus })
-          .select()
-          .single();
-        walletData = newWallet;
+          .select('*')
+          .eq('user_email', user.email)
+          .maybeSingle();
+        walletData = createdWallet;
       }
 
       setWallet(walletData);
