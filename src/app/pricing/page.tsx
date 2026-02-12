@@ -226,6 +226,7 @@ export default function PricingPage() {
     async function loadPlans() {
       try {
         const dbPlans = await db.getSubscriptionPlans();
+        console.log("PricingPage: Received dbPlans:", dbPlans);
         if (dbPlans && dbPlans.length > 0) {
           // Map DB schema to Plan interface
           const mappedPlans: Plan[] = dbPlans.map(p => ({
@@ -236,16 +237,21 @@ export default function PricingPage() {
             currency: p.currency,
             billingPeriod: p.billing_period as any,
             badge: p.badge,
-            highlights: p.highlights,
-            cta: p.cta_text,
-            ctaVariant: p.cta_variant as any,
+            highlights: p.highlights || [],
+            cta: p.cta_text || 'Seleccionar',
+            ctaVariant: (p.cta_variant as any) || 'default',
             popular: p.is_popular,
             order_index: p.order_index
           }));
+          console.log("PricingPage: Setting mappedPlans:", mappedPlans);
           setPlans(mappedPlans);
+        } else {
+          console.log("PricingPage: No dbPlans, using STATIC_PLANS");
+          setPlans(STATIC_PLANS);
         }
       } catch (err) {
         console.error("Error loading plans:", err);
+        setPlans(STATIC_PLANS);
       }
     }
     loadPlans();
@@ -255,12 +261,16 @@ export default function PricingPage() {
   const getGroupedTiers = () => {
     const groups: Record<string, any> = {};
     
+    console.log("PricingPage: Processing plans for grouping:", plans);
+
     plans.forEach(plan => {
       // Basic grouping: community, plus (from plus_monthly/plus_yearly/legacy_plus)
       let tierId = plan.id;
-      if (plan.id.startsWith('plus_')) tierId = 'plus';
-      else if (plan.id === 'legacy_plus') tierId = 'plus';
-      else if (plan.id.includes('_')) tierId = plan.id.split('_')[0];
+      if (typeof plan.id === 'string') {
+        if (plan.id.startsWith('plus_')) tierId = 'plus';
+        else if (plan.id === 'legacy_plus') tierId = 'plus';
+        else if (plan.id.includes('_')) tierId = plan.id.split('_')[0];
+      }
 
       if (!groups[tierId]) {
         groups[tierId] = {
@@ -275,11 +285,14 @@ export default function PricingPage() {
         };
       }
       
-      const period = (plan as any).billing_period === 'one-time' ? 'event' : 
-                    ((plan as any).billing_period === 'free' ? 'monthly' : (plan as any).billing_period);
+      const billingPeriod = plan.billingPeriod || (plan as any).billing_period;
+      const period = billingPeriod === 'one-time' ? 'event' : 
+                    (billingPeriod === 'free' ? 'monthly' : billingPeriod);
       
+      console.log(`PricingPage: Plan ${plan.id} assigned to tier ${tierId}, period ${period}`);
+
       // If it's free, put it in both monthly and yearly for display
-      if ((plan as any).billing_period === 'free') {
+      if (billingPeriod === 'free') {
         groups[tierId].variants['monthly'] = plan;
         groups[tierId].variants['yearly'] = plan;
       } else {
@@ -321,7 +334,9 @@ export default function PricingPage() {
       }
     });
 
-    return Object.values(groups).sort((a: any, b: any) => a.order_index - b.order_index);
+    const result = Object.values(groups).sort((a: any, b: any) => a.order_index - b.order_index);
+    console.log("PricingPage: groupedTiers result:", result);
+    return result;
   };
 
   const groupedTiers = getGroupedTiers();
