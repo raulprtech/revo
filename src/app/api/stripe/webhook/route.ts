@@ -132,11 +132,26 @@ export async function POST(request: Request) {
           break;
         }
 
-        // Handle subscription checkout
+        // Handle subscription OR one-time plan checkout
         const email = session.metadata?.user_email;
+        const planId = session.metadata?.plan_id;
         const subscriptionId = session.subscription as string;
 
-        if (email && subscriptionId) {
+        if (email && planId && session.mode === 'payment') {
+          // One-time payment (Legacy/Event Plan)
+          await supabase.from('subscriptions').upsert({
+            user_email: email,
+            plan: planId,
+            status: 'active',
+            stripe_customer_id: session.customer as string,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_email', // This will replace any current active plan
+          });
+          
+          // Send welcome email
+          await sendSubscriptionWelcomeEmail(email);
+        } else if (email && subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
           
           const periodStart = subscription.current_period_start 
@@ -146,9 +161,11 @@ export async function POST(request: Request) {
             ? new Date(subscription.current_period_end * 1000).toISOString()
             : null;
 
+          const planId = subscription.metadata?.plan_id || session.metadata?.plan_id || 'plus';
+
           await supabase.from('subscriptions').upsert({
             user_email: email,
-            plan: 'plus',
+            plan: planId,
             status: subscription.status === 'trialing' ? 'trialing' : 'active',
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: subscriptionId,

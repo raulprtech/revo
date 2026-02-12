@@ -18,10 +18,21 @@ import {
     DollarSign, 
     Landmark,
     Loader2,
-    RefreshCw
+    RefreshCw,
+    Copy,
+    ChevronDown,
+    PlusCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/database";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function TokenomicsManager() {
     const { toast } = useToast();
@@ -74,34 +85,79 @@ export function TokenomicsManager() {
         setPlans(plans.map(p => p.id === id ? { ...p, ...updates } : p));
     };
 
+    const handleCopyFeatures = (targetGroupId: string, sourceFeatures: string[]) => {
+        const group = getGroupedPlans().find(g => g.baseId === targetGroupId);
+        if (group) {
+            const newHighlights = Array.from(new Set([...group.highlights, ...sourceFeatures]));
+            group.variants.forEach((v: any) => handleUpdatePlan(v.id, { highlights: newHighlights }));
+            toast({ title: "Beneficios Copiados", description: `Se han añadido ${sourceFeatures.length} características.` });
+        }
+    };
+
     const handleAddPlan = async () => {
-        const newId = `plan_${Math.random().toString(36).substring(2, 7)}`;
-        const newPlan = {
-            id: newId,
-            name: "Nuevo Plan",
-            tagline: "Descripción corta...",
-            price: 0,
-            currency: "MXN",
-            billing_period: "monthly",
-            badge: "🏷️",
-            highlights: ["Beneficio 1"],
-            cta_text: "Suscribirse",
-            cta_variant: "default",
-            order_index: plans.length,
-            is_popular: false
-        };
+        const baseId = `p${Math.random().toString(36).substring(2, 6)}`;
+        const basePrice = 199;
+
+        const newPlans = [
+            {
+                id: `${baseId}_monthly`,
+                name: "Nuevo Plan",
+                tagline: "Gestión para organizadores",
+                price: basePrice,
+                currency: "MXN",
+                billing_period: "monthly",
+                badge: "⚡",
+                highlights: ["Beneficio 1", "Beneficio 2"],
+                cta_text: "Comenzar Plus",
+                cta_variant: "default",
+                order_index: plans.length,
+                is_popular: false
+            },
+            {
+                id: `${baseId}_yearly`,
+                name: "Nuevo Plan Anual",
+                tagline: "Ahorra ~20% con facturación anual",
+                price: Math.round(basePrice * 12 * 0.8),
+                currency: "MXN",
+                billing_period: "yearly",
+                badge: "⚡",
+                highlights: ["Beneficio 1", "Beneficio 2"],
+                cta_text: "Suscribirse Anual",
+                cta_variant: "default",
+                order_index: plans.length + 1,
+                is_popular: false
+            },
+            {
+                id: `${baseId}_event`,
+                name: "Nuevo Plan p/ Evento",
+                tagline: "Acceso Plus para un solo torneo",
+                price: Math.round(basePrice * 1.5),
+                currency: "MXN",
+                billing_period: "one-time",
+                badge: "⚡",
+                highlights: ["Beneficio 1", "Beneficio 2"],
+                cta_text: "Comprar p/ Evento",
+                cta_variant: "outline",
+                order_index: plans.length + 2,
+                is_popular: false
+            }
+        ];
         
         setSaving(true);
         try {
-            await db.addSubscriptionPlan(newPlan);
-            setPlans([...plans, newPlan]);
-            toast({ title: "Plan Creado", description: "El nuevo plan ha sido añadido a la base de datos." });
+            for (const p of newPlans) {
+                await db.addSubscriptionPlan(p);
+            }
+            setPlans([...plans, ...newPlans]);
+            toast({ 
+                title: "Nuevo Nivel de Suscripción", 
+                description: "Se han creado automáticamente las variantes Mensual, Anual y Por Evento." 
+            });
         } catch (error: any) {
-            console.error("Error creating plan detail:", error);
-            const message = error instanceof Error ? error.message : "Error desconocido";
+            console.error("Error creating plan level:", error);
             toast({ 
                 title: "Error al crear", 
-                description: message, 
+                description: error.message || "Error desconocido", 
                 variant: "destructive" 
             });
         } finally {
@@ -311,7 +367,27 @@ export function TokenomicsManager() {
                             <CardContent className="space-y-6">
                                 {/* Pricing Variants */}
                                 <div className="grid grid-cols-1 gap-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-                                    <Label className="text-[10px] font-black uppercase text-muted-foreground mb-1">Precios y Periodos</Label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Precios y Periodos</Label>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-5 text-[8px] uppercase font-bold text-primary hover:bg-primary/10"
+                                            onClick={() => {
+                                                const monthly = group.variants.find((v: any) => v.billing_period === 'monthly');
+                                                if (monthly) {
+                                                    const mPrice = monthly.price;
+                                                    group.variants.forEach((v: any) => {
+                                                        if (v.billing_period === 'yearly') handleUpdatePlan(v.id, { price: Math.round(mPrice * 12 * 0.8) });
+                                                        if (v.billing_period === 'one-time') handleUpdatePlan(v.id, { price: Math.round(mPrice * 1.5) });
+                                                    });
+                                                    toast({ title: "Precios Sincronizados", description: "Variantes actualizadas según el precio mensual (Anual -20%, Evento 1.5x)." });
+                                                }
+                                            }}
+                                        >
+                                            <RefreshCw className="h-2 w-2 mr-1" /> Sincronizar Variantes
+                                        </Button>
+                                    </div>
                                     {group.variants.map((variant: any) => (
                                         <div key={variant.id} className="flex items-center gap-3 bg-card p-2 rounded border border-border/50">
                                             <div className="flex-1">
@@ -354,7 +430,43 @@ export function TokenomicsManager() {
 
                                 {/* Common Features */}
                                 <div className="space-y-3">
-                                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Características Compartidas</Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Características Compartidas</Label>
+                                        
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="h-6 text-[9px] gap-1 px-2 font-bold uppercase hover:bg-primary/10 text-primary">
+                                                    <Copy className="h-3 w-3" /> Heredar de...
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-56">
+                                                <DropdownMenuLabel className="text-[10px] uppercase font-black opacity-50">Planes Existentes</DropdownMenuLabel>
+                                                {getGroupedPlans().filter(g => g.baseId !== group.baseId).map(other => (
+                                                    <DropdownMenuItem 
+                                                        key={other.baseId} 
+                                                        onClick={() => handleCopyFeatures(group.baseId, other.highlights)}
+                                                        className="flex items-center justify-between cursor-pointer"
+                                                    >
+                                                        <span className="text-xs font-semibold">{other.name}</span>
+                                                        <Badge variant="outline" className="text-[8px] h-4">{other.highlights.length} feats</Badge>
+                                                    </DropdownMenuItem>
+                                                ))}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem 
+                                                    onClick={() => handleCopyFeatures(group.baseId, ["Todo lo de Community"])}
+                                                    className="text-xs font-bold text-primary cursor-pointer"
+                                                >
+                                                    <PlusCircle className="h-3 w-3 mr-2" /> "Todo lo de Community"
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                    onClick={() => handleCopyFeatures(group.baseId, ["Todo lo de Organizer Plus"])}
+                                                    className="text-xs font-bold text-primary cursor-pointer"
+                                                >
+                                                    <PlusCircle className="h-3 w-3 mr-2" /> "Todo lo de Organizer Plus"
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                     <div className="space-y-2">
                                         {group.highlights?.map((highlight: string, idx: number) => (
                                             <div key={idx} className="flex gap-2 items-center group/item">
@@ -392,6 +504,68 @@ export function TokenomicsManager() {
                                         >
                                             <Plus className="h-3 w-3 mr-1" /> Añadir Beneficio
                                         </Button>
+                                    </div>
+                                </div>
+                                {/* Discounts & Custom Fields (Metadata) */}
+                                <div className="space-y-3 pt-2 border-t border-border/50">
+                                    <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                                        <Settings2 className="h-3 w-3" /> Descuentos y Configuración
+                                    </Label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px] uppercase opacity-70">Desc. Monedas (%)</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Percent className="h-3 w-3 text-muted-foreground" />
+                                                <Input 
+                                                    type="number"
+                                                    value={group.variants[0]?.metadata?.coins_discount || 0}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        group.variants.forEach((v: any) => handleUpdatePlan(v.id, { 
+                                                            metadata: { ...(v.metadata || {}), coins_discount: val } 
+                                                        }));
+                                                    }}
+                                                    className="h-7 text-xs font-bold"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px] uppercase opacity-70">Desc. Retiro (%)</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Percent className="h-3 w-3 text-muted-foreground" />
+                                                <Input 
+                                                    type="number"
+                                                    value={group.variants[0]?.metadata?.withdrawal_discount || 0}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        group.variants.forEach((v: any) => handleUpdatePlan(v.id, { 
+                                                            metadata: { ...(v.metadata || {}), withdrawal_discount: val } 
+                                                        }));
+                                                    }}
+                                                    className="h-7 text-xs font-bold"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[9px] uppercase opacity-70">Desc. Tickets de Entradas (%)</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Percent className="h-3 w-3 text-muted-foreground" />
+                                            <Input 
+                                                type="number"
+                                                value={group.variants[0]?.metadata?.tickets_discount || 0}
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value);
+                                                    group.variants.forEach((v: any) => handleUpdatePlan(v.id, { 
+                                                        metadata: { ...(v.metadata || {}), tickets_discount: val } 
+                                                    }));
+                                                }}
+                                                className="h-7 text-xs font-bold"
+                                                placeholder="0"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>

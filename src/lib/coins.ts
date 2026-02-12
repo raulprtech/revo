@@ -619,7 +619,9 @@ export class CoinsService {
     const spreads = settings?.value || { standard_percent: 10, pro_percent: 5 };
 
     // Determine user plan for specialized pricing
-    let isPro = false;
+    let coinsSpread = spreads.standard_percent;
+    let isSubscriber = false;
+
     if (userEmail) {
       const { data: sub } = await this.supabase
         .from('subscriptions')
@@ -627,13 +629,32 @@ export class CoinsService {
         .eq('user_email', userEmail)
         .in('status', ['active', 'trialing'])
         .maybeSingle();
-      isPro = sub?.plan === 'plus';
+      
+      if (sub?.plan) {
+        isSubscriber = sub.plan !== 'community';
+        
+        // Find metadata for this tier (matches 'plus' or 'plus_monthly')
+        const { data: planDetails } = await this.supabase
+          .from('subscription_plans')
+          .select('metadata')
+          .or(`id.eq.${sub.plan},id.ilike.${sub.plan}_%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (planDetails?.metadata?.coins_discount !== undefined) {
+          // The discount from metadata reduces the standard spread
+          coinsSpread = Math.max(0, spreads.standard_percent - Number(planDetails.metadata.coins_discount));
+        } else if (sub.plan === 'plus') {
+          // Fallback to old hardcoded pro_percent if no metadata found
+          coinsSpread = spreads.pro_percent;
+        }
+      }
     }
 
     return packages.map(pkg => {
       const basePrice = pkg.price_mxn;
-      // Spread included in the price: Standard (10%), Pro (5%)
-      const spreadMultiplier = isPro ? (1 + spreads.pro_percent / 100) : (1 + spreads.standard_percent / 100);
+      // Spread included in the price
+      const spreadMultiplier = (1 + coinsSpread / 100);
       const standardMultiplier = (1 + spreads.standard_percent / 100);
       
       const finalPrice = Math.round(basePrice * spreadMultiplier * 100) / 100;
@@ -643,7 +664,7 @@ export class CoinsService {
         ...pkg,
         price_mxn: finalPrice,
         original_price_mxn: standardPrice, // To show "normal" price for comparison
-        is_subscriber_discount: isPro && finalPrice < standardPrice,
+        is_subscriber_discount: isSubscriber && finalPrice < standardPrice,
       };
     });
   }

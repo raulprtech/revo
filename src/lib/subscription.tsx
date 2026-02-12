@@ -124,8 +124,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.email, fetchSubscription]);
 
-  const plan: PlanTier = subscription?.plan ?? 'community';
-  const isPro = plan === 'plus';
+  const plan = subscription?.plan ?? 'community';
+  const isPro = plan === 'plus' || (typeof plan === 'string' && (plan.startsWith('plus_') || plan === 'legacy_plus'));
 
   const isTournamentPro = useCallback(
     (tournament: { is_legacy_pro?: boolean }) => {

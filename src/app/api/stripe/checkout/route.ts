@@ -15,9 +15,23 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
-    const { email: bodyEmail, returnUrl, interval = 'monthly' } = await request.json();
+    const { email: bodyEmail, returnUrl, interval = 'monthly', planId } = await request.json();
     const email = user?.email || bodyEmail;
-    const priceId = interval === 'yearly' && PRICE_ID_YEARLY ? PRICE_ID_YEARLY : PRICE_ID_MONTHLY;
+    
+    let priceId = interval === 'yearly' && PRICE_ID_YEARLY ? PRICE_ID_YEARLY : PRICE_ID_MONTHLY;
+
+    // Use dynamic plan if planId is provided
+    if (planId) {
+      const { data: dbPlan } = await supabase
+        .from('subscription_plans')
+        .select('stripe_price_id, billing_period')
+        .eq('id', planId)
+        .maybeSingle();
+      
+      if (dbPlan?.stripe_price_id) {
+        priceId = dbPlan.stripe_price_id;
+      }
+    }
 
     if (!email) {
       return NextResponse.json({ error: 'Email requerido. Inicia sesión primero.' }, { status: 401 });
@@ -34,10 +48,12 @@ export async function POST(request: Request) {
       customerId = customer.id;
     }
 
-    // Create checkout session for Pro subscription
-    const session = await stripe.checkout.sessions.create({
+    const isOneTime = interval === 'one_time';
+
+    // Create checkout session
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
-      mode: 'subscription',
+      mode: isOneTime ? 'payment' : 'subscription',
       payment_method_types: ['card'],
       line_items: [
         {
@@ -49,14 +65,21 @@ export async function POST(request: Request) {
       cancel_url: `${returnUrl || process.env.NEXT_PUBLIC_APP_URL}/pricing?upgrade=canceled`,
       metadata: {
         user_email: email,
+        plan_id: planId || (isOneTime ? 'legacy_plus' : 'plus'),
       },
-      subscription_data: {
+    };
+
+    if (!isOneTime) {
+      sessionConfig.subscription_data = {
         metadata: {
           user_email: email,
+          plan_id: planId || 'plus',
         },
         trial_period_days: 14,
-      },
-    });
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return NextResponse.json({ url: session.url });
   } catch (error) {

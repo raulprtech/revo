@@ -64,6 +64,29 @@ export async function POST(request: Request) {
       }
     }
 
+    // Apply participant tickets discount if any
+    let finalAmount = amount;
+    const { data: participantSub } = await supabase
+      .from('subscriptions')
+      .select('plan')
+      .eq('user_email', participantEmail)
+      .in('status', ['active', 'trialing'])
+      .maybeSingle();
+    
+    if (participantSub) {
+      const { data: planDetails } = await supabase
+        .from('subscription_plans')
+        .select('metadata')
+        .or(`id.eq.${participantSub.plan},id.ilike.${participantSub.plan}_%`)
+        .limit(1)
+        .maybeSingle();
+      
+      if (planDetails?.metadata?.tickets_discount) {
+        const discountPercent = Number(planDetails.metadata.tickets_discount);
+        finalAmount = amount * (1 - discountPercent / 100);
+      }
+    }
+
     // Find or create customer
     const customers = await stripe.customers.list({ email: participantEmail, limit: 1 });
     let customerId: string;
@@ -88,7 +111,7 @@ export async function POST(request: Request) {
               name: `Entry Fee: ${tournamentName || 'Torneo'}`,
               description: `Inscripción al torneo ID: ${tournamentId}`,
             },
-            unit_amount: Math.round(amount * 100), // Stripe uses cents
+            unit_amount: Math.round(finalAmount * 100), // Stripe uses cents
           },
           quantity: 1,
         },
