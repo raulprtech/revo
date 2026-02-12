@@ -2,8 +2,8 @@
 // PLAN DEFINITIONS & FEATURE GATING
 // =============================================
 
-export type PlanTier = 'community' | 'plus';
-export type BillingInterval = 'monthly' | 'yearly';
+export type PlanTier = 'community' | 'plus' | string;
+export type BillingInterval = 'monthly' | 'yearly' | 'event';
 
 // One-time event purchase (Legacy Plus)
 export const EVENT_PAYMENT_PRICE = 299;
@@ -40,7 +40,7 @@ export interface Plan {
   tagline: string;
   price: number; // 0 for free
   currency: string;
-  billingPeriod: 'monthly' | 'yearly' | 'free';
+  billingPeriod: 'monthly' | 'yearly' | 'free' | 'one-time';
   badge: string; // emoji
   highlights: string[];
   cta: string;

@@ -344,7 +344,18 @@ export function TokenomicsManager() {
                             <CardHeader className="flex flex-row justify-between items-start">
                                 <div className="space-y-1 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-[10px] font-black">{group.badge} {group.baseId.toUpperCase()}</Badge>
+                                        <div className="flex items-center gap-1 bg-muted rounded-md px-1 border border-border/50">
+                                            <span className="text-[10px] uppercase font-black opacity-40 ml-1">Icon</span>
+                                            <Input 
+                                                value={group.badge} 
+                                                onChange={(e) => {
+                                                    group.variants.forEach((v: any) => handleUpdatePlan(v.id, { badge: e.target.value }));
+                                                }}
+                                                className="w-8 h-7 p-0 text-center text-sm bg-transparent border-none focus-visible:ring-0 shadow-none font-bold"
+                                                maxLength={4}
+                                            />
+                                        </div>
+                                        <Badge variant="outline" className="text-[10px] font-black">{group.baseId.toUpperCase()}</Badge>
                                         {group.is_popular && <Badge className="bg-primary text-[10px] font-bold">Populares</Badge>}
                                     </div>
                                     <Input 
@@ -389,40 +400,69 @@ export function TokenomicsManager() {
                                         </Button>
                                     </div>
                                     {group.variants.map((variant: any) => (
-                                        <div key={variant.id} className="flex items-center gap-3 bg-card p-2 rounded border border-border/50">
-                                            <div className="flex-1">
-                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-bold text-muted-foreground">$</span>
-                                                    <Input 
-                                                        type="number"
-                                                        value={variant.price}
-                                                        onChange={(e) => handleUpdatePlan(variant.id, { price: parseFloat(e.target.value) })}
-                                                        className="h-7 w-24 font-bold text-sm"
-                                                    />
-                                                    <Badge variant="secondary" className="text-[9px] h-5 uppercase">
-                                                        {variant.billing_period}
-                                                    </Badge>
-                                                 </div>
+                                        <div key={variant.id} className="flex flex-col gap-2 bg-card p-2 rounded border border-border/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1">
+                                                     <div className="flex items-center gap-1">
+                                                        <span className="text-xs font-bold text-muted-foreground">$</span>
+                                                        <Input 
+                                                            type="number"
+                                                            value={variant.price}
+                                                            onChange={(e) => handleUpdatePlan(variant.id, { price: parseFloat(e.target.value) })}
+                                                            className="h-7 w-24 font-bold text-sm"
+                                                        />
+                                                        <Badge variant="secondary" className="text-[9px] h-5 uppercase">
+                                                            {variant.billing_period}
+                                                        </Badge>
+                                                     </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Button 
+                                                        onClick={() => handleSavePlans(variant.id)}
+                                                        disabled={saving}
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 px-2 text-[10px] uppercase font-bold text-primary hover:bg-primary/10"
+                                                    >
+                                                        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                                                    </Button>
+                                                    <Button 
+                                                        onClick={() => handleDeletePlan(variant.id)}
+                                                        disabled={saving}
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 text-destructive/50 hover:text-destructive"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button 
-                                                    onClick={() => handleSavePlans(variant.id)}
-                                                    disabled={saving}
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-7 px-2 text-[10px] uppercase font-bold text-primary hover:bg-primary/10"
-                                                >
-                                                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
-                                                </Button>
-                                                <Button 
-                                                    onClick={() => handleDeletePlan(variant.id)}
-                                                    disabled={saving}
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-7 w-7 text-destructive/50 hover:text-destructive"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
+                                            
+                                            {/* CTA Customization */}
+                                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/30">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[8px] uppercase font-bold opacity-50">Texto del Botón</span>
+                                                    <Input 
+                                                        value={variant.cta_text || ''}
+                                                        onChange={(e) => handleUpdatePlan(variant.id, { cta_text: e.target.value })}
+                                                        className="h-6 text-[10px] py-0 px-2"
+                                                        placeholder="Ej: Suscribirse"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[8px] uppercase font-bold opacity-50">Estilo</span>
+                                                    <select 
+                                                        value={variant.cta_variant || 'default'}
+                                                        onChange={(e) => handleUpdatePlan(variant.id, { cta_variant: e.target.value })}
+                                                        className="h-6 text-[10px] rounded-md border border-input bg-transparent px-1 py-0"
+                                                    >
+                                                        <option value="default">Principal</option>
+                                                        <option value="outline">Contorno</option>
+                                                        <option value="secondary">Secundario</option>
+                                                        <option value="ghost">Fantasma</option>
+                                                        <option value="link">Enlace</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}

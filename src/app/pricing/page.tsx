@@ -506,15 +506,16 @@ export default function PricingPage() {
                           Plan actual
                         </Button>
                       ) : (
-                        <Button asChild variant="outline" className="w-full" size="lg">
+                        <Button asChild variant={currentPlan.ctaVariant || "outline"} className="w-full" size="lg">
                           <Link href="/signup">
-                            Empezar Gratis
+                            {currentPlan.cta || "Empezar Gratis"}
                             <ArrowRight className="ml-2 h-4 w-4" />
                           </Link>
                         </Button>
                       )
                     ) : (
                       <Button
+                        variant={currentPlan.ctaVariant || (isPopular ? "default" : "outline")}
                         className="w-full"
                         size="lg"
                         onClick={() => handleUpgradeToPro(currentPlan.id, billingInterval)}
@@ -531,11 +532,7 @@ export default function PricingPage() {
                         )}
                         {(isPro && billingInterval !== 'event') 
                           ? "Plan actual" 
-                          : billingInterval === 'event' 
-                            ? "Comprar p/ Evento" 
-                            : user 
-                              ? `Suscribirse ${billingInterval === 'yearly' ? 'Anual' : 'Plus'}` 
-                              : currentPlan.cta || "Comenzar"}
+                          : currentPlan.cta || "Comenzar"}
                       </Button>
                     )}
                   </CardFooter>

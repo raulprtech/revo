@@ -50,9 +50,10 @@ export function PricingPreview() {
   const getGroupedTiers = () => {
     const groups: Record<string, any> = {};
     plans.forEach(plan => {
-      let tierId = plan.id;
+      let tierId: any = plan.id;
       if (plan.id.startsWith('plus_')) tierId = 'plus';
       else if (plan.id.includes('_')) tierId = plan.id.split('_')[0];
+      else if (plan.id === 'legacy_plus') tierId = 'plus';
 
       if (!groups[tierId]) {
         groups[tierId] = {
@@ -144,9 +145,9 @@ export function PricingPreview() {
                       </li>
                     ))}
                   </ul>
-                  <Button asChild variant={isFree ? "outline" : "default"} className="w-full">
+                  <Button asChild variant={(currentPlan.ctaVariant as any) || (isFree ? "outline" : "default")} className="w-full">
                     <Link href="/signup">
-                      {isFree ? "Empezar Gratis" : "Probar Plus"} 
+                      {currentPlan.cta || (isFree ? "Empezar Gratis" : "Probar Plus")} 
                       {isFree ? <ArrowRight className="ml-2 h-4 w-4" /> : <Zap className="ml-2 h-4 w-4" />}
                     </Link>
                   </Button>

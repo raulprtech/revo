@@ -262,6 +262,110 @@ class DatabaseService {
     return createClient();
   }
 
+  // --- Platform Settings & Tokenomics ---
+
+  async getPlatformSettings<T>(key: string): Promise<T | null> {
+    const { data, error } = await this.supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data.value as T;
+  }
+
+  async updatePlatformSettings(key: string, value: any): Promise<void> {
+    const { data, error } = await this.supabase
+      .rpc('admin_upsert_setting', { p_key: key, p_value: value });
+
+    if (error) {
+      console.error('Error updating platform settings:', error);
+      throw error;
+    }
+    if (data && !data.success) {
+      throw new Error(data.error || 'Error al actualizar configuración');
+    }
+  }
+
+  async getSubscriptionPlans(): Promise<any[]> {
+    console.log('DatabaseService: Fetching subscription plans...');
+    const { data, error } = await this.supabase
+      .from('subscription_plans')
+      .select('*')
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching subscription plans:', error);
+      return [];
+    }
+    return data;
+  }
+
+  async updateSubscriptionPlan(planId: string, updates: any): Promise<void> {
+    const { data, error } = await this.supabase.rpc('admin_upsert_plan', {
+      p_id: planId,
+      p_name: updates.name,
+      p_tagline: updates.tagline || '',
+      p_price: Number(updates.price) || 0,
+      p_currency: updates.currency || 'MXN',
+      p_billing_period: updates.billing_period || 'monthly',
+      p_badge: updates.badge || '🏷️',
+      p_highlights: updates.highlights || [],
+      p_metadata: updates.metadata || {},
+      p_cta_text: updates.cta_text || 'Suscribirse',
+      p_cta_variant: updates.cta_variant || 'default',
+      p_is_popular: updates.is_popular || false,
+      p_order_index: updates.order_index || 0,
+    });
+
+    if (error) {
+      console.error('Error updating subscription plan:', error);
+      throw new Error(`Error al actualizar plan: ${error.message}`);
+    }
+    if (data && !data.success) {
+      throw new Error(data.error || 'Error al actualizar plan');
+    }
+  }
+
+  async addSubscriptionPlan(plan: any): Promise<void> {
+    const { data, error } = await this.supabase.rpc('admin_upsert_plan', {
+      p_id: plan.id,
+      p_name: plan.name,
+      p_tagline: plan.tagline || '',
+      p_price: Number(plan.price) || 0,
+      p_currency: plan.currency || 'MXN',
+      p_billing_period: plan.billing_period || 'monthly',
+      p_badge: plan.badge || '🏷️',
+      p_highlights: plan.highlights || [],
+      p_metadata: plan.metadata || {},
+      p_cta_text: plan.cta_text || 'Suscribirse',
+      p_cta_variant: plan.cta_variant || 'default',
+      p_is_popular: plan.is_popular || false,
+      p_order_index: plan.order_index || 0,
+    });
+
+    if (error) {
+      console.error('Error adding subscription plan:', error);
+      throw new Error(`Error al crear plan: ${error.message}`);
+    }
+    if (data && !data.success) {
+      throw new Error(data.error || 'Error al crear plan');
+    }
+  }
+
+  async deleteSubscriptionPlan(planId: string): Promise<void> {
+    const { data, error } = await this.supabase.rpc('admin_delete_plan', { p_id: planId });
+
+    if (error) {
+      console.error('Error deleting subscription plan:', error);
+      throw new Error(`Error al eliminar plan: ${error.message}`);
+    }
+    if (data && !data.success) {
+      throw new Error(data.error || 'Error al eliminar plan');
+    }
+  }
+
   // Tournament operations
   async createTournament(tournament: CreateTournamentData): Promise<Tournament> {
     // Log the data being sent for debugging
@@ -1734,109 +1838,6 @@ class DatabaseService {
         filter: `id=eq.${roomId}`
       }, callback)
       .subscribe();
-  }
-
-  // --- Platform Settings & Tokenomics ---
-  
-  async getPlatformSettings<T>(key: string): Promise<T | null> {
-    const { data, error } = await this.supabase
-      .from('platform_settings')
-      .select('value')
-      .eq('key', key)
-      .maybeSingle();
-    
-    if (error || !data) return null;
-    return data.value as T;
-  }
-
-  async updatePlatformSettings(key: string, value: any): Promise<void> {
-    const { data, error } = await this.supabase
-      .rpc('admin_upsert_setting', { p_key: key, p_value: value });
-    
-    if (error) {
-      console.error('Error updating platform settings:', error);
-      throw error;
-    }
-    if (data && !data.success) {
-      throw new Error(data.error || 'Error al actualizar configuración');
-    }
-  }
-
-  async getSubscriptionPlans(): Promise<any[]> {
-    const { data, error } = await this.supabase
-      .from('subscription_plans')
-      .select('*')
-      .order('order_index', { ascending: true });
-    
-    if (error) {
-      console.error('Error fetching subscription plans:', error);
-      return [];
-    }
-    return data;
-  }
-
-  async updateSubscriptionPlan(planId: string, updates: any): Promise<void> {
-    const { data, error } = await this.supabase.rpc('admin_upsert_plan', {
-      p_id: planId,
-      p_name: updates.name,
-      p_tagline: updates.tagline || '',
-      p_price: Number(updates.price) || 0,
-      p_currency: updates.currency || 'MXN',
-      p_billing_period: updates.billing_period || 'monthly',
-      p_badge: updates.badge || '🏷️',
-      p_highlights: updates.highlights || [],
-      p_metadata: updates.metadata || {},
-      p_cta_text: updates.cta_text || 'Suscribirse',
-      p_cta_variant: updates.cta_variant || 'default',
-      p_is_popular: updates.is_popular || false,
-      p_order_index: updates.order_index || 0,
-    });
-    
-    if (error) {
-      console.error('Error updating subscription plan:', error);
-      throw new Error(`Error al actualizar plan: ${error.message}`);
-    }
-    if (data && !data.success) {
-      throw new Error(data.error || 'Error al actualizar plan');
-    }
-  }
-
-  async addSubscriptionPlan(plan: any): Promise<void> {
-    const { data, error } = await this.supabase.rpc('admin_upsert_plan', {
-      p_id: plan.id,
-      p_name: plan.name,
-      p_tagline: plan.tagline || '',
-      p_price: Number(plan.price) || 0,
-      p_currency: plan.currency || 'MXN',
-      p_billing_period: plan.billing_period || 'monthly',
-      p_badge: plan.badge || '🏷️',
-      p_highlights: plan.highlights || [],
-      p_metadata: plan.metadata || {},
-      p_cta_text: plan.cta_text || 'Suscribirse',
-      p_cta_variant: plan.cta_variant || 'default',
-      p_is_popular: plan.is_popular || false,
-      p_order_index: plan.order_index || 0,
-    });
-    
-    if (error) {
-      console.error('Error adding subscription plan:', error);
-      throw new Error(`Error al crear plan: ${error.message}`);
-    }
-    if (data && !data.success) {
-      throw new Error(data.error || 'Error al crear plan');
-    }
-  }
-
-  async deleteSubscriptionPlan(planId: string): Promise<void> {
-    const { data, error } = await this.supabase.rpc('admin_delete_plan', { p_id: planId });
-    
-    if (error) {
-      console.error('Error deleting subscription plan:', error);
-      throw new Error(`Error al eliminar plan: ${error.message}`);
-    }
-    if (data && !data.success) {
-      throw new Error(data.error || 'Error al eliminar plan');
-    }
   }
 }
 
