@@ -23,7 +23,7 @@ interface RetentionMetricsProps {
   /** All tournaments owned by this user (or in this event) */
   tournaments: Tournament[];
   /** Map of tournament ID -> participant emails */
-  participantsByTournament: Record<string, string[]>;
+  participantsByTournament?: Record<string, string[]>;
 }
 
 interface RetentionData {
@@ -37,7 +37,7 @@ interface RetentionData {
   growthRate: number;
 }
 
-export function RetentionMetrics({ tournaments, participantsByTournament }: RetentionMetricsProps) {
+export function RetentionMetrics({ tournaments, participantsByTournament = {} }: RetentionMetricsProps) {
   const { isPro } = useSubscription();
 
   const data = useMemo((): RetentionData => {

@@ -616,7 +616,7 @@ export class CoinsService {
       .eq('key', 'coins_spreads')
       .maybeSingle();
     
-    const spreads = settings?.value || { standard_percent: 10, pro_percent: 5 };
+    const spreads = settings?.value || { standard_percent: 10 };
 
     // Determine user plan for specialized pricing
     let coinsSpread = spreads.standard_percent;
@@ -644,9 +644,6 @@ export class CoinsService {
         if (planDetails?.metadata?.coins_discount !== undefined) {
           // The discount from metadata reduces the standard spread
           coinsSpread = Math.max(0, spreads.standard_percent - Number(planDetails.metadata.coins_discount));
-        } else if (sub.plan === 'plus') {
-          // Fallback to old hardcoded pro_percent if no metadata found
-          coinsSpread = spreads.pro_percent;
         }
       }
     }

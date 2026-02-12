@@ -18,7 +18,7 @@ interface TournamentFormData {
     maxParticipants: number;
     startDate: Date;
     startTime: string;
-    format: 'single-elimination' | 'double-elimination' | 'swiss';
+    format: 'single-elimination' | 'double-elimination' | 'swiss' | 'round-robin' | 'free-for-all';
     tournamentMode: 'online' | 'presencial';
     prizePool?: string;
     prizes?: Prize[];

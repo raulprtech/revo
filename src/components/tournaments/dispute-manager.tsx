@@ -52,7 +52,7 @@ export function DisputeManager({ tournamentId }: DisputeManagerProps) {
         setLoading(false);
     };
 
-    const resolveDispute = async (matchRoomId: UUID, winnerSlot: 1 | 2) => {
+    const resolveDispute = async (matchRoomId: string, winnerSlot: 1 | 2) => {
         setIsResolving(true);
         try {
             const { data: { user: adminUser } } = await supabase.auth.getUser();

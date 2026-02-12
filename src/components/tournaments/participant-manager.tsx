@@ -671,7 +671,6 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
                             )}
                             {/* Export Button */}
                             <ProFeatureGate 
-                                showUpgradeButton={false}
                                 fallback={
                                     <Button variant="outline" size="sm" onClick={() => {
                                         toast({

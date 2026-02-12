@@ -265,7 +265,7 @@ export default function PricingPage() {
       if (!groups[tierId]) {
         groups[tierId] = {
           id: tierId,
-          name: plan.name.replace(' Anual', '').replace(' Mensual', '').replace(' Pago por Evento', ''),
+          name: plan.name.replace(' Anual', '').replace(' Mensual', '').replace(' (Pago Único)', '').replace(' - Pago por Evento', '').replace(' Pago por Evento', ''),
           tagline: plan.tagline,
           badge: plan.badge,
           highlights: plan.highlights || [],
@@ -275,11 +275,11 @@ export default function PricingPage() {
         };
       }
       
-      const period = plan.billingPeriod === 'one-time' ? 'event' : 
-                    (plan.billingPeriod === 'free' ? 'monthly' : plan.billingPeriod);
+      const period = (plan as any).billing_period === 'one-time' ? 'event' : 
+                    ((plan as any).billing_period === 'free' ? 'monthly' : (plan as any).billing_period);
       
       // If it's free, put it in both monthly and yearly for display
-      if (plan.billingPeriod === 'free') {
+      if ((plan as any).billing_period === 'free') {
         groups[tierId].variants['monthly'] = plan;
         groups[tierId].variants['yearly'] = plan;
       } else {
@@ -506,16 +506,16 @@ export default function PricingPage() {
                           Plan actual
                         </Button>
                       ) : (
-                        <Button asChild variant={currentPlan.ctaVariant || "outline"} className="w-full" size="lg">
+                        <Button asChild variant={(currentPlan as any).cta_variant || "outline"} className="w-full" size="lg">
                           <Link href="/signup">
-                            {currentPlan.cta || "Empezar Gratis"}
+                            {(currentPlan as any).cta || "Empezar Gratis"}
                             <ArrowRight className="ml-2 h-4 w-4" />
                           </Link>
                         </Button>
                       )
                     ) : (
                       <Button
-                        variant={currentPlan.ctaVariant || (isPopular ? "default" : "outline")}
+                        variant={(currentPlan as any).cta_variant || (isPopular ? "default" : "outline")}
                         className="w-full"
                         size="lg"
                         onClick={() => handleUpgradeToPro(currentPlan.id, billingInterval)}
@@ -532,7 +532,7 @@ export default function PricingPage() {
                         )}
                         {(isPro && billingInterval !== 'event') 
                           ? "Plan actual" 
-                          : currentPlan.cta || "Comenzar"}
+                          : (currentPlan as any).cta || "Comenzar"}
                       </Button>
                     )}
                   </CardFooter>

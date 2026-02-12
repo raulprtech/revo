@@ -136,7 +136,7 @@ const formSchema = z.object({
   description: z.string().max(500).optional(),
   game: z.string().min(1, "El juego es obligatorio."),
   gameMode: z.string().min(1, "La modalidad de juego es obligatoria."),
-  format: z.enum(["single-elimination", "double-elimination", "swiss"]),
+  format: z.enum(["single-elimination", "double-elimination", "swiss", "round-robin", "free-for-all"]),
   startDate: z.date({ required_error: "Se requiere una fecha de inicio." }),
   startTime: z.string().min(1, "Se requiere una hora de inicio."),
   maxParticipants: z.coerce.number().min(2, "Se requieren al menos 2 participantes.").max(512),
@@ -194,7 +194,7 @@ export function CreateTournamentForm({ mode = "create", tournamentData, eventId 
     currency: 'MXN',
     enabled: false
   });
-  const [prizeDistributions, setPrizeDistributions] = useState<{position: number, percentage: number}[]>([]);
+  const [prizeDistributions, setPrizeDistributions] = useState<{position: string, percentage: number}[]>([]);
   const [branding, setBranding] = useState<BracketBranding>({
     primaryColor: '#e8590c',
     secondaryColor: '#1a1a2e',

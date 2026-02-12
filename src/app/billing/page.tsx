@@ -65,6 +65,7 @@ export default function BillingPage() {
   const [fiatTransactions, setFiatTransactions] = useState<FiatTransaction[]>([]);
   const [payoutAmount, setPayoutAmount] = useState<string>("");
   const [clabe, setClabe] = useState<string>("");
+  const [profile, setProfile] = useState<any>(null);
   const [walletLoading, setWalletLoading] = useState(true);
 
   const loading = authLoading || subLoading;
@@ -76,12 +77,14 @@ export default function BillingPage() {
     const loadWalletData = async () => {
       setWalletLoading(true);
       try {
-        const [wallet, txs] = await Promise.all([
+        const [wallet, txs, profileData] = await Promise.all([
           db.getFiatWallet(user.email!),
-          db.getFiatTransactions(user.email!)
+          db.getFiatTransactions(user.email!),
+          db.getProfileByEmail(user.email!)
         ]);
         setFiatWallet(wallet);
         setFiatTransactions(txs as any[]);
+        setProfile(profileData);
       } catch (err) {
         console.error("Error loading wallet:", err);
       } finally {
@@ -154,6 +157,74 @@ export default function BillingPage() {
       toast({
         title: "Error",
         description: err instanceof Error ? err.message : "No se pudo procesar el retiro",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConnectOnboard = async () => {
+    setActionLoading("connect");
+    try {
+      const res = await fetch("/api/stripe/connect/onboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user?.email }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      toast({
+        title: "Error de vinculación",
+        description: err instanceof Error ? err.message : "No se pudo iniciar el proceso con Stripe",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConnectPayout = async () => {
+    const amount = parseFloat(payoutAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Error", description: "Monto inválido", variant: "destructive" });
+      return;
+    }
+
+    setActionLoading("payout");
+    try {
+      const res = await fetch("/api/stripe/connect/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast({
+          title: "Transferencia Exitosa",
+          description: `Se han enviado $${amount} MXN a tu cuenta de Stripe.`,
+        });
+        setPayoutAmount("");
+        // Refresh wallet
+        const [wallet, txs] = await Promise.all([
+          db.getFiatWallet(user.email!),
+          db.getFiatTransactions(user.email!)
+        ]);
+        setFiatWallet(wallet);
+        setFiatTransactions(txs as any[]);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      toast({
+        title: "Error de retiro",
+        description: err instanceof Error ? err.message : "No se pudo realizar el retiro automático",
         variant: "destructive",
       });
     } finally {
@@ -273,7 +344,51 @@ export default function BillingPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-4 p-4 rounded-lg border bg-background/50">
                 <h3 className="font-semibold flex items-center gap-2">
-                  <Landmark className="h-4 w-4" /> Solicitud de Retiro
+                  <Zap className="h-4 w-4 text-amber-500" /> Retiro Automático (Stripe Connect)
+                </h3>
+                {profile?.stripe_connect_id ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground bg-green-500/10 text-green-600 p-2 rounded border border-green-500/20 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Cuenta de Stripe vinculada correctamente.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="amount_connect" className="text-xs">Monto a retirar ($MXN)</Label>
+                      <Input 
+                        id="amount_connect"
+                        type="number"
+                        placeholder="0.00"
+                        value={payoutAmount}
+                        onChange={(e) => setPayoutAmount(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      className="w-full bg-amber-500 hover:bg-amber-600" 
+                      onClick={handleConnectPayout}
+                      disabled={!payoutAmount || actionLoading === 'payout' || (fiatWallet?.balance || 0) <= 0}
+                    >
+                      {actionLoading === 'payout' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Retiro Instantáneo"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground p-2 bg-muted rounded border">
+                      Vincula tu cuenta de Stripe para recibir tus premios instantáneamente a tu banco.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-amber-500 text-amber-600 hover:bg-amber-50"
+                      onClick={handleConnectOnboard}
+                      disabled={actionLoading === 'connect'}
+                    >
+                      {actionLoading === 'connect' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Vincular Stripe Connect"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4 p-4 rounded-lg border bg-background/50">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Landmark className="h-4 w-4" /> Transferencia Bancaria
                 </h3>
                 <div className="space-y-2">
                   <Label htmlFor="clabe" className="text-xs">CLABE Interbancaria (18 dígitos)</Label>
@@ -299,14 +414,15 @@ export default function BillingPage() {
                   disabled={!clabe || !payoutAmount || actionLoading === 'payout' || (fiatWallet?.balance || 0) <= 0}
                   onClick={handlePayout}
                 >
-                  {actionLoading === 'payout' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Solicitar Retiro"}
+                  {actionLoading === 'payout' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Solicitar Retiro SPEI"}
                 </Button>
                 <p className="text-[10px] text-muted-foreground text-center">
                   * Las transferencias SPEI suelen procesarse en 24-48 horas hábiles.
                 </p>
               </div>
+            </div>
 
-              <div className="space-y-4">
+            <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2 px-2">
                   <Receipt className="h-4 w-4" /> Movimientos Recientes
                 </h3>

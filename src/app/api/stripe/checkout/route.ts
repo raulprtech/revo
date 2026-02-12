@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       cancel_url: `${returnUrl || process.env.NEXT_PUBLIC_APP_URL}/pricing?upgrade=canceled`,
       metadata: {
         user_email: email,
-        plan_id: planId || (isOneTime ? 'legacy_plus' : 'plus'),
+        plan_id: planId?.replace('_auto', '') || (isOneTime ? 'legacy_plus' : 'plus'),
       },
     };
 

@@ -21,7 +21,8 @@ import {
     RefreshCw,
     Copy,
     ChevronDown,
-    PlusCircle
+    PlusCircle,
+    Ticket
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/database";
@@ -41,7 +42,8 @@ export function TokenomicsManager() {
 
     // Platform Settings
     const [withdrawalFees, setWithdrawalFees] = useState({ fixed: 15, percentage: 3 });
-    const [coinsSpreads, setCoinsSpreads] = useState({ standard_percent: 10, pro_percent: 5 });
+    const [coinsSpreads, setCoinsSpreads] = useState({ standard_percent: 10 });
+    const [ticketFees, setTicketFees] = useState({ base_fee: 10, service_percent: 5 });
 
     // Plans
     const [plans, setPlans] = useState<any[]>([]);
@@ -55,10 +57,12 @@ export function TokenomicsManager() {
         try {
             const wFees = await db.getPlatformSettings<any>("withdrawal_fees");
             const cSpreads = await db.getPlatformSettings<any>("coins_spreads");
+            const tFees = await db.getPlatformSettings<any>("ticket_fees");
             const dbPlans = await db.getSubscriptionPlans();
 
             if (wFees) setWithdrawalFees(wFees);
             if (cSpreads) setCoinsSpreads(cSpreads);
+            if (tFees) setTicketFees(tFees);
             setPlans(dbPlans);
         } catch (error) {
             console.error("Error loading tokenomics data:", error);
@@ -73,6 +77,7 @@ export function TokenomicsManager() {
         try {
             await db.updatePlatformSettings("withdrawal_fees", withdrawalFees);
             await db.updatePlatformSettings("coins_spreads", coinsSpreads);
+            await db.updatePlatformSettings("ticket_fees", ticketFees);
             toast({ title: "Configuración Guardada", description: "Los montos y spreads han sido actualizados." });
         } catch (error) {
             toast({ title: "Error", description: "No se pudo guardar la configuración", variant: "destructive" });
@@ -206,13 +211,19 @@ export function TokenomicsManager() {
         const groups: Record<string, any> = {};
         
         plans.forEach(plan => {
-            // Grouping logic: "plus_monthly" -> "plus", "community" -> "community"
-            const baseId = plan.id.includes('_') ? plan.id.split('_')[0] : plan.id;
+            // Grouping logic: "plus_monthly" -> "plus", "community" -> "community", "legacy_plus" -> "plus"
+            let baseId = plan.id;
             
+            if (plan.id === 'legacy_plus' || plan.id.startsWith('plus_')) {
+                baseId = 'plus';
+            } else if (plan.id.includes('_')) {
+                baseId = plan.id.split('_')[0];
+            }
+
             if (!groups[baseId]) {
                 groups[baseId] = {
                     baseId,
-                    name: plan.name.replace(' Anual', '').replace(' Mensual', ''),
+                    name: plan.name.replace(' Anual', '').replace(' Mensual', '').replace(' (Pago Único)', '').replace(' - Pago por Evento', ''),
                     tagline: plan.tagline,
                     badge: plan.badge,
                     highlights: plan.highlights || [],
@@ -221,6 +232,14 @@ export function TokenomicsManager() {
                 };
             }
             groups[baseId].variants.push(plan);
+        });
+        
+        // Sort variants: monthly, yearly, one-time
+        Object.values(groups).forEach((group: any) => {
+            group.variants.sort((a: any, b: any) => {
+                const order = { 'monthly': 0, 'yearly': 1, 'one-time': 2 };
+                return (order[a.billing_period as keyof typeof order] ?? 4) - (order[b.billing_period as keyof typeof order] ?? 4);
+            });
         });
         
         return Object.values(groups);
@@ -232,7 +251,7 @@ export function TokenomicsManager() {
 
     return (
         <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Withdrawal Fees */}
                 <Card>
                     <CardHeader>
@@ -283,12 +302,12 @@ export function TokenomicsManager() {
                             Spreads de Duels Coins
                         </CardTitle>
                         <CardDescription>
-                            Define el margen incluido en el precio de las monedas para usuarios normales y suscriptores de pago.
+                            Define el margen base incluido en el precio de las monedas para todos los usuarios.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Spread Estándar (%)</Label>
+                            <Label>Spread Base Estándar (%)</Label>
                             <div className="flex items-center gap-2">
                                 <Percent className="h-4 w-4 text-muted-foreground" />
                                 <Input 
@@ -298,21 +317,52 @@ export function TokenomicsManager() {
                                 />
                             </div>
                         </div>
+                    </CardContent>
+                     <CardFooter className="bg-muted/30 pt-6">
+                        <div className="text-xs text-muted-foreground italic">
+                            Los suscriptores obtienen descuentos sobre este spread configurado en cada plan.
+                        </div>
+                    </CardFooter>
+                </Card>
+
+                {/* Ticket Fees */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Ticket className="h-5 w-5 text-blue-500" />
+                            Precios de Tickets
+                        </CardTitle>
+                        <CardDescription>
+                            Configura el precio base y el cargo por servicio para los tickets de entrada.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Spread Pro / Suscriptor (%)</Label>
+                            <Label>Precio Base Sugerido (MXN)</Label>
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    type="number" 
+                                    value={ticketFees.base_fee} 
+                                    onChange={(e) => setTicketFees({ ...ticketFees, base_fee: parseFloat(e.target.value) })}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Cargo de Servicio (%)</Label>
                             <div className="flex items-center gap-2">
                                 <Percent className="h-4 w-4 text-muted-foreground" />
                                 <Input 
                                     type="number" 
-                                    value={coinsSpreads.pro_percent} 
-                                    onChange={(e) => setCoinsSpreads({ ...coinsSpreads, pro_percent: parseFloat(e.target.value) })}
+                                    value={ticketFees.service_percent} 
+                                    onChange={(e) => setTicketFees({ ...ticketFees, service_percent: parseFloat(e.target.value) })}
                                 />
                             </div>
                         </div>
                     </CardContent>
-                     <CardFooter className="bg-muted/30 pt-6">
+                    <CardFooter className="bg-muted/30 pt-6">
                         <div className="text-xs text-muted-foreground italic">
-                            Los suscriptores verán la diferencia como un "Descuento Especial".
+                            Este precio puede ser modificado por organizadores Plus con su descuento aplicado.
                         </div>
                     </CardFooter>
                 </Card>

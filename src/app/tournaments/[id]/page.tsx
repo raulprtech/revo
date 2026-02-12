@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2, Radio, Eye, DollarSign, Landmark } from "lucide-react";
+import { Gamepad2, Users, Calendar, Trophy, Shield, GitBranch, Loader2, Pencil, Trash2, CheckCircle2, MapPin, Share2, Radio, Eye, DollarSign, Landmark, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bracket, { generateRounds, type Round, type CosmeticsMap } from "@/components/tournaments/bracket";
 import StandingsTable from "@/components/tournaments/standings-table";
@@ -19,6 +19,7 @@ import { PrizeDisplay } from "@/components/tournaments/prize-manager";
 import { OrganizerManager } from "@/components/shared/organizer-manager";
 import { MatchRoomComponent } from "@/components/tournaments/match-room";
 import { DisputeManager } from "@/components/tournaments/dispute-manager";
+import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import {
   AlertDialog,
@@ -43,7 +44,9 @@ import { getDefaultTournamentImage } from "@/lib/utils";
 const formatMapping = {
     'single-elimination': 'Eliminación Simple',
     'double-elimination': 'Doble Eliminación',
-    'swiss': 'Suizo'
+    'swiss': 'Suizo',
+    'round-robin': 'Round Robin',
+    'free-for-all': 'Free for All'
 };
 
 type LocalParticipant = Omit<Participant, 'id' | 'created_at' | 'tournament_id'> & { tournament_id?: string };
@@ -60,12 +63,19 @@ export default function TournamentPage() {
   // Use SWR hooks for tournament data
   const { tournament: fetchedTournament, isLoading: tournamentLoading, refresh: refreshTournament } = useTournament(id);
   const { isParticipating: isParticipantFromHook, isLoading: participantLoading } = useIsParticipating(id);
+  const { participants } = useParticipants(id);
   
   // Local state for tournament (allows updates)
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [linkedEvent, setLinkedEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [isParticipant, setIsParticipant] = useState(false);
+  
+  // Check if user is owner or co-organizer
+  const isOwner = user?.email === tournament?.owner_email || 
+    (tournament?.organizers?.includes(user?.email ?? '') ?? false);
+  const isMainOwner = user?.email === tournament?.owner_email;
+
   const [accessChecked, setAccessChecked] = useState(false);
   const [cosmeticsMap, setCosmeticsMap] = useState<CosmeticsMap>({});
   const [legacyCheckoutLoading, setLegacyCheckoutLoading] = useState(false);
@@ -87,7 +97,8 @@ export default function TournamentPage() {
     const fetchMatchRoom = async () => {
         if (!user || (!isParticipant && !isOwner) || !id) return;
         
-        const { data } = await db.supabase
+        const supabase = createClient();
+        const { data } = await supabase
           .from('match_rooms')
           .select('*')
           .eq('tournament_id', id)
@@ -131,16 +142,11 @@ export default function TournamentPage() {
     setIsParticipant(isParticipantFromHook);
   }, [isParticipantFromHook]);
 
-  // Check if user is owner or co-organizer
-  const isOwner = user?.email === tournament?.owner_email || 
-    (tournament?.organizers?.includes(user?.email ?? '') ?? false);
-  const isMainOwner = user?.email === tournament?.owner_email;
-
   // Real-time updates for disputes
   useEffect(() => {
     if (!isOwner || !id) return;
 
-    const supabase = db.supabase;
+    const supabase = createClient();
     const channel = supabase
       .channel(`dispute-alerts-${id}`)
       .on('postgres_changes', {
@@ -288,9 +294,6 @@ export default function TournamentPage() {
       window.removeEventListener('seedsAssigned', loadBracketData);
     };
   }, [loadBracketData]);
-
-  // Get participants for badge awarding
-  const { participants } = useParticipants(id);
 
   // Function to award badges when tournament finishes
   const awardBadgesToParticipants = async () => {
@@ -640,8 +643,8 @@ export default function TournamentPage() {
       invalidateCache.publicTournaments();
 
       // Trigger Discord Onboarding if available
-      if (tournament.discord_role_id && user.discord_id) {
-          DiscordBotService.onboardParticipant(user.discord_id, tournament.discord_role_id);
+      if (tournament.discord_role_id && user.discordId) {
+          DiscordBotService.onboardParticipant(user.discordId, tournament.discord_role_id);
       }
 
       setIsParticipant(true);
@@ -977,7 +980,7 @@ export default function TournamentPage() {
                           {sponsor.url ? (
                             <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="block transition-transform hover:scale-105">
                               <Image 
-                                src={sponsor.logo} 
+                                src={sponsor.logo || sponsor.logoUrl || ""} 
                                 alt={sponsor.name || "Sponsor"} 
                                 width={120} 
                                 height={60} 
@@ -986,7 +989,7 @@ export default function TournamentPage() {
                             </a>
                           ) : (
                             <Image 
-                              src={sponsor.logo} 
+                              src={sponsor.logo || sponsor.logoUrl || ""} 
                               alt={sponsor.name || "Sponsor"} 
                               width={120} 
                               height={60} 

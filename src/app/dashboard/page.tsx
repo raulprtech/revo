@@ -23,6 +23,7 @@ import { useUserTournaments } from "@/hooks/use-tournaments";
 import { Pagination, paginateArray } from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { coinsService } from "@/lib/coins";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,7 @@ const DASHBOARD_PER_PAGE = 10;
 export default function DashboardPage() {
     const { user, loading: authLoading } = useAuth();
     const { isPro, subscription } = useSubscription();
-    const { balance, cashBalance, dailyAvailable, refresh: refreshCoins } = useCoins();
+    const { wallet, balance, cashBalance, dailyAvailable, refresh: refreshCoins } = useCoins();
     const { toast } = useToast();
     
     // Reinversion State

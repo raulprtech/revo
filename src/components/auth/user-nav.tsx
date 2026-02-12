@@ -12,13 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { LogOut, User, Wrench, LayoutDashboard } from "lucide-react";
+import { LogOut, User, Wrench, LayoutDashboard, CreditCard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth, type AppUser } from "@/lib/supabase/auth-context";
+import { useSubscription } from "@/lib/subscription";
 
 export function UserNav({ user }: { user: AppUser }) {
   const router = useRouter();
   const { signOut } = useAuth();
+  const { isPro } = useSubscription();
 
   const getInitials = (name?: string | null) => {
     if (!name) return "U";
@@ -71,6 +73,13 @@ export function UserNav({ user }: { user: AppUser }) {
             <Link href="/tournaments/create">
               <Wrench className="mr-2 h-4 w-4" />
               <span>Crear Torneo</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/billing">
+              <CreditCard className="mr-2 h-4 w-4" />
+              <span>Facturación</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

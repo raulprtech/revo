@@ -381,7 +381,8 @@ export default function SpectatePage() {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className={cn("container mx-auto px-4 py-6", isOverlay && "max-w-none p-0")}>

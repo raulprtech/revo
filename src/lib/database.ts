@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 export type Sponsor = {
   name: string;
   logo: string;
+  logoUrl?: string; // Standardized URL
   url?: string;
   showInDetails?: boolean;
   showInSpectator?: boolean;
@@ -152,10 +153,18 @@ export type Tournament = {
   entry_fee_currency?: string;
   stripe_payment_link?: string;
   collected_fees?: number;
-  prize_pool_percentage?: { position: number; percentage: number }[];
+  prize_pool_percentage?: { position: string; percentage: number }[];
   bracket_primary_color?: string;
   bracket_secondary_color?: string;
-  sponsor_logos?: { name: string; logoUrl: string; website?: string }[];
+  sponsor_logos?: { 
+    name: string; 
+    logoUrl?: string; 
+    website?: string;
+    logo?: string; // Compatibility with legacy code
+    url?: string;  // Compatibility with legacy code
+    showInDetails?: boolean;
+    showInSpectator?: boolean;
+  }[];
   registration_fields?: {
     id: string;
     label: string;
@@ -216,6 +225,8 @@ export type Profile = {
   discord_id?: string;
   discord_username?: string;
   discord_linked?: boolean;
+  stripe_connect_id?: string;
+  onboarding_completed?: boolean;
   created_at?: string;
   updated_at?: string;
 };

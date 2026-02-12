@@ -28,7 +28,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Autenticación y acción requeridas' }, { status: 401 });
     }
 
-    // Get subscription from DB
+    if (action === 'portal') {
+      // Create customer portal session for billing management
+      const { data: subData } = await supabase
+        .from('subscriptions')
+        .select('stripe_customer_id')
+        .eq('user_email', email)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!subData?.stripe_customer_id) {
+        return NextResponse.json({ error: 'No se encontró un cliente de Stripe asociado a este usuario.' }, { status: 404 });
+      }
+
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: subData.stripe_customer_id,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing`,
+      });
+
+      return NextResponse.json({ url: portalSession.url });
+    }
+
+    // Get subscription from DB for active management (cancel/resume)
     const { data: sub } = await supabase
       .from('subscriptions')
       .select('stripe_subscription_id')
@@ -37,7 +59,7 @@ export async function POST(request: Request) {
       .single();
 
     if (!sub?.stripe_subscription_id) {
-      return NextResponse.json({ error: 'No active subscription found' }, { status: 404 });
+      return NextResponse.json({ error: 'No se encontró una suscripción activa para gestionar.' }, { status: 404 });
     }
 
     if (action === 'cancel') {
@@ -68,27 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 'active' });
     }
 
-    if (action === 'portal') {
-      // Create customer portal session for billing management
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('stripe_customer_id')
-        .eq('user_email', email)
-        .single();
-
-      if (!subData?.stripe_customer_id) {
-        return NextResponse.json({ error: 'No Stripe customer found' }, { status: 404 });
-      }
-
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: subData.stripe_customer_id,
-        return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
-      });
-
-      return NextResponse.json({ url: portalSession.url });
-    }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return NextResponse.json({ error: 'Acción inválida' }, { status: 400 });
   } catch (error) {
     console.error('Error managing subscription:', error);
     return NextResponse.json(

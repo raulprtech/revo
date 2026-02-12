@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { Trophy, Expand, Users, Gamepad2, MapPin } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ReportScoreDialog } from "./report-score-dialog";
 import type { Tournament, GameStation } from "@/lib/database";
 import { Badge } from "@/components/ui/badge";
@@ -443,7 +443,7 @@ export type Match = {
 export type Round = {
     name: string;
     matches: Match[];
-    bracket?: 'winners' | 'losers' | 'finals' | 'swiss';
+    bracket?: 'winners' | 'losers' | 'finals' | 'swiss' | 'round-robin' | 'ffa';
 };
 
 /** Cosmetics data for a single player, keyed by email */

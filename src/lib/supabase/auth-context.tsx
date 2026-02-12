@@ -21,6 +21,7 @@ export type AppUser = {
   // Gaming
   favoriteGames?: string;
   gamingPlatforms?: string;
+  discordId?: string;
   discordUsername?: string;
   twitchUsername?: string;
   // Social
@@ -95,6 +96,7 @@ function mapSupabaseUser(user: User | null): AppUser | null {
     // Gaming
     favoriteGames: meta.favorite_games,
     gamingPlatforms: meta.gaming_platforms,
+    discordId: meta.discord_id,
     discordUsername: meta.discord_username,
     twitchUsername: meta.twitch_username,
     // Social
