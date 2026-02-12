@@ -172,6 +172,8 @@ export interface CoinPackage {
   coin_amount: number;
   bonus_amount: number;
   price_mxn: number;
+  original_price_mxn?: number;
+  is_subscriber_discount?: boolean;
   stripe_price_id: string | null;
   is_featured: boolean;
   is_active: boolean;

@@ -40,6 +40,8 @@ import PlatformIntelligence from "./intelligence/page";
 import RetentionEngine from "./retention/page";
 import CosmeticsManager from "./cosmetics/page";
 import { BurnMasterPilotCard } from "./economy/pilot-mode-card";
+import { RecentBurnActions } from "./economy/recent-actions";
+import { TokenomicsManager } from "./economy/tokenomics-manager";
 import { 
     LineChart, 
     Line, 
@@ -499,7 +501,10 @@ export default function MissionControl() {
                         <Users className="h-4 w-4" /> GHOSTS
                     </TabsTrigger>
                     <TabsTrigger value="economy" className="gap-2 font-bold px-6">
-                        <TrendingUp className="h-4 w-4" /> TOKENOMICS
+                        <TrendingUp className="h-4 w-4" /> BURN MASTER
+                    </TabsTrigger>
+                    <TabsTrigger value="tokenomics" className="gap-2 font-bold px-6 text-amber-500">
+                        <Coins className="h-4 w-4" /> TOKENOMICS
                     </TabsTrigger>
                     <TabsTrigger value="intelligence" className="gap-2 font-bold px-6">
                         <BarChartIcon className="h-4 w-4" /> INTELLIGENCE
@@ -1008,6 +1013,7 @@ export default function MissionControl() {
 
                         <div className="space-y-6">
                             <BurnMasterPilotCard />
+                            <RecentBurnActions />
 
                             <Card className="border-border/50 bg-card">
                                 <CardHeader>
@@ -1107,6 +1113,24 @@ export default function MissionControl() {
                 {/* --- 2.8 STORE ADMIN --- */}
                 <TabsContent value="cosmetics">
                     <CosmeticsManager />
+                </TabsContent>
+
+                {/* --- 2.9 TOKENOMICS & PLANS --- */}
+                <TabsContent value="tokenomics">
+                    <div className="space-y-6">
+                        <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-xl mb-6 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                    <Zap className="h-6 w-6 text-amber-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold font-headline">Tokenomics Lab</h2>
+                                    <p className="text-sm text-muted-foreground italic">Control maestro de spreads, comisiones y planes de monetización.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <TokenomicsManager />
+                    </div>
                 </TabsContent>
 
                 {/* --- 4. GHOST ACCOUNTS --- */}

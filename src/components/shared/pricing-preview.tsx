@@ -5,15 +5,46 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, ArrowRight, Zap, X } from "lucide-react";
-import { PLANS } from "@/lib/plans";
+import { PLANS as STATIC_PLANS, type Plan } from "@/lib/plans";
+import { useEffect, useState } from "react";
+import { db } from "@/lib/database";
 
 /**
  * Compact pricing section to embed in the home page or other pages.
  * Shows both plans side by side with key highlights and CTA buttons.
  */
 export function PricingPreview() {
-  const communityPlan = PLANS[0];
-  const proPlan = PLANS[1];
+  const [plans, setPlans] = useState<Plan[]>(STATIC_PLANS);
+
+  useEffect(() => {
+    async function loadPlans() {
+      try {
+        const dbPlans = await db.getSubscriptionPlans();
+        if (dbPlans && dbPlans.length > 0) {
+          const mappedPlans: Plan[] = dbPlans.map(p => ({
+            id: p.id as any,
+            name: p.name,
+            tagline: p.tagline,
+            price: Number(p.price),
+            currency: p.currency,
+            billingPeriod: p.billing_period as any,
+            badge: p.badge,
+            highlights: p.highlights,
+            cta: p.cta_text,
+            ctaVariant: p.cta_variant as any,
+            popular: p.is_popular
+          }));
+          setPlans(mappedPlans);
+        }
+      } catch (err) {
+        console.error("Error loading plans for preview:", err);
+      }
+    }
+    loadPlans();
+  }, []);
+
+  const communityPlan = plans.find(p => p.id === 'community') || plans[0];
+  const proPlan = plans.find(p => p.id === 'plus') || plans[1];
 
   return (
     <section className="w-full py-12 md:py-24 lg:py-32">

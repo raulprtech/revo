@@ -8,6 +8,8 @@ export type Sponsor = {
   name: string;
   logo: string;
   url?: string;
+  showInDetails?: boolean;
+  showInSpectator?: boolean;
 };
 
 // Badge/Medal types for tournaments and events
@@ -494,6 +496,15 @@ class DatabaseService {
       console.error('Unexpected error in getTournament:', serialized);
       return { tournament: null, status: 0, error: serialized };
     }
+  }
+
+  async hasProAccess(email: string): Promise<boolean> {
+    const { data, error } = await this.supabase.rpc('has_pro_access', { p_email: email });
+    if (error) {
+      console.error('Error checking pro access:', error);
+      return false;
+    }
+    return !!data;
   }
 
   async updateTournament(id: string, updates: UpdateTournamentData): Promise<Tournament> {
@@ -984,6 +995,10 @@ class DatabaseService {
       location: dbTournament.location,
       invited_users: dbTournament.invited_users || [],
       bracket_data: dbTournament.bracket_data || null,
+      bracket_primary_color: dbTournament.bracket_primary_color,
+      bracket_secondary_color: dbTournament.bracket_secondary_color,
+      sponsor_logos: dbTournament.sponsor_logos || [],
+      is_legacy_pro: dbTournament.is_legacy_pro,
       created_at: dbTournament.created_at,
       updated_at: dbTournament.updated_at,
     };
@@ -1719,6 +1734,79 @@ class DatabaseService {
         filter: `id=eq.${roomId}`
       }, callback)
       .subscribe();
+  }
+
+  // --- Platform Settings & Tokenomics ---
+  
+  async getPlatformSettings<T>(key: string): Promise<T | null> {
+    const { data, error } = await this.supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle();
+    
+    if (error || !data) return null;
+    return data.value as T;
+  }
+
+  async updatePlatformSettings(key: string, value: any): Promise<void> {
+    const { error } = await this.supabase
+      .from('platform_settings')
+      .upsert({ key, value, updated_at: new Date().toISOString() });
+    
+    if (error) {
+      console.error('Error updating platform settings:', error);
+      throw error;
+    }
+  }
+
+  async getSubscriptionPlans(): Promise<any[]> {
+    const { data, error } = await this.supabase
+      .from('subscription_plans')
+      .select('*')
+      .order('order_index', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching subscription plans:', error);
+      return [];
+    }
+    return data;
+  }
+
+  async updateSubscriptionPlan(planId: string, updates: any): Promise<void> {
+    const { error } = await this.supabase
+      .from('subscription_plans')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', planId);
+    
+    if (error) {
+      console.error('Error updating subscription plan:', error);
+      throw error;
+    }
+  }
+
+  async addSubscriptionPlan(plan: any): Promise<void> {
+    const { error } = await this.supabase
+      .from('subscription_plans')
+      .insert({ ...plan, updated_at: new Date().toISOString() });
+    
+    if (error) {
+      const errorMsg = `Plan Error [${error.code}]: ${error.message}${error.details ? ' | Details: ' + error.details : ''}${error.hint ? ' | Hint: ' + error.hint : ''}`;
+      console.error('Error adding subscription plan:', errorMsg);
+      throw new Error(errorMsg);
+    }
+  }
+
+  async deleteSubscriptionPlan(planId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('subscription_plans')
+      .delete()
+      .eq('id', planId);
+    
+    if (error) {
+      console.error('Error deleting subscription plan:', error);
+      throw error;
+    }
   }
 }
 

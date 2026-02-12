@@ -71,11 +71,14 @@ export default function TournamentPage() {
   const [legacyCheckoutLoading, setLegacyCheckoutLoading] = useState(false);
   const [showCustomFields, setShowCustomFields] = useState(false);
   const [currentMatchRoom, setCurrentMatchRoom] = useState<any | null>(null);
+  const [hasPro, setHasPro] = useState(false);
 
   // Sync fetched tournament to local state
   useEffect(() => {
     if (fetchedTournament) {
       setTournament(fetchedTournament);
+      // Check for pro access
+      db.hasProAccess(fetchedTournament.owner_email).then(setHasPro);
     }
   }, [fetchedTournament]);
 
@@ -961,6 +964,41 @@ export default function TournamentPage() {
                     </div>
                 )}
               </div>
+
+              {/* Patrocinadores Section */}
+              {hasPro && tournament.sponsor_logos && tournament.sponsor_logos.filter(s => s.showInDetails !== false).length > 0 && (
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">Patrocinadores</h3>
+                  <div className="flex flex-wrap gap-8 items-center">
+                    {tournament.sponsor_logos
+                      .filter(s => s.showInDetails !== false)
+                      .map((sponsor, idx) => (
+                        <div key={idx} className="group relative">
+                          {sponsor.url ? (
+                            <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="block transition-transform hover:scale-105">
+                              <Image 
+                                src={sponsor.logo} 
+                                alt={sponsor.name || "Sponsor"} 
+                                width={120} 
+                                height={60} 
+                                className="h-10 w-auto object-contain grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all"
+                              />
+                            </a>
+                          ) : (
+                            <Image 
+                              src={sponsor.logo} 
+                              alt={sponsor.name || "Sponsor"} 
+                              width={120} 
+                              height={60} 
+                              className="h-10 w-auto object-contain grayscale opacity-70 transition-all"
+                            />
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               {tournament.entry_fee && tournament.entry_fee > 0 && (
                 <div className="flex items-center space-x-3">
                   <DollarSign className="h-8 w-8 text-primary" />

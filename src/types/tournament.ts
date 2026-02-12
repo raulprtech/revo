@@ -16,6 +16,16 @@ export interface Tournament {
   format?: 'single-elimination' | 'double-elimination' | 'swiss' | 'round-robin' | 'free-for-all';
   prizePool?: string;
   invitedUsers?: string[]; // Array of email addresses for private tournaments
+  bracket_primary_color?: string;
+  bracket_secondary_color?: string;
+  sponsor_logos?: { 
+    name: string; 
+    logo: string; 
+    url?: string;
+    showInDetails?: boolean;
+    showInSpectator?: boolean;
+  }[];
+  is_legacy_pro?: boolean;
 }
 
 export interface User {

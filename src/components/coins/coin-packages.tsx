@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
+import { coinsService } from "@/lib/coins";
 import type { CoinPackage } from "@/types/coins";
-import { Coins, Star, Loader2, Crown, Gift, TrendingUp } from "lucide-react";
+import { Coins, Star, Loader2, Crown, Gift, TrendingUp, Zap } from "lucide-react";
 
 export function CoinPackages() {
   const [packages, setPackages] = useState<CoinPackage[]>([]);
@@ -16,11 +17,9 @@ export function CoinPackages() {
     async function fetchPackages() {
       try {
         const supabase = createClient();
-        const { data } = await supabase
-          .from('coin_packages')
-          .select('*')
-          .eq('is_active', true)
-          .order('price_mxn', { ascending: true });
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const data = await coinsService.getCoinPackages(user?.email || undefined);
 
         setPackages(data || []);
       } catch (err) {
@@ -148,8 +147,30 @@ export function CoinPackages() {
 
                 {/* Price */}
                 <div className="text-center py-2 border-t border-b border-border/50">
-                  <span className="text-3xl font-extrabold">${pkg.price_mxn}</span>
-                  <span className="text-sm text-muted-foreground ml-1">MXN</span>
+                  {pkg.is_subscriber_discount ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-sm text-muted-foreground line-through opacity-60">
+                          ${pkg.original_price_mxn?.toFixed(0)}
+                        </span>
+                        <Badge 
+                          variant="secondary" 
+                          className="bg-primary/10 text-primary border-primary/20 text-[9px] uppercase font-black px-1.5 py-0 h-4 border leading-none"
+                        >
+                           Benefit Plus ⚡
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <span className="text-3xl font-extrabold">${pkg.price_mxn}</span>
+                        <span className="text-sm text-muted-foreground ml-1">MXN</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-extrabold">${pkg.price_mxn}</span>
+                      <span className="text-sm text-muted-foreground ml-1">MXN</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Value indicator */}

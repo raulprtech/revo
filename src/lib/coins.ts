@@ -11,6 +11,7 @@ import type {
   CoinPackage,
   TournamentCoinUnlock,
   TournamentUnlockType,
+  CashTransaction,
 } from '@/types/coins';
 import { COIN_REWARDS, COIN_COSTS } from '@/types/coins';
 
@@ -18,7 +19,7 @@ import { COIN_REWARDS, COIN_COSTS } from '@/types/coins';
 // COINS SERVICE — All coin-related operations
 // =============================================
 
-class CoinsService {
+export class CoinsService {
   private get supabase() {
     return createClient();
   }
@@ -594,8 +595,8 @@ class CoinsService {
   // ─── COIN PACKAGES ──────────────────────────
 
   /** Get available coin packages for purchase */
-  async getCoinPackages(): Promise<CoinPackage[]> {
-    const { data, error } = await this.supabase
+  async getCoinPackages(userEmail?: string): Promise<CoinPackage[]> {
+    const { data: packages, error } = await this.supabase
       .from('coin_packages')
       .select('*')
       .eq('is_active', true)
@@ -605,7 +606,46 @@ class CoinsService {
       console.error('Error fetching packages:', error);
       return [];
     }
-    return data || [];
+
+    if (!packages) return [];
+
+    // Apply dynamic spreads
+    const { data: settings } = await this.supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'coins_spreads')
+      .maybeSingle();
+    
+    const spreads = settings?.value || { standard_percent: 10, pro_percent: 5 };
+
+    // Determine user plan for specialized pricing
+    let isPro = false;
+    if (userEmail) {
+      const { data: sub } = await this.supabase
+        .from('subscriptions')
+        .select('plan')
+        .eq('user_email', userEmail)
+        .in('status', ['active', 'trialing'])
+        .maybeSingle();
+      isPro = sub?.plan === 'plus';
+    }
+
+    return packages.map(pkg => {
+      const basePrice = pkg.price_mxn;
+      // Spread included in the price: Standard (10%), Pro (5%)
+      const spreadMultiplier = isPro ? (1 + spreads.pro_percent / 100) : (1 + spreads.standard_percent / 100);
+      const standardMultiplier = (1 + spreads.standard_percent / 100);
+      
+      const finalPrice = Math.round(basePrice * spreadMultiplier * 100) / 100;
+      const standardPrice = Math.round(basePrice * standardMultiplier * 100) / 100;
+
+      return {
+        ...pkg,
+        price_mxn: finalPrice,
+        original_price_mxn: standardPrice, // To show "normal" price for comparison
+        is_subscriber_discount: isPro && finalPrice < standardPrice,
+      };
+    });
   }
 
   /** Credit coins from a package purchase (called after Stripe payment confirmation) */

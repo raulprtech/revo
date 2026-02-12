@@ -17,28 +17,6 @@ import {
 import { Coins, ShoppingBag, Check, Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// ─── Fallback catalog when DB is empty ──────────────
-const FALLBACK_ITEMS: CosmeticItem[] = [
-  // === AVATARES — Bottts Neutral (robots minimalistas) ===
-  { id: 'fb-bottts-1', slug: 'bottts_circuit', name: 'Circuit', description: 'Robot con circuitos integrados', category: 'avatar_collection', price: 20, image_preview: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=circuit', rarity: 'common', metadata: { dicebear_style: 'bottts-neutral', seeds: ['circuit'] }, is_active: true, created_at: '' },
-  { id: 'fb-bottts-2', slug: 'bottts_spark', name: 'Spark', description: 'Robot eléctrico y energético', category: 'avatar_collection', price: 20, image_preview: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=spark', rarity: 'common', metadata: { dicebear_style: 'bottts-neutral', seeds: ['spark'] }, is_active: true, created_at: '' },
-  { id: 'fb-bottts-3', slug: 'bottts_bolt', name: 'Bolt', description: 'Robot veloz como un rayo', category: 'avatar_collection', price: 20, image_preview: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=bolt', rarity: 'common', metadata: { dicebear_style: 'bottts-neutral', seeds: ['bolt'] }, is_active: true, created_at: '' },
-  { id: 'fb-bottts-4', slug: 'bottts_gear', name: 'Gear', description: 'Robot mecánico con engranajes', category: 'avatar_collection', price: 20, image_preview: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=gear', rarity: 'common', metadata: { dicebear_style: 'bottts-neutral', seeds: ['gear'] }, is_active: true, created_at: '' },
-  { id: 'fb-bottts-5', slug: 'bottts_neon', name: 'Neon', description: 'Robot con luces de neón', category: 'avatar_collection', price: 20, image_preview: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=neon', rarity: 'rare', metadata: { dicebear_style: 'bottts-neutral', seeds: ['neon'] }, is_active: true, created_at: '' },
-  { id: 'fb-bottts-6', slug: 'bottts_quantum', name: 'Quantum', description: 'Robot cuántico avanzado', category: 'avatar_collection', price: 20, image_preview: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=quantum', rarity: 'rare', metadata: { dicebear_style: 'bottts-neutral', seeds: ['quantum'] }, is_active: true, created_at: '' },
-  // === MARCOS ===
-  { id: 'fb-frame-1', slug: 'frame_golden', name: 'Marco Dorado', description: 'Un elegante borde dorado para tu avatar', category: 'bracket_frame', price: 100, image_preview: null, rarity: 'common', metadata: { border_color: '#FFD700', border_style: 'solid', border_width: 3, glow: false }, is_active: true, created_at: '' },
-  { id: 'fb-frame-2', slug: 'frame_neon_blue', name: 'Neón Azul', description: 'Borde luminoso en tono azul eléctrico', category: 'bracket_frame', price: 150, image_preview: null, rarity: 'rare', metadata: { border_color: '#00D4FF', border_style: 'solid', border_width: 2, glow: true, glow_color: '#00D4FF' }, is_active: true, created_at: '' },
-  { id: 'fb-frame-3', slug: 'frame_fire', name: 'Marco de Fuego', description: 'Borde animado con efecto de llamas', category: 'bracket_frame', price: 300, image_preview: null, rarity: 'epic', metadata: { border_color: '#FF4500', border_style: 'animated', animation: 'fire', glow: true, glow_color: '#FF6B00' }, is_active: true, created_at: '' },
-  { id: 'fb-frame-4', slug: 'frame_legendary', name: 'Marco Legendario', description: 'El máximo prestigio: borde arcoíris animado', category: 'bracket_frame', price: 500, image_preview: null, rarity: 'legendary', metadata: { border_style: 'animated', animation: 'rainbow', glow: true, gradient: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'] }, is_active: true, created_at: '' },
-  // === BANNERS ===
-  { id: 'fb-banner-1', slug: 'banner_galaxy', name: 'Galaxia', description: 'Fondo de galaxia con estrellas', category: 'profile_banner', price: 350, image_preview: null, rarity: 'legendary', metadata: { gradient: ['#0c0d13','#1a1a2e','#16213e','#0f3460'], pattern: 'stars', animated: true }, is_active: true, created_at: '' },
-  { id: 'fb-banner-2', slug: 'banner_fire_gradient', name: 'Fuego Vivo', description: 'Gradiente de tonos cálidos y ardientes', category: 'profile_banner', price: 80, image_preview: null, rarity: 'common', metadata: { gradient: ['#f12711', '#f5af19'], pattern: 'none' }, is_active: true, created_at: '' },
-  // === COLORES DE NICKNAME ===
-  { id: 'fb-nick-1', slug: 'nick_gold', name: 'Nombre Dorado', description: 'Tu nickname brilla en dorado', category: 'nickname_color', price: 100, image_preview: null, rarity: 'common', metadata: { color: '#FFD700', gradient: false }, is_active: true, created_at: '' },
-  { id: 'fb-nick-2', slug: 'nick_rainbow', name: 'Nombre Arcoíris', description: 'Tu nickname con todos los colores', category: 'nickname_color', price: 400, image_preview: null, rarity: 'legendary', metadata: { gradient: true, animated: true, colors: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'] }, is_active: true, created_at: '' },
-];
-
 export function CosmeticsShop() {
   const { user } = useAuth();
   const { balance, refresh: refreshWallet } = useCoins();
@@ -75,12 +53,8 @@ export function CosmeticsShop() {
       if (response.ok) {
         const data = await response.json();
         const fetchedItems = data.items || [];
-        // Use fallback catalog if DB is empty
-        setItems(fetchedItems.length > 0 ? fetchedItems : FALLBACK_ITEMS);
+        setItems(fetchedItems);
         setOwnedIds(new Set(data.owned || []));
-      } else {
-        // API error — show fallback items anyway
-        setItems(FALLBACK_ITEMS);
       }
 
       // Fetch equipped
@@ -95,10 +69,6 @@ export function CosmeticsShop() {
       }
     } catch (err) {
       console.error('Error fetching shop:', err);
-      // On any error, show fallback items so the shop is never empty
-      if (items.length === 0) {
-        setItems(FALLBACK_ITEMS);
-      }
     } finally {
       setIsLoading(false);
     }

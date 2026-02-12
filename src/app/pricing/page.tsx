@@ -27,16 +27,19 @@ import {
   Landmark,
 } from "lucide-react";
 import {
-  PLANS,
+  PLANS as STATIC_PLANS,
   PLAN_FEATURES,
   CATEGORY_LABELS,
   EVENT_PAYMENT_PLAN,
   type PlanFeature,
   type FeatureCategory,
+  type Plan,
 } from "@/lib/plans";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { useSubscription } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/database";
+import { useEffect } from "react";
 
 const CATEGORY_ICONS: Record<FeatureCategory, React.ReactNode> = {
   tournaments: <Gamepad2 className="h-5 w-5" />,
@@ -192,13 +195,43 @@ function CategoryGroup({
 }
 
 export default function PricingPage() {
-  const communityPlan = PLANS[0];
-  const proPlan = PLANS[1];
+  const [plans, setPlans] = useState<Plan[]>(STATIC_PLANS);
   const { user } = useAuth();
   const { isPro, isLoading: subLoading } = useSubscription();
   const { toast } = useToast();
   const router = useRouter();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadPlans() {
+      try {
+        const dbPlans = await db.getSubscriptionPlans();
+        if (dbPlans && dbPlans.length > 0) {
+          // Map DB schema to Plan interface
+          const mappedPlans: Plan[] = dbPlans.map(p => ({
+            id: p.id as any,
+            name: p.name,
+            tagline: p.tagline,
+            price: Number(p.price),
+            currency: p.currency,
+            billingPeriod: p.billing_period as any,
+            badge: p.badge,
+            highlights: p.highlights,
+            cta: p.cta_text,
+            ctaVariant: p.cta_variant as any,
+            popular: p.is_popular
+          }));
+          setPlans(mappedPlans);
+        }
+      } catch (err) {
+        console.error("Error loading plans:", err);
+      }
+    }
+    loadPlans();
+  }, []);
+
+  const communityPlan = plans.find(p => p.id === 'community') || plans[0];
+  const proPlan = plans.find(p => p.id === 'plus') || plans[1];
 
   const handleUpgradeToPro = async () => {
     if (!user?.email) {

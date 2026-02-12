@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Palette, Image as ImageIcon, Plus, Trash2, ExternalLink, Zap } from "lucide-react";
+import { Palette, Image as ImageIcon, Plus, Trash2, ExternalLink, Zap, Eye, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useSubscription, ProUpgradePrompt } from "@/lib/subscription";
 import type { Sponsor } from "@/lib/database";
 
@@ -71,6 +72,8 @@ export function BracketBrandingEditor({ branding, onChange }: BracketBrandingEdi
       name: newSponsor.name,
       logo: newSponsor.logo,
       url: newSponsor.url || undefined,
+      showInDetails: true,
+      showInSpectator: true,
     };
     onChange({
       ...branding,
@@ -258,6 +261,36 @@ export function BracketBrandingEditor({ branding, onChange }: BracketBrandingEdi
                         {sponsor.url}
                       </a>
                     )}
+                    <div className="flex items-center gap-4 mt-2">
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox 
+                          id={`show-details-${idx}`}
+                          checked={sponsor.showInDetails !== false}
+                          onCheckedChange={(checked) => {
+                            const newSponsors = [...branding.sponsorLogos];
+                            newSponsors[idx] = { ...sponsor, showInDetails: !!checked };
+                            onChange({ ...branding, sponsorLogos: newSponsors });
+                          }}
+                        />
+                        <Label htmlFor={`show-details-${idx}`} className="text-[10px] cursor-pointer flex items-center gap-1">
+                          <Eye className="h-3 w-3" /> Detalles
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox 
+                          id={`show-spectator-${idx}`}
+                          checked={sponsor.showInSpectator !== false}
+                          onCheckedChange={(checked) => {
+                            const newSponsors = [...branding.sponsorLogos];
+                            newSponsors[idx] = { ...sponsor, showInSpectator: !!checked };
+                            onChange({ ...branding, sponsorLogos: newSponsors });
+                          }}
+                        />
+                        <Label htmlFor={`show-spectator-${idx}`} className="text-[10px] cursor-pointer flex items-center gap-1">
+                          <Monitor className="h-3 w-3" /> Espectador
+                        </Label>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     type="button"

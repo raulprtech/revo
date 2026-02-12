@@ -28,16 +28,76 @@ import { useTournamentRealtime, type TournamentRealtimeEvent } from "@/hooks/use
 import { getDefaultTournamentImage } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { Copy, Video, ShieldCheck } from "lucide-react";
+
+function BrandingSponsors({ tournament, ownerIsPro, isOverlay = false }: { tournament: Tournament; ownerIsPro: boolean, isOverlay?: boolean }) {
+  return (
+    <div className={cn(
+      "flex items-center gap-4",
+      isOverlay && "bg-background/80 backdrop-blur-md p-2 px-4 rounded-xl border"
+    )}>
+      {!ownerIsPro ? (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
+          <span className="text-[8px] font-black uppercase text-primary/70 tracking-tighter">Powered by</span>
+          <span className="text-xs font-black italic tracking-tighter text-primary">DUELS ESPORTS</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          {tournament.sponsor_logos && tournament.sponsor_logos.filter(s => s.showInSpectator !== false).length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[8px] font-black uppercase opacity-40 mr-1">Sponsors</span>
+              <div className="flex items-center -space-x-2">
+                {tournament.sponsor_logos
+                  .filter(sponsor => sponsor.showInSpectator !== false)
+                  .map((sponsor, idx) => (
+                    <div key={idx} className="h-8 w-8 rounded-full border-2 border-background overflow-hidden bg-white/5 shadow-xl transition-transform hover:scale-110 hover:z-10" title={sponsor.name}>
+                      {sponsor.logo ? (
+                        <img src={sponsor.logo} alt={sponsor.name} className="h-full w-full object-contain p-1" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-[10px] font-bold bg-muted">{sponsor.name[0]}</div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          <div className="h-4 w-[1px] bg-border mx-1" />
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-3 w-3 text-emerald-500" />
+            <span className="text-[10px] font-black uppercase tracking-wider">Verified Pro</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SpectatePage() {
   const params = useParams();
   const id = params.id as string;
+  const { toast } = useToast();
+  
+  const [isOverlay, setIsOverlay] = useState(false);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    setIsOverlay(searchParams.get("overlay") === "true");
+  }, []);
 
   const { tournament, isLoading: tournamentLoading, refresh: refreshTournament } = useTournament(id);
   const { participants } = useParticipants(id);
 
   const [rounds, setRounds] = useState<Round[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [ownerIsPro, setOwnerIsPro] = useState(false);
+
+  useEffect(() => {
+    if (tournament?.owner_email) {
+      db.hasProAccess(tournament.owner_email).then(setOwnerIsPro);
+    }
+  }, [tournament?.owner_email]);
+
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [updatedMatchIds, setUpdatedMatchIds] = useState<Set<number>>(new Set());
   const [spectatorCount] = useState(() => Math.floor(Math.random() * 20) + 1);
@@ -212,12 +272,14 @@ export default function SpectatePage() {
   return (
     <div
       className={cn(
-        "min-h-screen bg-background",
+        "min-h-screen",
+        isOverlay ? "bg-transparent overflow-hidden" : "bg-background",
         isFullscreen && "p-4"
       )}
     >
       {/* Header Bar */}
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+      {!isOverlay && (
+        <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             {/* Left: Back + Tournament info */}
@@ -279,7 +341,28 @@ export default function SpectatePage() {
             </div>
 
             {/* Right: Fullscreen + format */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              {tournament && (
+                <BrandingSponsors tournament={tournament} ownerIsPro={ownerIsPro} />
+              )}
+              <div className="h-6 w-[1px] bg-border mx-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden lg:flex gap-1.5 h-8 text-[10px] font-black uppercase"
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("overlay", "true");
+                  navigator.clipboard.writeText(url.toString());
+                  toast({
+                    title: "Link de OBS Copiado",
+                    description: "Pega esto como 'Browser Source' en tu OBS (Fondo transparente).",
+                  });
+                }}
+              >
+                <Video className="h-3 w-3" />
+                OBS Overlay
+              </Button>
               <Badge variant="secondary" className="hidden md:flex">
                 {formatMapping[tournament.format] || tournament.format}
               </Badge>
@@ -301,8 +384,13 @@ export default function SpectatePage() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        {lastUpdate && (
+      <div className={cn("container mx-auto px-4 py-6", isOverlay && "max-w-none p-0")}>
+        {isOverlay && tournament && (
+          <div className="fixed top-6 right-6 z-[100] animate-in slide-in-from-right duration-700">
+            <BrandingSponsors tournament={tournament} ownerIsPro={ownerIsPro} isOverlay />
+          </div>
+        )}
+        {!isOverlay && lastUpdate && (
           <p className="text-xs text-muted-foreground text-right mb-2">
             Última actualización:{" "}
             {lastUpdate.toLocaleTimeString("es-ES", {
@@ -313,7 +401,18 @@ export default function SpectatePage() {
           </p>
         )}
 
-        <Tabs defaultValue="bracket" className="w-full">
+        {isOverlay ? (
+          <div className="scale-90 transform-gpu origin-top">
+             <LiveBracket
+              rounds={rounds}
+              format={tournament.format}
+              gameMode={tournament.game_mode}
+              updatedMatchIds={updatedMatchIds}
+              cosmeticsMap={cosmeticsMap}
+            />
+          </div>
+        ) : (
+          <Tabs defaultValue="bracket" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="bracket" className="gap-1.5">
               <Trophy className="h-4 w-4" />
@@ -347,10 +446,12 @@ export default function SpectatePage() {
             </TabsContent>
           )}
         </Tabs>
+        )}
       </div>
 
       {/* Footer info bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t py-2 px-4">
+      {!isOverlay && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t py-2 px-4">
         <div className="container mx-auto flex items-center justify-between text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Eye className="h-3.5 w-3.5" />
@@ -365,6 +466,7 @@ export default function SpectatePage() {
           </span>
         </div>
       </div>
+      )}
     </div>
   );
 }
