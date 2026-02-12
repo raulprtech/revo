@@ -955,6 +955,20 @@ export default function TournamentPage() {
                         </div>
                     </div>
                 )}
+                {tournament.discord_settings?.channels && (
+                    <div className="flex items-center space-x-3">
+                        <MessageCircle className="h-8 w-8 text-[#5865F2]" />
+                        <div>
+                        <p className="text-sm font-medium">Discord</p>
+                        <Button variant="link" className="p-0 h-auto text-lg text-[#5865F2] hover:text-[#5865F2]/80" asChild>
+                           <a href="https://discord.gg/duels-revo" target="_blank" rel="noopener noreferrer">
+                              Unirse al servidor
+                           </a>
+                        </Button>
+                        <p className="text-xs text-muted-foreground">ID Rol: {tournament.discord_role_id}</p>
+                        </div>
+                    </div>
+                )}
                 {linkedEvent && (
                     <div className="flex items-center space-x-3">
                         <Calendar className="h-8 w-8 text-accent" />

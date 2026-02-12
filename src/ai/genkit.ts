@@ -36,20 +36,26 @@ export const arbiterFlow = ai.defineFlow(
     }
 
     const response = await ai.generate({
-      prompt: `Analiza esta captura de pantalla del juego. 
-               Identifica el marcador final para ${input.p1_name} y ${input.p2_name}. 
-               Si la imagen es borrosa o ambigua, marca needs_human como true.`,
-      // En una implementación real, aquí pasaríamos la imagen como parte del mensaje multipart
+      prompt: [
+        { text: `Analiza esta captura de pantalla de un videojuego. 
+               Tu tarea es actuar como un árbitro oficial de eSports.
+               1. Identifica a los jugadores: ${input.p1_name} y ${input.p2_name}.
+               2. Extrae el marcador final de la partida para cada uno.
+               3. Si la captura es ambigua, de baja calidad, o no muestra claramente el final de la partida, marca needs_human como true.
+               4. Explica brevemente tu razonamiento.`
+        },
+        { media: { url: input.screenshot_url, contentType: 'image/jpeg' } }
+      ],
+      outputStructure: z.object({
+        p1_score: z.number(),
+        p2_score: z.number(),
+        confidence: z.number(),
+        reasoning: z.string(),
+        needs_human: z.boolean(),
+      })
     });
     
-    // Simulación de lógica de arbitraje
-    return {
-        p1_score: 2,
-        p2_score: 1,
-        confidence: 0.95,
-        reasoning: "Detección clara de HUD superior",
-        needs_human: false
-    };
+    return response.output;
   }
 );
 

@@ -27,9 +27,16 @@ Duels Esports es una plataforma automatizada para la creación y gestión de tor
 - **Duels Cash:** Saldo retirable a moneda fiat (MXN).
 - **Control de Comisiones:** Configuración administrativa de spreads, comisiones de retiro y cargos por servicio.
 
-### 4. Comunidad y Discord
+### 4. Comunidad y Discord (Configuración Final)
 - **Onboarding Automático:** Creación de categorías, canales y roles temporales en Discord al iniciar un torneo.
 - **Integración de Identidad:** Mapeo de perfiles de Discord con cuentas de Duels.
+- **Discord Bridge:** API interna para automatizar acciones de bot sin necesidad de un backend externo para comandos básicos.
+
+#### Requiere para producción:
+```bash
+DISCORD_BOT_TOKEN=tu_token_aqui
+DISCORD_GUILD_ID=id_de_tu_servidor
+```
 
 ## ⚙️ Variables de Entorno (.env)
 Para que la plataforma funcione correctamente, se requieren las siguientes claves:

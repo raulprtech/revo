@@ -246,9 +246,8 @@ export function ReportScoreDialog({ isOpen, onOpenChange, match, onScoreReported
 
   async function onSubmit(values: z.infer<typeof reportScoreSchema>) {
     setLoading(true);
-    // Simulación de una llamada a la API
-    await new Promise(resolve => setTimeout(resolve, 500));
     
+    // El reporte se maneja a través de la prop onScoreReported que actualiza el estado y persiste en DB
     onScoreReported({ top: values.topScore, bottom: values.bottomScore });
     
     setLoading(false);

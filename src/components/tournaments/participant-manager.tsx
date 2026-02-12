@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db, type Participant as DbParticipant } from "@/lib/database";
 import { useParticipants, useTournament, invalidateCache } from "@/hooks/use-tournaments";
 import { ProFeatureGate } from "@/lib/subscription";
+import { DiscordBotService } from "@/lib/discord-bot-service";
 
 type Participant = DbParticipant;
 type FilterStatus = 'all' | 'pending-checkin' | 'checked-in' | 'pending' | 'accepted' | 'rejected';
@@ -150,6 +151,15 @@ export default function ParticipantManager({ tournamentId, onTournamentStart }: 
         try {
             const updated = await db.updateParticipant(participantId, { status: newStatus });
             
+            // Discord Onboarding if accepted
+            if (newStatus === 'Aceptado' && tournament?.discord_role_id) {
+                // If the user has a linked discord account in their profile, onboard them
+                const profile = await db.getProfile(updated.email);
+                if (profile?.discord_id) {
+                    await DiscordBotService.onboardParticipant(profile.discord_id, tournament.discord_role_id);
+                }
+            }
+
             // Invalidate cache to refresh data
             invalidateCache.participants(tournamentId);
             
